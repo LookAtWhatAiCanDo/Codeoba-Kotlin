@@ -121,6 +121,27 @@ object SettingsManager {
     fun setCacheEnabled(value: Boolean) {
         prefs.putBoolean("cache_enabled", value)
     }
+
+    fun getSidebarSortBy(): SidebarSortDimension {
+        val name = prefs.get("sidebar_sort_by", SidebarSortDimension.UPDATED.name)
+        return try {
+            SidebarSortDimension.valueOf(name)
+        } catch (e: Exception) {
+            SidebarSortDimension.UPDATED
+        }
+    }
+
+    fun setSidebarSortBy(value: SidebarSortDimension) {
+        prefs.put("sidebar_sort_by", value.name)
+    }
+
+    fun getSidebarSortAscending(): Boolean {
+        return prefs.getBoolean("sidebar_sort_ascending", false)
+    }
+
+    fun setSidebarSortAscending(value: Boolean) {
+        prefs.putBoolean("sidebar_sort_ascending", value)
+    }
 }
 
 fun SourceAdapter.isEffectiveEnabled(): Boolean {

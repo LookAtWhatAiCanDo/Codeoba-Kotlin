@@ -62,6 +62,70 @@ fun Sidebar(
 ) {
     var toastMessage by remember { mutableStateOf<String?>(null) }
 
+    var sortBy by remember { mutableStateOf(SettingsManager.getSidebarSortBy()) }
+    var sortAscending by remember { mutableStateOf(SettingsManager.getSidebarSortAscending()) }
+
+    LaunchedEffect(sortBy, sortAscending) {
+        SettingsManager.setSidebarSortBy(sortBy)
+        SettingsManager.setSidebarSortAscending(sortAscending)
+    }
+
+    val availableDimensions = remember(queryValue.text) {
+        if (queryValue.text.isNotEmpty()) {
+            SidebarSortDimension.entries
+        } else {
+            SidebarSortDimension.entries.filter { it != SidebarSortDimension.RELEVANCE }
+        }
+    }
+
+    val effectiveSortBy = remember(sortBy, queryValue.text) {
+        if (sortBy == SidebarSortDimension.RELEVANCE && queryValue.text.isEmpty()) {
+            SidebarSortDimension.UPDATED
+        } else {
+            sortBy
+        }
+    }
+
+    val sortedSearchResults = remember(searchResults, effectiveSortBy, sortAscending) {
+        if (effectiveSortBy == SidebarSortDimension.RELEVANCE) {
+            if (sortAscending) {
+                searchResults.sortedWith(
+                    compareBy<SearchResult> { it.score }
+                        .thenBy { it.session.updatedAt }
+                )
+            } else {
+                searchResults.sortedWith(
+                    compareByDescending<SearchResult> { it.score }
+                        .thenByDescending { it.session.updatedAt }
+                )
+            }
+        } else {
+            val comparator = when (effectiveSortBy) {
+                SidebarSortDimension.UPDATED -> compareBy<SearchResult> { it.session.updatedAt }
+                SidebarSortDimension.TOKENS -> compareBy<SearchResult> {
+                    val charCount = it.session.turns.sumOf { turn -> turn.userMessage.length + turn.assistantMessage.length }
+                    charCount / 4
+                }
+                SidebarSortDimension.SPEED -> compareBy<SearchResult> {
+                    val charCount = it.session.turns.sumOf { turn -> turn.userMessage.length + turn.assistantMessage.length }
+                    val estTokens = charCount / 4
+                    val durationMs = getSessionComputeTimeMs(it.session)
+                    if (durationMs > 0) {
+                        (estTokens.toDouble() * 1000.0) / durationMs
+                    } else 0.0
+                }
+                SidebarSortDimension.TURNS -> compareBy<SearchResult> { it.session.turns.size }
+                SidebarSortDimension.DURATION -> compareBy<SearchResult> { getSessionComputeTimeMs(it.session) }
+                else -> compareBy<SearchResult> { it.session.updatedAt }
+            }
+            if (sortAscending) {
+                searchResults.sortedWith(comparator)
+            } else {
+                searchResults.sortedWith(comparator.reversed())
+            }
+        }
+    }
+
     LaunchedEffect(toastMessage) {
         if (toastMessage != null) {
             kotlinx.coroutines.delay(2000)
@@ -355,6 +419,85 @@ fun Sidebar(
 
             Spacer(modifier = Modifier.height(6.dp))
 
+            // Sort Section
+            Text(
+                text = "Sort by",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextSecondary,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(bottom = 2.dp)
+            )
+
+            val sortScrollState = rememberScrollState()
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(sortScrollState),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    availableDimensions.forEach { dimension ->
+                        val isSelected = effectiveSortBy == dimension
+                        val arrowIcon = if (sortAscending) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isSelected) AccentCyan.copy(alpha = 0.15f) else CardSurface)
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) AccentCyan else BorderColor,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable {
+                                    if (sortBy == dimension) {
+                                        sortAscending = !sortAscending
+                                    } else {
+                                        sortBy = dimension
+                                        sortAscending = false
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = dimension.displayName,
+                                    color = if (isSelected) AccentCyan else TextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    lineHeight = 12.sp,
+                                    modifier = Modifier.offset(y = 1.dp)
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = arrowIcon,
+                                        contentDescription = if (sortAscending) "Sorted Ascending" else "Sorted Descending",
+                                        tint = AccentCyan,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                if (sortScrollState.maxValue > 0) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    HorizontalScrollbar(
+                        modifier = Modifier.fillMaxWidth().height(4.dp),
+                        adapter = rememberScrollbarAdapter(scrollState = sortScrollState),
+                        style = defaultScrollbarStyle().copy(
+                            unhoverColor = AccentCyan.copy(alpha = 0.2f),
+                            hoverColor = AccentCyan.copy(alpha = 0.6f),
+                            thickness = 4.dp
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
             // Indexing Progress or Title
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -418,7 +561,7 @@ fun Sidebar(
                             .padding(end = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        searchResults.forEach { result ->
+                        sortedSearchResults.forEach { result ->
                             SessionItem(
                                 result = result,
                                 isSelected = selectedSession?.id == result.session.id,
@@ -740,4 +883,13 @@ fun SessionItem(
         }
     }
 }
+}
+
+enum class SidebarSortDimension(val displayName: String) {
+    RELEVANCE("Relevance"),
+    UPDATED("Updated"),
+    TOKENS("Tokens"),
+    SPEED("Speed"),
+    TURNS("Turns"),
+    DURATION("Duration")
 }

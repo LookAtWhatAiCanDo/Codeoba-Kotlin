@@ -648,11 +648,11 @@ class SourceParsersTest {
             val session = source.parseSession(targetPath)
             assertNotNull(session)
             println("SESSION PARSED SUCCESSFULLY! Turns: ${session.turns.size}")
-            session.turns.forEachIndexed { idx, turn ->
-                println("--- TURN $idx ---")
-                val parts = tempParseAssistantMessage(turn.assistantMessage)
-                parts.forEachIndexed { pIdx, part ->
-                    println("  PART $pIdx: $part")
+            val turn = session.turns[0]
+            val parts = tempParseAssistantMessage(turn.assistantMessage)
+            for (pIdx in 22..28) {
+                if (pIdx < parts.size) {
+                    println("  PART $pIdx: ${parts[pIdx]}")
                 }
             }
         } else {

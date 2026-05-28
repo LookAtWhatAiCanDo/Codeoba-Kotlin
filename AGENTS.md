@@ -125,6 +125,11 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Centralizes common parsing caching logic, directory checking (`getBaseDir()`), availability/installation checks (`isAvailable()`, `isExecutableInstalled(binaryName)`), and session data cleanup (`deleteDataPaths()`, `getDataPathsToDelete()`) into the shared base class `./core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/DesktopSourceAdapter.kt`.
     - File-based sources (Claude, Codex, Antigravity, Aider) implement `parseSessionContent(File)` and benefit from automated file metadata check/cache write on miss.
     - Database-based sources (Cursor) override `parseSession(String)` directly to bypass file-based caching and implement custom SQLite row hashing.
+17. **Conversations Sidebar List Sorting**:
+    - The left-side conversations sidebar displays a "Sort by" section with interactive horizontal chips: Relevance (only when a search query is active), Updated, Tokens, Speed, Turns, and Duration.
+    - Selecting a chip sorts the indexed conversation sessions dynamically. Numeric/temporal metrics default to descending order on first click. Toggling the active chip flips the sorting direction.
+    - If the search query becomes empty, the active sort option falls back from Relevance to Updated automatically.
+    - The sorting preference (sortBy and sortAscending) is persistently stored via `SettingsManager` (Java Preferences API) to remain persistent across application launches.
 
 ---
 

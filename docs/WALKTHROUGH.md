@@ -167,6 +167,16 @@ To improve user workflow and data accessibility, we added support for copying a 
 
 ---
 
+## ↕️ Conversations Sidebar List Sorting
+
+To easily navigate and locate conversations based on size, speed, and time, we added sorting capabilities directly in the left-side sidebar:
+1. **Interactive Sorting Row**: Placed a horizontal, scrollable row of chips (Relevance, Updated, Tokens, Speed, Turns, Duration) right above the conversations list.
+2. **Relevance Option**: Automatically visible when a search query is typed, allowing sorting by score. If the query is empty, it hides and falls back to "Updated" sorting.
+3. **Persisted Settings**: The sorting preferences are persisted via `SettingsManager` using Java Preferences API, so they remain persistent across application restarts.
+4. **Intuitive Defaults**: On first click, sorting defaults to descending order for all numeric and chronological fields, and switches direction on subsequent clicks.
+
+---
+
 ## 🧪 Verification Plan
 
 
@@ -202,9 +212,16 @@ To improve user workflow and data accessibility, we added support for copying a 
    - Click the "Help" menu in the desktop MenuBar.
    - Click "Google AI Studio Status", "Anthropic Status", "OpenAI Status", or "Cursor Status".
    - Verify that the link opens correctly in your default web browser.
-
 8. **Verify Context Menu Path Copying**:
    - Right-click on any conversation list item in the sidebar.
    - Verify that a context menu with "Copy Source File Path" appears.
    - Click the menu item and verify that a premium checkmark toast ("Source file path copied to clipboard") appears at the bottom center of the sidebar and fades away after 2 seconds.
    - Paste the clipboard contents to confirm the absolute path of the session file was copied.
+9. **Verify Sidebar List Sorting**:
+   - Run the application. Notice the "Sort by" chips row above the conversation list.
+   - Click "Tokens" and verify the list is sorted by total estimated tokens descending.
+   - Click "Turns" and verify it's sorted by turns descending.
+   - Click "Duration" and verify it's sorted by compute time.
+   - Click "Speed" and verify it's sorted by token speed.
+   - Type a query, click "Relevance" to sort by search match score. Clear the search and verify it falls back to "Updated".
+
