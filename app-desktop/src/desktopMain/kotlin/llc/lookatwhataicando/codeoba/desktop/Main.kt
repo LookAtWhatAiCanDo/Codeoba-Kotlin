@@ -203,7 +203,18 @@ internal fun openUrl(url: String) {
     }
 }
 
-fun main() {
+@Volatile
+var cacheOverride: Boolean? = null
+
+fun main(args: Array<String>) {
+    if (args.contains("--no-cache")) {
+        cacheOverride = false
+        log("Main: Caching disabled via command-line option --no-cache.")
+    } else if (args.contains("--cache")) {
+        cacheOverride = true
+        log("Main: Caching enabled via command-line option --cache.")
+    }
+
     System.setProperty("apple.awt.application.name", "Codeoba")
     System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Codeoba")
     val sources = listOf(
@@ -434,7 +445,12 @@ fun mainEntry() = application {
         isIndexing = true
         try {
             activeIndexManager?.stopWatchers()
-            val manager = IndexManager(sourceRegistry, currentEngine, scope)
+            val manager = IndexManager(
+                sourceRegistry = sourceRegistry,
+                searchEngine = currentEngine,
+                scope = scope,
+                cacheEnabled = cacheOverride ?: SettingsManager.getCacheEnabled()
+            )
             activeIndexManager = manager
             manager.addIndexUpdatedListener {
                 log("Main UI: Index update callback received")

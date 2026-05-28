@@ -69,11 +69,13 @@ interface SourceAdapter {
 ```
 
 ### Implementations:
-1. **`DesktopCursorSource`**: Parses Cursor's global SQLite (`state.vscdb`). Filters sessions against each workspace's local `allComposers` list to exclude deleted sessions.
-2. **`DesktopClaudeSource`**: Parses JSONL log files under `~/.claude/projects/`.
-3. **`DesktopAntigravitySource`**: Parses Antigravity's JSONL files, extracting settings changes (e.g., `<USER_SETTINGS_CHANGE>`), system messages (e.g., background compile logs), and tool execution error logs.
-4. **`DesktopCodexSource`**: Indexes JSONL logs under `~/.codex/`.
-5. **`DesktopAiderSource`**: Reads and tokenizes Markdown logs (`.aider.chat.history.md`).
+All desktop source implementations inherit from the abstract base class [DesktopSourceAdapter](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/DesktopSourceAdapter.kt) under `desktopMain`, which centralizes common caching, folder validation (`getBaseDir()`), directory deletion, and command execution availability checking.
+
+1. **`DesktopCursorSource`**: Parses Cursor's global SQLite (`state.vscdb`). Filters sessions against each workspace's local `allComposers` list to exclude deleted sessions. Overrides the base `parseSession` to handle row-level database hashing.
+2. **`DesktopClaudeSource`**: Parses JSONL log files under `~/.claude/projects/`. Implements `parseSessionContent(File)`.
+3. **`DesktopAntigravitySource`**: Parses Antigravity's JSONL files, extracting settings changes (e.g., `<USER_SETTINGS_CHANGE>`), system messages (e.g., background compile logs), and tool execution error logs. Implements `parseSessionContent(File)`.
+4. **`DesktopCodexSource`**: Indexes JSONL logs under `~/.codex/`. Implements `parseSessionContent(File)`.
+5. **`DesktopAiderSource`**: Reads and tokenizes Markdown logs (`.aider.chat.history.md`). Implements `parseSessionContent(File)`.
 
 ---
 
@@ -82,7 +84,12 @@ interface SourceAdapter {
 - **`LexicalSearchEngine`**: Keyword query match using term frequency ranking.
 - **`SemanticSearchEngine`**: Concept similarity ranking using local hashing-based embeddings and cosine distance.
 - **`SearchFilter`**: Restricts search results by source IDs, timestamp ranges, workspace paths, and session archival status (`ArchivalFilter`).
-- **`IndexManager`**: In-memory thread-safe cache updating in `<5ms` via background NIO folder watchers.
+- **`IndexManager`**: Coordinates scanning, index updates, directory watchers, and timing instrumentation.
+- **`SessionCacheManager`**: Persistently caches pre-parsed `Session` models under `~/.codeoba/cache/cache_<sourceId>.json` using `kotlinx.serialization` to avoid expensive startup JSON/Markdown parsing and semantic embedding computation:
+  - File-based sources: Check file metadata (path, size, modification timestamp) to hit cache instantly.
+  - Database-based sources (Cursor): Compute string MD5 hashes on SQLite values in memory to hit cache without JSON parsing.
+  - Pruning: Automatically deletes orphaned cache entries for sessions that are no longer present on disk during scans.
+- **`Startup Profiler`**: Measures and formats log reports of exact scanning times and percentages for all registered active source adapters. Together with the persistent caching layer, this reduces the average startup log scanning/load time from ~2.5s down to ~0.25s (a ~90% optimization).
 - **SQLite WAL**: Uses `mode=ro` (read-only) without `immutable` to safely query Cursor’s database concurrently in real time.
 
 ---

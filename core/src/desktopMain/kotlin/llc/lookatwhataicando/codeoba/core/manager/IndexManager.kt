@@ -14,7 +14,8 @@ import java.io.File
 class IndexManager(
     private val sourceRegistry: SourceRegistry,
     private val searchEngine: SearchEngine,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val cacheEnabled: Boolean = true
 ) {
     private val watchers = mutableListOf<DirectoryWatcher>()
     private var isScanning = false
@@ -34,20 +35,62 @@ class IndexManager(
         log("IndexManager: Beginning initial scan and watch...")
 
         try {
+            SessionCacheManager.isCacheEnabled = cacheEnabled
             val allSessions = mutableListOf<Session>()
             val activeAdapters = sourceRegistry.getActiveAdapters()
             log("IndexManager: Found ${activeAdapters.size} active adapters out of ${sourceRegistry.getAllAdapters().size} registered.")
 
+            val adapterDurations = mutableMapOf<String, Long>()
+            val overallStart = System.currentTimeMillis()
+
             for (adapter in activeAdapters) {
                 log("IndexManager: Scanning ${adapter.displayName}...")
+                val adapterStart = System.currentTimeMillis()
                 try {
+                    if (cacheEnabled) {
+                        SessionCacheManager.startScan(adapter.id)
+                    }
                     val sessions = adapter.parseAllSessions()
-                    log("IndexManager: Finished ${adapter.displayName} scan, found ${sessions.size} sessions.")
+                    if (cacheEnabled) {
+                        SessionCacheManager.endScan(adapter.id)
+                    }
+                    val duration = System.currentTimeMillis() - adapterStart
+                    adapterDurations[adapter.displayName] = duration
+                    log("IndexManager: Finished ${adapter.displayName} scan in ${duration}ms, found ${sessions.size} sessions.")
                     allSessions.addAll(sessions)
                 } catch (e: Exception) {
-                    log("IndexManager: Error scanning ${adapter.displayName}:", e)
+                    val duration = System.currentTimeMillis() - adapterStart
+                    adapterDurations[adapter.displayName] = duration
+                    log("IndexManager: Error scanning ${adapter.displayName} after ${duration}ms:", e)
+                    if (cacheEnabled) {
+                        try {
+                            SessionCacheManager.endScan(adapter.id)
+                        } catch (_: Exception) {}
+                    }
                 }
             }
+
+            val overallDuration = System.currentTimeMillis() - overallStart
+
+            // Profile summary block
+            val sortedDurations = adapterDurations.entries.sortedByDescending { it.value }
+            val logBuilder = java.lang.StringBuilder()
+            logBuilder.append("\n===========================================\n")
+            logBuilder.append("          CODEOBA SOURCE PROFILER          \n")
+            logBuilder.append("===========================================\n")
+            for ((name, duration) in sortedDurations) {
+                val percentage = if (overallDuration > 0) (duration * 100f / overallDuration).toInt() else 0
+                val namePart = name.padEnd(20)
+                val durationPart = "${duration} ms".padStart(10)
+                val percentPart = "(${percentage}%)".padStart(6)
+                logBuilder.append("$namePart : $durationPart $percentPart\n")
+            }
+            logBuilder.append("-------------------------------------------\n")
+            val totalLabel = "Total Scanning Time".padEnd(20)
+            val totalTime = "${overallDuration} ms".padStart(10)
+            logBuilder.append("$totalLabel : $totalTime\n")
+            logBuilder.append("===========================================")
+            log(logBuilder.toString())
 
             log("IndexManager: Updating search index with ${allSessions.size} total sessions...")
             searchEngine.updateIndex(allSessions)

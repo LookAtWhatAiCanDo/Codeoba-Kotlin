@@ -12,8 +12,9 @@ import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
 import java.io.File
 import java.sql.DriverManager
+import llc.lookatwhataicando.codeoba.core.manager.SessionCacheManager
 
-class DesktopCursorSource : SourceAdapter {
+class DesktopCursorSource : DesktopSourceAdapter() {
     override val id: String = "cursor"
     override val displayName: String = "Cursor"
 
@@ -24,14 +25,17 @@ class DesktopCursorSource : SourceAdapter {
         Class.forName("org.sqlite.JDBC")
     }
 
-    private fun getGlobalDbFile(): File {
+    override fun getBaseDir(): File {
         val userHome = System.getProperty("user.home")
-        return File(userHome, "Library/Application Support/Cursor/User/globalStorage/state.vscdb")
+        return File(userHome, "Library/Application Support/Cursor/User")
+    }
+
+    private fun getGlobalDbFile(): File {
+        return File(getBaseDir(), "globalStorage/state.vscdb")
     }
 
     private fun getWorkspaceStorageDir(): File {
-        val userHome = System.getProperty("user.home")
-        return File(userHome, "Library/Application Support/Cursor/User/workspaceStorage")
+        return File(getBaseDir(), "workspaceStorage")
     }
 
     override fun isAvailable(): Boolean {
@@ -115,6 +119,12 @@ class DesktopCursorSource : SourceAdapter {
 
 
     private fun parseSessionFromJson(composerId: String, valueStr: String): Session? {
+        val filePath = "composerData:$composerId"
+        val size = valueStr.length.toLong()
+        val hash = SessionCacheManager.calculateStringMd5(valueStr)
+        val cached = SessionCacheManager.getCachedSessionForDb(id, filePath, hash, size)
+        if (cached != null) return cached
+
         return try {
             val valObj = json.parseToJsonElement(valueStr).jsonObject
             val name       = valObj["name"]?.jsonPrimitive?.content ?: "Cursor Session"
@@ -155,16 +165,18 @@ class DesktopCursorSource : SourceAdapter {
             if (turns.isEmpty()) return null
 
             val cwd = composerToWorkspaceMap?.get(composerId)
-            Session(
+            val session = Session(
                 id          = composerId,
                 sourceId    = id,
-                filePath    = "composerData:$composerId",
+                filePath    = filePath,
                 timestamp   = createdAt,
                 updatedAt   = updatedAt,
                 cwd         = cwd,
                 threadName  = name,
                 turns       = turns
             )
+            SessionCacheManager.putCachedSession(id, filePath, lastModified = 0L, size = size, hash = hash, session = session)
+            session
         } catch (e: Exception) { null }
     }
 

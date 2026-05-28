@@ -9,21 +9,17 @@ import llc.lookatwhataicando.codeoba.core.domain.model.Turn
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import java.io.File
 import java.time.Instant
+import llc.lookatwhataicando.codeoba.core.manager.SessionCacheManager
 
-class DesktopCodexSource : SourceAdapter {
+class DesktopCodexSource : DesktopSourceAdapter() {
     override val id: String = "codex"
     override val displayName: String = "OpenAI Codex"
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    private fun getBaseDir(): File {
+    override fun getBaseDir(): File {
         val userHome = System.getProperty("user.home")
         return File(userHome, ".codex")
-    }
-
-    override fun isAvailable(): Boolean {
-        val dir = getBaseDir()
-        return dir.exists() && dir.isDirectory
     }
 
     override fun getDefaultLogPaths(): List<String> {
@@ -47,40 +43,7 @@ class DesktopCodexSource : SourceAdapter {
                 return true
             }
         }
-
-        val userHome = System.getProperty("user.home")
-        val commonPaths = listOf(
-            "/opt/homebrew/bin/codex",
-            "/usr/local/bin/codex",
-            "/usr/bin/codex",
-            "$userHome/.local/bin/codex",
-            "$userHome/.npm-global/bin/codex"
-        )
-        for (path in commonPaths) {
-            if (File(path).exists()) return true
-        }
-
-        try {
-            val process = ProcessBuilder("which", "codex")
-                .redirectError(ProcessBuilder.Redirect.DISCARD)
-                .start()
-            val exitCode = process.waitFor()
-            if (exitCode == 0) return true
-        } catch (_: Exception) {}
-
-        return false
-    }
-
-    override fun deleteDataPaths(): Boolean {
-        val baseDir = getBaseDir()
-        if (baseDir.exists()) {
-            return baseDir.deleteRecursively()
-        }
-        return true
-    }
-
-    override fun getDataPathsToDelete(): List<String> {
-        return listOf(getBaseDir().absolutePath)
+        return isExecutableInstalled("codex")
     }
 
     private var sessionTitleMap: Map<String, String>? = null
@@ -114,9 +77,8 @@ class DesktopCodexSource : SourceAdapter {
         sessionTitleMap = map
     }
 
-    override suspend fun parseSession(filePath: String): Session? {
-        val file = File(filePath)
-        if (!file.exists() || !file.isFile) return null
+    override suspend fun parseSessionContent(file: File): Session? {
+        val filePath = file.absolutePath
 
         val lines = try {
             file.readLines()
@@ -229,7 +191,7 @@ class DesktopCodexSource : SourceAdapter {
         val threadName = getSessionTitle(sessionId)
         val isArchived = File(filePath).parentFile?.name == "archived_sessions"
 
-        return Session(
+        val session = Session(
             id = sessionId,
             sourceId = id,
             filePath = filePath,
@@ -240,6 +202,7 @@ class DesktopCodexSource : SourceAdapter {
             turns = turns,
             isArchived = isArchived
         )
+        return session
     }
 
     override suspend fun parseAllSessions(): List<Session> {

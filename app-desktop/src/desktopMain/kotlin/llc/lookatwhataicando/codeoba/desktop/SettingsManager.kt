@@ -113,6 +113,14 @@ object SettingsManager {
     fun setLastStatusFilters(filters: Set<ArchivalFilter>) {
         prefs.put("last_status_filters", filters.map { it.name }.joinToString(","))
     }
+
+    fun getCacheEnabled(): Boolean {
+        return prefs.getBoolean("cache_enabled", true)
+    }
+
+    fun setCacheEnabled(value: Boolean) {
+        prefs.putBoolean("cache_enabled", value)
+    }
 }
 
 fun SourceAdapter.isEffectiveEnabled(): Boolean {

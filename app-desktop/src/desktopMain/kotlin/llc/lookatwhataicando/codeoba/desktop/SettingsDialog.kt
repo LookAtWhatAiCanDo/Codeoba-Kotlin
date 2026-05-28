@@ -152,21 +152,65 @@ fun SettingsDialog(
                     ) {
                         when (selectedCategory) {
                             SettingsCategory.General -> {
+                                var cacheEnabled by remember { mutableStateOf(SettingsManager.getCacheEnabled()) }
+
                                 Text(
                                     text = "General Settings",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = TextPrimary,
                                     modifier = Modifier.padding(bottom = 16.dp)
                                 )
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
+
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                                    modifier = Modifier.fillMaxSize()
                                 ) {
-                                    Text(
-                                        text = "General settings are coming soon.",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = TextSecondary
-                                    )
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                                        colors = CardDefaults.cardColors(containerColor = CardSurface),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.weight(1f),
+                                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Persistent Startup Cache",
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                    color = TextPrimary
+                                                )
+                                                Text(
+                                                    text = "Speed up startup time by caching parsed sessions on disk.",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = TextSecondary
+                                                )
+                                            }
+
+                                            Switch(
+                                                checked = cacheEnabled,
+                                                onCheckedChange = { isChecked ->
+                                                    cacheEnabled = isChecked
+                                                    SettingsManager.setCacheEnabled(isChecked)
+                                                    onSettingsChanged()
+                                                },
+                                                colors = SwitchDefaults.colors(
+                                                    checkedThumbColor = ObsidianBg,
+                                                    checkedTrackColor = AccentCyan,
+                                                    uncheckedThumbColor = TextSecondary,
+                                                    uncheckedTrackColor = SlateSurface,
+                                                    uncheckedBorderColor = BorderColor
+                                                ),
+                                                modifier = Modifier.pointerHoverIcon(PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)))
+                                            )
+                                        }
+                                    }
                                 }
                             }
                             SettingsCategory.Sources -> {

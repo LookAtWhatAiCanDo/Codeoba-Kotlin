@@ -4,17 +4,22 @@ import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import llc.lookatwhataicando.codeoba.core.domain.model.Turn
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import java.io.File
+import llc.lookatwhataicando.codeoba.core.manager.SessionCacheManager
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
-class DesktopAiderSource : SourceAdapter {
+class DesktopAiderSource : DesktopSourceAdapter() {
     override val id: String = "aider"
     override val displayName: String = "Aider"
 
     @Volatile
     private var activeAiderPaths = emptyList<String>()
+
+    override fun getBaseDir(): File {
+        throw UnsupportedOperationException("Aider does not have a single base directory")
+    }
 
     private fun getBaseDirs(): List<File> {
         val userHome = System.getProperty("user.home")
@@ -44,31 +49,7 @@ class DesktopAiderSource : SourceAdapter {
 
     override fun isAppInstalled(): Boolean {
         if (activeAiderPaths.isNotEmpty()) return true
-
-        val userHome = System.getProperty("user.home")
-        val commonPaths = listOf(
-            "/opt/homebrew/bin/aider",
-            "/usr/local/bin/aider",
-            "/usr/bin/aider",
-            "$userHome/.local/bin/aider",
-            "$userHome/Library/Python/3.9/bin/aider",
-            "$userHome/Library/Python/3.10/bin/aider",
-            "$userHome/Library/Python/3.11/bin/aider",
-            "$userHome/Library/Python/3.12/bin/aider"
-        )
-        for (path in commonPaths) {
-            if (File(path).exists()) return true
-        }
-
-        try {
-            val process = ProcessBuilder("which", "aider")
-                .redirectError(ProcessBuilder.Redirect.DISCARD)
-                .start()
-            val exitCode = process.waitFor()
-            if (exitCode == 0) return true
-        } catch (_: Exception) {}
-
-        return false
+        return isExecutableInstalled("aider")
     }
 
     override fun deleteDataPaths(): Boolean {
@@ -89,9 +70,8 @@ class DesktopAiderSource : SourceAdapter {
         return activeAiderPaths.map { File(it, ".aider.chat.history.md").absolutePath }
     }
 
-    override suspend fun parseSession(filePath: String): Session? {
-        val file = File(filePath)
-        if (!file.exists() || !file.isFile) return null
+    override suspend fun parseSessionContent(file: File): Session? {
+        val filePath = file.absolutePath
 
         val text = try {
             file.readText()
@@ -187,7 +167,7 @@ class DesktopAiderSource : SourceAdapter {
         val projectName = file.parentFile?.name ?: "Project"
         val threadName = "$projectName (Aider)"
 
-        return Session(
+        val session = Session(
             id = sessionId,
             sourceId = id,
             filePath = filePath,
@@ -197,6 +177,7 @@ class DesktopAiderSource : SourceAdapter {
             threadName = threadName,
             turns = turns
         )
+        return session
     }
 
     override suspend fun parseAllSessions(): List<Session> {

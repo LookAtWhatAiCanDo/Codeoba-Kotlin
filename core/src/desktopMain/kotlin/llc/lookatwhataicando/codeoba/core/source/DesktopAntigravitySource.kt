@@ -10,8 +10,9 @@ import llc.lookatwhataicando.codeoba.core.domain.model.Turn
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import java.io.File
 import java.time.Instant
+import llc.lookatwhataicando.codeoba.core.manager.SessionCacheManager
 
-class DesktopAntigravitySource : SourceAdapter {
+class DesktopAntigravitySource : DesktopSourceAdapter() {
     override val id: String = "antigravity"
     override val displayName: String = "Google Antigravity"
 
@@ -151,18 +152,9 @@ class DesktopAntigravitySource : SourceAdapter {
         }
     }
 
-    private fun getBaseDir(): File {
+    override fun getBaseDir(): File {
         val userHome = System.getProperty("user.home")
         return File(userHome, ".gemini/antigravity/brain")
-    }
-
-    override fun isAvailable(): Boolean {
-        val dir = getBaseDir()
-        return dir.exists() && dir.isDirectory
-    }
-
-    override fun getDefaultLogPaths(): List<String> {
-        return listOf(getBaseDir().absolutePath)
     }
 
     override fun getWatchPaths(): List<String> {
@@ -181,18 +173,6 @@ class DesktopAntigravitySource : SourceAdapter {
                 File(userHome, ".gemini/antigravity").exists()
             }
         }
-    }
-
-    override fun deleteDataPaths(): Boolean {
-        val baseDir = getBaseDir()
-        if (baseDir.exists()) {
-            return baseDir.deleteRecursively()
-        }
-        return true
-    }
-
-    override fun getDataPathsToDelete(): List<String> {
-        return listOf(getBaseDir().absolutePath)
     }
 
     // Only re-index when transcript.jsonl itself changes — not log/task files
@@ -270,9 +250,8 @@ class DesktopAntigravitySource : SourceAdapter {
         return "[[[TOOL:$type|$header|$timestamp]]]\n$cleaned\n[[[/TOOL]]]"
     }
 
-    override suspend fun parseSession(filePath: String): Session? {
-        val file = File(filePath)
-        if (!file.exists() || !file.isFile) return null
+    override suspend fun parseSessionContent(file: File): Session? {
+        val filePath = file.absolutePath
 
         val lines = try {
             file.readLines()
@@ -479,7 +458,7 @@ class DesktopAntigravitySource : SourceAdapter {
             false
         }
 
-        return Session(
+        val session = Session(
             id = sessionId,
             sourceId = id,
             filePath = filePath,
@@ -490,6 +469,7 @@ class DesktopAntigravitySource : SourceAdapter {
             turns = turns,
             isArchived = isArchived
         )
+        return session
     }
 
     override suspend fun parseAllSessions(): List<Session> {
