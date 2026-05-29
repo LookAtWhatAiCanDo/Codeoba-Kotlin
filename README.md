@@ -19,6 +19,24 @@ Codeoba is a platform-agnostic, zero-dependency, 100% local search application t
 
 ---
 
+## 🔍 How Search Works (Lexical vs. Semantic)
+
+Codeoba provides two distinct search modes to locate information in your coding assistant logs:
+
+1. **Lexical Search (Keyword / Substring Find)**
+   * **Best For:** Finding exact character matches, specific variable/function names, code snippets, tags, or TODO comments (e.g., `onCloseRequest`, `TODO:`, `git merge`).
+   * **How it works:** Performs literal case-insensitive or case-sensitive character-sequence matching across all sessions and turns.
+   
+2. **Semantic Search (Conceptual / Natural Language)**
+   * **Best For:** Natural language queries, questions, or conceptual searches (e.g., `how to deploy to mobile store`, `setting up database transaction locks`).
+   * **How it works:** Utilizes a lightweight, quantized `all-MiniLM-L6-v2` transformer model (~23 MB, downloaded automatically to `~/.codeoba/models/` on first toggle) to convert text turns into 384-dimensional conceptual vectors. It finds matches using cosine similarity.
+   * **Key Details:**
+     * **Model Context Window:** The model accepts up to 256 tokens. Dialogue turns longer than this are truncated for semantic vector comparison.
+     * **Embedding Cache:** Embedding calculations are CPU-intensive. The first indexing run can take 15–30 seconds for large log folders. Codeoba caches these vectors locally at `~/.codeoba/cache/embeddings_cache.json` so that subsequent searches and app launches load in milliseconds.
+     * **Adjustable Threshold:** You can configure search strictness under the **Settings -> Semantic** panel using the Similarity Threshold slider. Lower values return more fuzzy results, while higher values require stricter matching. A **Restore to Default** button is available to reset it to `0.30` at any time.
+
+---
+
 ## 🏗️ Project Architecture
 
 ```mermaid

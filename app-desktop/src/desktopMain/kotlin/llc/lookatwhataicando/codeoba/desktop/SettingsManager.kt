@@ -122,6 +122,14 @@ object SettingsManager {
         prefs.putBoolean("cache_enabled", value)
     }
 
+    fun getSimilarityThreshold(): Float {
+        return prefs.getFloat("similarity_threshold", 0.30f)
+    }
+
+    fun setSimilarityThreshold(value: Float) {
+        prefs.putFloat("similarity_threshold", value)
+    }
+
     fun getSidebarSortBy(): SidebarSortDimension {
         val name = prefs.get("sidebar_sort_by", SidebarSortDimension.UPDATED.name)
         return try {

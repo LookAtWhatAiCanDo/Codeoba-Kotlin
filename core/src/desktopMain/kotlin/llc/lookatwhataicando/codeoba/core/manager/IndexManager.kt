@@ -21,9 +21,14 @@ class IndexManager(
     private var isScanning = false
 
     private val onIndexUpdatedListeners = mutableListOf<() -> Unit>()
+    private var onProgressCallback: ((String) -> Unit)? = null
 
     fun addIndexUpdatedListener(listener: () -> Unit) {
         onIndexUpdatedListeners.add(listener)
+    }
+
+    fun setOnProgressListener(listener: (String) -> Unit) {
+        onProgressCallback = listener
     }
 
     suspend fun initialScanAndWatch() = withContext(Dispatchers.IO) {
@@ -44,6 +49,7 @@ class IndexManager(
             val overallStart = System.currentTimeMillis()
 
             for (adapter in activeAdapters) {
+                onProgressCallback?.invoke("Scanning ${adapter.displayName}...")
                 log("IndexManager: Scanning ${adapter.displayName}...")
                 val adapterStart = System.currentTimeMillis()
                 try {
@@ -92,8 +98,11 @@ class IndexManager(
             logBuilder.append("===========================================")
             log(logBuilder.toString())
 
+            onProgressCallback?.invoke("Updating search index...")
             log("IndexManager: Updating search index with ${allSessions.size} total sessions...")
-            searchEngine.updateIndex(allSessions)
+            searchEngine.updateIndex(allSessions) { processed, total ->
+                onProgressCallback?.invoke("Indexing: $processed / $total...")
+            }
             log("IndexManager: Index updated successfully. Notifying listeners...")
             notifyListeners()
 

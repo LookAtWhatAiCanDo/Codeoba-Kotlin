@@ -5,7 +5,7 @@ import llc.lookatwhataicando.codeoba.core.domain.model.Session
 class LexicalSearchEngine : SearchEngine {
     private val sessionsMap = mutableMapOf<String, Session>()
 
-    override suspend fun updateIndex(sessions: List<Session>) {
+    override suspend fun updateIndex(sessions: List<Session>, onProgress: ((Int, Int) -> Unit)?) {
         synchronized(sessionsMap) {
             sessionsMap.clear()
             for (session in sessions) {

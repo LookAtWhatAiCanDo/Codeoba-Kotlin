@@ -53,6 +53,7 @@ import llc.lookatwhataicando.codeoba.core.domain.search.SearchResult
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceRegistry
 
 import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
+import androidx.compose.ui.text.style.TextAlign
 
 @Composable
 fun Sidebar(
@@ -74,6 +75,7 @@ fun Sidebar(
     selectionAnchorId: String? = null,
     onSelectionChange: (Session?, Set<String>, String?) -> Unit = { _, _, _ -> },
     isIndexing: Boolean,
+    indexingProgressText: String = "",
     ignoredSources: Set<String>,
     activeStatusFilters: Set<ArchivalFilter>,
     onStatusFilterToggle: (ArchivalFilter) -> Unit,
@@ -90,6 +92,11 @@ fun Sidebar(
     onGroupRemove: (Session, String) -> Unit = { _, _ -> },
     dragDropState: DragDropState = remember { DragDropState() },
     unassignedSessionCount: Int = 0,
+    isModelDownloaded: Boolean = true,
+    isModelDownloading: Boolean = false,
+    modelDownloadProgress: Float = 0f,
+    modelDownloadError: String? = null,
+    onDownloadModel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var toastMessage by remember { mutableStateOf<String?>(null) }
@@ -744,23 +751,115 @@ fun Sidebar(
                 Spacer(modifier = Modifier.weight(1f))
                 
                 if (isIndexing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(14.dp),
-                        strokeWidth = 2.dp,
-                        color = AccentCyan
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (indexingProgressText.isNotEmpty()) {
+                            Text(
+                                text = indexingProgressText,
+                                color = TextSecondary,
+                                fontSize = 11.sp,
+                                modifier = Modifier.offset(y = 0.5.dp)
+                            )
+                        }
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = AccentCyan
+                        )
+                    }
                 }
             }
 
             // Sessions List
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                if (searchResults.isEmpty()) {
+                if (searchMode == SearchMode.Semantic && !isModelDownloaded) {
+                    // Show Semantic Search Model Download Overlay
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(CardSurface, RoundedCornerShape(12.dp))
+                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Semantic Model Required",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary
+                        )
+
+                        Text(
+                            text = "To perform concept-matching search, Codeoba needs to download a lightweight, quantized embedding model (~23 MB) from Hugging Face. This will run 100% locally on your machine once downloaded.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+
+                        if (isModelDownloading) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                LinearProgressIndicator(
+                                    progress = modelDownloadProgress,
+                                    color = AccentCyan,
+                                    trackColor = SlateSurface,
+                                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
+                                )
+                                Text(
+                                    text = String.format("Downloading... %.0f%%", modelDownloadProgress * 100f),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                    color = TextPrimary
+                                )
+                            }
+                        } else {
+                            if (modelDownloadError != null) {
+                                Text(
+                                    text = "Error: $modelDownloadError",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = onDownloadModel,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = ObsidianBg),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Download Model (~23MB)", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
+                                }
+
+                                Button(
+                                    onClick = { onSearchModeChange(SearchMode.Lexical) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = SlateSurface, contentColor = TextPrimary),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Cancel", style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
+                        }
+                    }
+                } else if (searchResults.isEmpty()) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isIndexing) "Indexing logs..." else "No conversations found.",
+                            text = if (isIndexing) {
+                                if (indexingProgressText.isNotEmpty()) indexingProgressText else "Indexing logs..."
+                            } else "No conversations found.",
                             color = TextSecondary,
                             fontSize = 14.sp
                         )

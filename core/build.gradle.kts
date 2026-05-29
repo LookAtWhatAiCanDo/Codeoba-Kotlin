@@ -45,6 +45,9 @@ kotlin {
                 // SQLite JDBC — pure-Java, no subprocess needed
                 implementation("org.xerial:sqlite-jdbc:3.45.3.0")
 
+                // ONNX Runtime for JVM
+                implementation("com.microsoft.onnxruntime:onnxruntime:1.18.0")
+
                 // Ktor Server (for local Hub API)
                 implementation("io.ktor:ktor-server-core:2.3.12")
                 implementation("io.ktor:ktor-server-netty:2.3.12")

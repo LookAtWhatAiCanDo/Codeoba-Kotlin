@@ -80,7 +80,7 @@ interface SearchEngine {
     /**
      * Overwrites or populates the index with a fresh list of sessions.
      */
-    suspend fun updateIndex(sessions: List<Session>)
+    suspend fun updateIndex(sessions: List<Session>, onProgress: ((processed: Int, total: Int) -> Unit)? = null)
 
     /**
      * Incremental update for a single session when it gets modified or added.

@@ -47,7 +47,8 @@ import androidx.compose.foundation.shape.CircleShape
 
 enum class SettingsCategory(val displayName: String) {
     General("General"),
-    Sources("Sources")
+    Sources("Sources"),
+    Semantic("Semantic")
 }
 
 @Composable
@@ -291,6 +292,111 @@ fun SettingsDialog(
                                                 deletingSource = adapter
                                             }
                                         )
+                                    }
+                                }
+                            }
+                            SettingsCategory.Semantic -> {
+                                var similarityThreshold by remember { mutableStateOf(SettingsManager.getSimilarityThreshold()) }
+
+                                Text(
+                                    text = "Semantic Search Settings",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = TextPrimary,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                                ) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                                        colors = CardDefaults.cardColors(containerColor = CardSurface),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Text(
+                                                    text = "Similarity Threshold",
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                    color = TextPrimary
+                                                )
+                                                Text(
+                                                    text = "Configure the minimum confidence score required for search matches. Lower values return more results (fuzzier), higher values return fewer results (stricter).",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = TextSecondary
+                                                )
+                                            }
+
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Slider(
+                                                    value = similarityThreshold,
+                                                    onValueChange = { newValue ->
+                                                        similarityThreshold = newValue
+                                                        SettingsManager.setSimilarityThreshold(newValue)
+                                                        onSettingsChanged()
+                                                    },
+                                                    valueRange = 0.0f..1.0f,
+                                                    steps = 19, // Every 0.05 step
+                                                    colors = SliderDefaults.colors(
+                                                        thumbColor = AccentCyan,
+                                                        activeTrackColor = AccentCyan,
+                                                        inactiveTrackColor = SlateSurface
+                                                    ),
+                                                    modifier = Modifier.weight(1f)
+                                                )
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .width(52.dp)
+                                                        .height(32.dp)
+                                                        .background(SlateSurface, RoundedCornerShape(6.dp))
+                                                        .border(1.dp, BorderColor, RoundedCornerShape(6.dp)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = String.format("%.2f", similarityThreshold),
+                                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                        color = TextPrimary
+                                                    )
+                                                }
+                                            }
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.End
+                                            ) {
+                                                Button(
+                                                    onClick = {
+                                                        similarityThreshold = 0.30f
+                                                        SettingsManager.setSimilarityThreshold(0.30f)
+                                                        onSettingsChanged()
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = SlateSurface,
+                                                        contentColor = AccentCyan
+                                                    ),
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    modifier = Modifier.height(32.dp),
+                                                    contentPadding = PaddingValues(horizontal = 12.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "Restore to Default",
+                                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                                        modifier = Modifier.offset(y = 0.5.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }

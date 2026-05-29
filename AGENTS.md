@@ -158,6 +158,13 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
 23. **Consolidated OS Detection**:
     - Avoid direct system property checks for operating system detection (e.g., `System.getProperty("os.name")`). Use centralized helpers in `./core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/util/PlatformUtils.kt`: `PlatformUtils.isMac()`, `PlatformUtils.isWindows()`, `PlatformUtils.isLinux()`.
 
+24. **Local ONNX-based Semantic Search**:
+    - Replaces pseudo-random word hashing with a real local neural text embedding pipeline using the quantized `all-MiniLM-L6-v2` transformer model.
+    - Pre-trained models are downloaded on demand to `~/.codeoba/models/` and loaded dynamically using ONNX Runtime JVM bindings.
+    - The search similarity threshold is dynamically adjustable via an interactive slider in a dedicated "Semantic" tab in the settings dialog and persisted via `SettingsManager.getSimilarityThreshold()`.
+    - Leverages a local `EmbeddingCache` (implemented via `EmbeddingCacheManager`) to store text embedding vectors in `~/.codeoba/cache/embeddings_cache.json`, preventing redundant ONNX calls.
+    - Indexes sessions in parallel using Kotlin coroutines and a `Semaphore` (concurrency limit of 4) in `SemanticSearchEngine.updateIndex` to utilize multicore CPUs efficiently and prevent UI thread blockage.
+
 ---
 
 ## 🛠️ Common Gradle Development Commands

@@ -151,13 +151,17 @@ import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import llc.lookatwhataicando.codeoba.core.domain.model.Turn
 import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
 import llc.lookatwhataicando.codeoba.core.manager.GroupManager
+import llc.lookatwhataicando.codeoba.core.manager.EmbeddingCacheManager
 import llc.lookatwhataicando.codeoba.core.domain.search.ArchivalFilter
 import llc.lookatwhataicando.codeoba.core.domain.search.SearchEngine
+import llc.lookatwhataicando.codeoba.core.domain.search.SemanticEmbedder
 import llc.lookatwhataicando.codeoba.core.domain.search.HashSemanticEmbedder
 import llc.lookatwhataicando.codeoba.core.domain.search.LexicalSearchEngine
 import llc.lookatwhataicando.codeoba.core.domain.search.SearchFilter
 import llc.lookatwhataicando.codeoba.core.domain.search.SearchResult
 import llc.lookatwhataicando.codeoba.core.domain.search.SemanticSearchEngine
+import llc.lookatwhataicando.codeoba.core.domain.search.OnnxSemanticEmbedder
+import llc.lookatwhataicando.codeoba.core.util.ModelDownloader
 import llc.lookatwhataicando.codeoba.core.domain.search.buildFindRegex
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceRegistry
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
@@ -185,6 +189,14 @@ import kotlin.math.round
 
 enum class SearchMode {
     Lexical, Semantic
+}
+
+class DynamicSemanticEmbedder(fallback: SemanticEmbedder) : SemanticEmbedder {
+    @Volatile
+    var delegate: SemanticEmbedder = fallback
+    override suspend fun getEmbeddings(text: String): FloatArray {
+        return delegate.getEmbeddings(text)
+    }
 }
 
 internal fun openUrl(url: String) {
@@ -321,7 +333,72 @@ fun mainEntry() = application {
     }
 
     val lexicalEngine = remember { LexicalSearchEngine() }
-    val semanticEngine = remember { SemanticSearchEngine(HashSemanticEmbedder()) }
+    val dynamicEmbedder = remember { DynamicSemanticEmbedder(HashSemanticEmbedder()) }
+    val semanticEngine = remember {
+        SemanticSearchEngine(
+            embedder = dynamicEmbedder,
+            cache = EmbeddingCacheManager,
+            similarityThreshold = SettingsManager.getSimilarityThreshold()
+        )
+    }
+
+    var isModelDownloaded by remember { mutableStateOf(ModelDownloader.isModelDownloaded()) }
+    var isModelDownloading by remember { mutableStateOf(false) }
+    var modelDownloadProgress by remember { mutableStateOf(0f) }
+    var modelDownloadError by remember { mutableStateOf<String?>(null) }
+
+    fun loadOnnxEmbedder() {
+        if (ModelDownloader.isModelDownloaded()) {
+            try {
+                val onnxEmbedder = OnnxSemanticEmbedder(
+                    ModelDownloader.getModelFile(),
+                    ModelDownloader.getVocabFile()
+                )
+                val old = dynamicEmbedder.delegate
+                if (old is AutoCloseable) {
+                    old.close()
+                }
+                dynamicEmbedder.delegate = onnxEmbedder
+                log("Main: Loaded local ONNX Semantic Embedder.")
+            } catch (e: Throwable) {
+                log("Main: Failed to load ONNX semantic embedder, falling back to HashSemanticEmbedder.", e)
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        EmbeddingCacheManager.loadCache()
+        if (isModelDownloaded) {
+            loadOnnxEmbedder()
+        }
+    }
+
+    LaunchedEffect(refreshTrigger) {
+        semanticEngine.similarityThreshold = SettingsManager.getSimilarityThreshold()
+    }
+
+    val onDownloadModel = {
+        if (!isModelDownloading) {
+            isModelDownloading = true
+            modelDownloadError = null
+            modelDownloadProgress = 0f
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    ModelDownloader.downloadModel { progress ->
+                        modelDownloadProgress = progress
+                    }
+                    loadOnnxEmbedder()
+                    isModelDownloaded = true
+                    refreshTrigger++
+                } catch (e: Exception) {
+                    log("Main: Failed to download model: ${e.message}", e)
+                    modelDownloadError = e.message ?: "Unknown error"
+                } finally {
+                    isModelDownloading = false
+                }
+            }
+        }
+    }
 
     var searchMode by remember { mutableStateOf(SearchMode.Lexical) }
     val currentEngine = if (searchMode == SearchMode.Lexical) lexicalEngine else semanticEngine
@@ -381,6 +458,7 @@ fun mainEntry() = application {
 
     var searchResults by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
     var isIndexing by remember { mutableStateOf(true) }
+    var indexingProgressText by remember { mutableStateOf("Initializing...") }
 
     var pinnedSessionIds by remember { mutableStateOf(SettingsManager.getPinnedSessionIds()) }
     
@@ -488,12 +566,16 @@ fun mainEntry() = application {
         isIndexing = true
         try {
             activeIndexManager?.stopWatchers()
+            indexingProgressText = "Initializing..."
             val manager = IndexManager(
                 sourceRegistry = sourceRegistry,
                 searchEngine = currentEngine,
                 scope = scope,
                 cacheEnabled = cacheOverride ?: SettingsManager.getCacheEnabled()
             )
+            manager.setOnProgressListener { text ->
+                indexingProgressText = text
+            }
             activeIndexManager = manager
             manager.addIndexUpdatedListener {
                 log("Main UI: Index update callback received")
@@ -514,11 +596,17 @@ fun mainEntry() = application {
                     )
                     searchResults = currentEngine.search(queryValue.text, filter)
                     log("Main UI: Search results updated inside listener, count: ${searchResults.size}")
+                    if (searchMode == SearchMode.Semantic) {
+                        EmbeddingCacheManager.saveCache()
+                    }
                 }
             }
             log("Main UI: Calling manager.initialScanAndWatch()...")
             manager.initialScanAndWatch()
             log("Main UI: manager.initialScanAndWatch() completed.")
+            if (searchMode == SearchMode.Semantic) {
+                EmbeddingCacheManager.saveCache()
+            }
             val allSessions = currentEngine.search("", SearchFilter(archivalFilter = ArchivalFilter.ALL))
             val allSessionIds = allSessions.map { it.session.id }.toSet()
             GroupManager.cleanOrphanedSessions(allSessionIds)
@@ -583,6 +671,9 @@ fun mainEntry() = application {
     Window(
         onCloseRequest = {
             saveWindowState()
+            if (searchMode == SearchMode.Semantic) {
+                EmbeddingCacheManager.saveCache()
+            }
             activeIndexManager?.stopWatchers()
             exitApplication()
             java.lang.System.exit(0)
@@ -764,6 +855,7 @@ fun mainEntry() = application {
                                     navigateTo(activeSession?.id)
                                 },
                                 isIndexing = isIndexing,
+                                indexingProgressText = indexingProgressText,
                                 ignoredSources = ignoredSources,
                                 activeStatusFilters = activeStatusFilters,
                                 onStatusFilterToggle = { filter ->
@@ -779,6 +871,11 @@ fun mainEntry() = application {
                                 activeGroupFilter = activeGroupFilter,
                                 onActiveGroupFilterChange = { activeGroupFilter = it },
                                 unassignedSessionCount = unassignedSessionCount,
+                                isModelDownloaded = isModelDownloaded,
+                                isModelDownloading = isModelDownloading,
+                                modelDownloadProgress = modelDownloadProgress,
+                                modelDownloadError = modelDownloadError,
+                                onDownloadModel = onDownloadModel,
                                 onAddGroup = { name -> GroupManager.addGroup(name).also { if (it) groupsState = GroupManager.getGroups() } },
                                 onRenameGroup = { old, new -> GroupManager.renameGroup(old, new).also { if (it) { if (activeGroupFilter == old) activeGroupFilter = new; groupsState = GroupManager.getGroups() } } },
                                 onDeleteGroup = { name -> GroupManager.deleteGroup(name).also { if (activeGroupFilter == name) activeGroupFilter = null; groupsState = GroupManager.getGroups() } },

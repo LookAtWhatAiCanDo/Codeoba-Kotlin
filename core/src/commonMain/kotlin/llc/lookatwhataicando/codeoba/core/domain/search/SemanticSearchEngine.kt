@@ -2,10 +2,15 @@ package llc.lookatwhataicando.codeoba.core.domain.search
 
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import kotlin.math.sqrt
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 class SemanticSearchEngine(
     private val embedder: SemanticEmbedder,
-    private val similarityThreshold: Float = 0.35f
+    private val cache: EmbeddingCache? = null,
+    var similarityThreshold: Float = 0.35f
 ) : SearchEngine {
     private val sessionsMap = mutableMapOf<String, Session>()
     private val sessionEmbeddings = mutableMapOf<String, SessionVectorIndex>()
@@ -15,20 +20,46 @@ class SemanticSearchEngine(
         val turnEmbeddings: List<FloatArray>
     )
 
-    override suspend fun updateIndex(sessions: List<Session>) {
+    override suspend fun updateIndex(sessions: List<Session>, onProgress: ((Int, Int) -> Unit)?) {
         synchronized(sessionsMap) {
             sessionsMap.clear()
             sessionEmbeddings.clear()
         }
-        for (session in sessions) {
-            updateSession(session)
+
+        val total = sessions.size
+        var processed = 0
+        val progressLock = Any()
+
+        // Limit concurrency for CPU-heavy embedding calls
+        val semaphore = Semaphore(4)
+        coroutineScope {
+            for (session in sessions) {
+                launch {
+                    semaphore.withPermit {
+                        updateSession(session)
+                    }
+                    val current = synchronized(progressLock) {
+                        processed++
+                        processed
+                    }
+                    onProgress?.invoke(current, total)
+                }
+            }
         }
     }
 
     override suspend fun updateSession(session: Session) {
+        val threadName = session.threadName ?: "Untitled Session"
         val threadNameEmb = try {
-            embedder.getEmbeddings(session.threadName ?: "Untitled Session")
-        } catch (e: Exception) {
+            val cached = cache?.get(threadName)
+            if (cached != null) {
+                cached
+            } else {
+                val emb = embedder.getEmbeddings(threadName)
+                cache?.put(threadName, emb)
+                emb
+            }
+        } catch (e: Throwable) {
             FloatArray(0)
         }
 
@@ -36,8 +67,15 @@ class SemanticSearchEngine(
         for (turn in session.turns) {
             val turnText = "${turn.userMessage}\n${turn.assistantMessage}"
             val turnEmb = try {
-                embedder.getEmbeddings(turnText)
-            } catch (e: Exception) {
+                val cached = cache?.get(turnText)
+                if (cached != null) {
+                    cached
+                } else {
+                    val emb = embedder.getEmbeddings(turnText)
+                    cache?.put(turnText, emb)
+                    emb
+                }
+            } catch (e: Throwable) {
                 FloatArray(0)
             }
             turnEmbs.add(turnEmb)
@@ -84,7 +122,7 @@ class SemanticSearchEngine(
 
         val queryEmbedding = try {
             embedder.getEmbeddings(query)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             return emptyList()
         }
 
