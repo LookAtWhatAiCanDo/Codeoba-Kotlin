@@ -164,6 +164,7 @@ import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import llc.lookatwhataicando.codeoba.core.manager.IndexManager
 import llc.lookatwhataicando.codeoba.core.source.DesktopAiderSource
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
+import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
 import androidx.compose.ui.text.style.TextAlign
 import llc.lookatwhataicando.codeoba.core.source.DesktopAntigravitySource
 import llc.lookatwhataicando.codeoba.core.source.DesktopClaudeSource
@@ -912,7 +913,7 @@ fun mainEntry() = application {
                                         while (decodedPath.contains("//")) {
                                             decodedPath = decodedPath.replace("//", "/")
                                         }
-                                        val isWindows = System.getProperty("os.name").lowercase().contains("win")
+                                        val isWindows = PlatformUtils.isWindows()
                                         if (isWindows && decodedPath.startsWith("/") && decodedPath.length > 2 && decodedPath[2] == ':') {
                                             decodedPath = decodedPath.substring(1)
                                         }
@@ -979,7 +980,7 @@ fun mainEntry() = application {
                                     while (decodedPath.contains("//")) {
                                         decodedPath = decodedPath.replace("//", "/")
                                     }
-                                    val isWindows = System.getProperty("os.name").lowercase().contains("win")
+                                    val isWindows = PlatformUtils.isWindows()
                                     if (isWindows && decodedPath.startsWith("/") && decodedPath.length > 2 && decodedPath[2] == ':') {
                                         decodedPath = decodedPath.substring(1)
                                     }

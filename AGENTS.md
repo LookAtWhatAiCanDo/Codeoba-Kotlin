@@ -155,6 +155,9 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Always place custom `.pointerHoverIcon(PointerIcon.Hand)` modifiers *after* `.clickable` to prevent hover gesture filters from intercepting or consuming long-press pointer events meant for drag gesture detectors.
     - To prevent vertical drag conflicts inside scrollable containers (like `verticalScroll` or `LazyColumn` lists on Desktop), use immediate `detectDragGestures` instead of `detectDragGesturesAfterLongPress`. Because scrolling on desktop with a mouse uses the mouse wheel, dragging inside list items can start dragging immediately (past touch slop) to optimize responsiveness and success rates across all directions. Clicks still propagate normally since they do not exceed touch slop.
 
+23. **Consolidated OS Detection**:
+    - Avoid direct system property checks for operating system detection (e.g., `System.getProperty("os.name")`). Use centralized helpers in `./core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/util/PlatformUtils.kt`: `PlatformUtils.isMac()`, `PlatformUtils.isWindows()`, `PlatformUtils.isLinux()`.
+
 ---
 
 ## 🛠️ Common Gradle Development Commands

@@ -36,7 +36,7 @@ compose {
                     org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb
                 )
                 packageName = "Codeoba"
-                packageVersion = "1.0.0"
+                packageVersion = project.findProperty("appVersion")?.toString() ?: "1.0.0"
                 macOS {
                     iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
                 }

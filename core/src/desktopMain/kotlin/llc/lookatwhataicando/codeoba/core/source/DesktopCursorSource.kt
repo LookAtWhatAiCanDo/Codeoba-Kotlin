@@ -13,6 +13,7 @@ import llc.lookatwhataicando.codeoba.core.util.Logger.log
 import java.io.File
 import java.sql.DriverManager
 import llc.lookatwhataicando.codeoba.core.manager.SessionCacheManager
+import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
 
 class DesktopCursorSource : DesktopSourceAdapter() {
     override val id: String = "cursor"
@@ -27,7 +28,18 @@ class DesktopCursorSource : DesktopSourceAdapter() {
 
     override fun getBaseDir(): File {
         val userHome = System.getProperty("user.home")
-        return File(userHome, "Library/Application Support/Cursor/User")
+        return when {
+            PlatformUtils.isMac() -> {
+                File(userHome, "Library/Application Support/Cursor/User")
+            }
+            PlatformUtils.isWindows() -> {
+                val appData = System.getenv("APPDATA")
+                if (appData != null) File(appData, "Cursor/User") else File(userHome, "AppData/Roaming/Cursor/User")
+            }
+            else -> {
+                File(userHome, ".config/Cursor/User")
+            }
+        }
     }
 
     private fun getGlobalDbFile(): File {

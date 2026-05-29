@@ -47,6 +47,7 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
+import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
 import llc.lookatwhataicando.codeoba.core.domain.search.ArchivalFilter
 import llc.lookatwhataicando.codeoba.core.domain.search.SearchResult
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceRegistry
@@ -208,7 +209,10 @@ fun Sidebar(
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Spacer(modifier = Modifier.width(76.dp)) // clear macOS traffic lights
+            val isMac = remember { PlatformUtils.isMac() }
+            if (isMac) {
+                Spacer(modifier = Modifier.width(76.dp)) // clear macOS traffic lights
+            }
         }
 
         Column(

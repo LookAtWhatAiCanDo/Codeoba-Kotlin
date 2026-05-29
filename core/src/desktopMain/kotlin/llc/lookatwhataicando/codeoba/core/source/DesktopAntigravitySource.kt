@@ -11,6 +11,7 @@ import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import java.io.File
 import java.time.Instant
 import llc.lookatwhataicando.codeoba.core.manager.SessionCacheManager
+import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
 
 class DesktopAntigravitySource : DesktopSourceAdapter() {
     override val id: String = "antigravity"
@@ -163,9 +164,8 @@ class DesktopAntigravitySource : DesktopSourceAdapter() {
     }
 
     override fun isAppInstalled(): Boolean {
-        val os = System.getProperty("os.name").lowercase()
         return when {
-            os.contains("mac") -> {
+            PlatformUtils.isMac() -> {
                 File("/Applications/Antigravity.app").exists() || File("/Applications/Gemini.app").exists()
             }
             else -> {
