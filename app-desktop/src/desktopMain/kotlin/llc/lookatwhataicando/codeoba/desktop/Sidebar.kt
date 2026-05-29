@@ -35,13 +35,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.input.key.*
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.PointerButton
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
@@ -72,7 +69,9 @@ fun Sidebar(
     sourceRegistry: SourceRegistry,
     searchResults: List<SearchResult>,
     selectedSession: Session?,
-    onSessionSelect: (Session?) -> Unit,
+    selectedSessionIds: Set<String> = emptySet(),
+    selectionAnchorId: String? = null,
+    onSelectionChange: (Session?, Set<String>, String?) -> Unit = { _, _, _ -> },
     isIndexing: Boolean,
     ignoredSources: Set<String>,
     activeStatusFilters: Set<ArchivalFilter>,
@@ -774,8 +773,51 @@ fun Sidebar(
                         sortedSearchResults.forEach { result ->
                             SessionItem(
                                 result = result,
-                                isSelected = selectedSession?.id == result.session.id,
-                                onClick = { onSessionSelect(result.session) },
+                                isSelected = selectedSessionIds.contains(result.session.id),
+                                onClick = { isShift, isCmdOrCtrl ->
+                                    val clickedSession = result.session
+                                    val clickedId = clickedSession.id
+                                    val currentIds = selectedSessionIds
+                                    
+                                    when {
+                                        isShift -> {
+                                            val anchorId = selectionAnchorId ?: selectedSession?.id ?: clickedId
+                                            val allIds = sortedSearchResults.map { it.session.id }
+                                            val anchorIndex = allIds.indexOf(anchorId).coerceAtLeast(0)
+                                            val clickedIndex = allIds.indexOf(clickedId).coerceAtLeast(0)
+                                            
+                                            val start = minOf(anchorIndex, clickedIndex)
+                                            val end = maxOf(anchorIndex, clickedIndex)
+                                            val rangeIds = allIds.subList(start, end + 1).toSet()
+                                            
+                                            onSelectionChange(clickedSession, rangeIds, anchorId)
+                                        }
+                                        isCmdOrCtrl -> {
+                                            val newIds = if (currentIds.contains(clickedId)) {
+                                                currentIds - clickedId
+                                            } else {
+                                                currentIds + clickedId
+                                            }
+                                            
+                                            val newActiveSession = if (newIds.contains(clickedId)) {
+                                                clickedSession
+                                            } else {
+                                                val remainingId = newIds.lastOrNull()
+                                                if (remainingId != null) {
+                                                    searchResults.firstOrNull { it.session.id == remainingId }?.session
+                                                } else {
+                                                    null
+                                                }
+                                            }
+                                            
+                                            val newAnchor = if (newIds.contains(clickedId)) clickedId else selectionAnchorId
+                                            onSelectionChange(newActiveSession, newIds, newAnchor)
+                                        }
+                                        else -> {
+                                            onSelectionChange(clickedSession, setOf(clickedId), clickedId)
+                                        }
+                                    }
+                                },
                                 onCopyPath = { path ->
                                     copyToClipboard(path)
                                     toastMessage = "Source file path copied to clipboard"
@@ -785,7 +827,9 @@ fun Sidebar(
                                 onGroupAdd = onGroupAdd,
                                 onGroupRemove = onGroupRemove,
                                 activeGroupFilter = activeGroupFilter,
-                                groups = groups
+                                groups = groups,
+                                selectedSessionIds = selectedSessionIds,
+                                onSelectionChange = onSelectionChange
                             )
                         }
                     }
@@ -1094,14 +1138,16 @@ fun Sidebar(
 fun SessionItem(
     result: SearchResult,
     isSelected: Boolean,
-    onClick: () -> Unit,
+    onClick: (isShift: Boolean, isCmdOrCtrl: Boolean) -> Unit,
     onCopyPath: (String) -> Unit,
     onTogglePin: (Session) -> Unit,
     dragDropState: DragDropState,
     onGroupAdd: (Session, String) -> Unit,
     onGroupRemove: (Session, String) -> Unit,
     activeGroupFilter: String?,
-    groups: List<ConversationGroup>
+    groups: List<ConversationGroup>,
+    selectedSessionIds: Set<String> = emptySet(),
+    onSelectionChange: (Session?, Set<String>, String?) -> Unit = { _, _, _ -> }
 ) {
     val session = result.session
     val sessionGroups = remember(groups, session.id) {
@@ -1111,6 +1157,8 @@ fun SessionItem(
     val currentActiveGroupFilter by rememberUpdatedState(activeGroupFilter)
     val currentOnGroupRemove by rememberUpdatedState(onGroupRemove)
     val currentOnGroupAdd by rememberUpdatedState(onGroupAdd)
+    val currentSelectedSessionIds by rememberUpdatedState(selectedSessionIds)
+    val currentOnSelectionChange by rememberUpdatedState(onSelectionChange)
 
     val badgeColors = getSourceBadgeColors(session.sourceId)
     val formatter = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
@@ -1125,6 +1173,10 @@ fun SessionItem(
     var pressOffset by remember { mutableStateOf(DpOffset.Zero) }
     val density = LocalDensity.current
 
+    val keyboardModifiers = LocalWindowInfo.current.keyboardModifiers
+    val isShift = keyboardModifiers.isShiftPressed
+    val isCmdOrCtrl = keyboardModifiers.isMetaPressed || keyboardModifiers.isCtrlPressed
+
     var itemCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     Box(
         modifier = Modifier
@@ -1138,7 +1190,7 @@ fun SessionItem(
             )
             .alpha(alpha)
             .onGloballyPositioned { itemCoords = it }
-            .clickable { onClick() }
+            .clickable { onClick(isShift, isCmdOrCtrl) }
             .pointerInput(session.id) {
                 awaitPointerEventScope {
                     while (true) {
@@ -1161,6 +1213,9 @@ fun SessionItem(
             .pointerInput(session.id) {
                 detectDragGestures(
                     onDragStart = { offset ->
+                        if (!currentSelectedSessionIds.contains(session.id)) {
+                            currentOnSelectionChange(session, setOf(session.id), session.id)
+                        }
                         val rootOffset = itemCoords?.localToRoot(offset) ?: Offset.Zero
                         dragDropState.draggingSession = session
                         dragDropState.dragPosition = rootOffset

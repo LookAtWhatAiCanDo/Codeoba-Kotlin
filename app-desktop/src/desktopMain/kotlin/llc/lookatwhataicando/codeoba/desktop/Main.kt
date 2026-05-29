@@ -360,6 +360,8 @@ fun mainEntry() = application {
     val navigationStack = remember { mutableStateListOf<String?>(null) }
     var navigationIndex by remember { mutableStateOf(0) }
     var selectedSession by remember { mutableStateOf<Session?>(null) }
+    var selectedSessionIds by remember { mutableStateOf(emptySet<String>()) }
+    var selectionAnchorId by remember { mutableStateOf<String?>(null) }
 
     fun navigateTo(sessionId: String?) {
         val currentId = if (navigationIndex in navigationStack.indices) navigationStack[navigationIndex] else null
@@ -476,6 +478,15 @@ fun mainEntry() = application {
     LaunchedEffect(selectedSession) {
         showDetailFindBar = false
         findQueryValue = TextFieldValue("")
+        if (selectedSession != null) {
+            if (!selectedSessionIds.contains(selectedSession!!.id)) {
+                selectedSessionIds = setOf(selectedSession!!.id)
+                selectionAnchorId = selectedSession!!.id
+            }
+        } else {
+            selectedSessionIds = emptySet()
+            selectionAnchorId = null
+        }
     }
 
     // Load and index sessions
@@ -752,7 +763,13 @@ fun mainEntry() = application {
                                 sourceRegistry = sourceRegistry,
                                 searchResults = searchResults,
                                 selectedSession = selectedSession,
-                                onSessionSelect = { navigateTo(it?.id) },
+                                selectedSessionIds = selectedSessionIds,
+                                selectionAnchorId = selectionAnchorId,
+                                onSelectionChange = { activeSession, selectedIds, anchorId ->
+                                    selectedSessionIds = selectedIds
+                                    selectionAnchorId = anchorId
+                                    navigateTo(activeSession?.id)
+                                },
                                 isIndexing = isIndexing,
                                 ignoredSources = ignoredSources,
                                 activeStatusFilters = activeStatusFilters,
@@ -773,8 +790,24 @@ fun mainEntry() = application {
                                 onRenameGroup = { old, new -> GroupManager.renameGroup(old, new).also { if (it) { if (activeGroupFilter == old) activeGroupFilter = new; groupsState = GroupManager.getGroups() } } },
                                 onDeleteGroup = { name -> GroupManager.deleteGroup(name).also { if (activeGroupFilter == name) activeGroupFilter = null; groupsState = GroupManager.getGroups() } },
                                 onToggleGroupPin = { name, pinned -> GroupManager.setGroupPinned(name, pinned); groupsState = GroupManager.getGroups() },
-                                onGroupAdd = { session, groupName -> GroupManager.assignSessionToGroup(session.id, groupName); groupsState = GroupManager.getGroups() },
-                                onGroupRemove = { session, groupName -> GroupManager.removeSessionFromGroup(session.id, groupName); groupsState = GroupManager.getGroups() },
+                                onGroupAdd = { session, groupName ->
+                                    val targets = if (selectedSessionIds.contains(session.id)) {
+                                        selectedSessionIds.mapNotNull { id -> searchResults.firstOrNull { it.session.id == id }?.session }
+                                    } else {
+                                        listOf(session)
+                                    }
+                                    targets.forEach { GroupManager.assignSessionToGroup(it.id, groupName) }
+                                    groupsState = GroupManager.getGroups()
+                                },
+                                onGroupRemove = { session, groupName ->
+                                    val targets = if (selectedSessionIds.contains(session.id)) {
+                                        selectedSessionIds.mapNotNull { id -> searchResults.firstOrNull { it.session.id == id }?.session }
+                                    } else {
+                                        listOf(session)
+                                    }
+                                    targets.forEach { GroupManager.removeSessionFromGroup(it.id, groupName) }
+                                    groupsState = GroupManager.getGroups()
+                                },
                                 dragDropState = dragDropState,
                                 modifier = Modifier.width(sidebarWidth)
                             )
@@ -849,8 +882,24 @@ fun mainEntry() = application {
                                 onOpenSettings = { showSettingsDialog = true },
                                 onTogglePin = { toggleSessionPinned(it) },
                                 groups = groupsState,
-                                onGroupAdd = { session, groupName -> GroupManager.assignSessionToGroup(session.id, groupName); groupsState = GroupManager.getGroups() },
-                                onGroupRemove = { session, groupName -> GroupManager.removeSessionFromGroup(session.id, groupName); groupsState = GroupManager.getGroups() },
+                                onGroupAdd = { session, groupName ->
+                                    val targets = if (selectedSessionIds.contains(session.id)) {
+                                        selectedSessionIds.mapNotNull { id -> searchResults.firstOrNull { it.session.id == id }?.session }
+                                    } else {
+                                        listOf(session)
+                                    }
+                                    targets.forEach { GroupManager.assignSessionToGroup(it.id, groupName) }
+                                    groupsState = GroupManager.getGroups()
+                                },
+                                onGroupRemove = { session, groupName ->
+                                    val targets = if (selectedSessionIds.contains(session.id)) {
+                                        selectedSessionIds.mapNotNull { id -> searchResults.firstOrNull { it.session.id == id }?.session }
+                                    } else {
+                                        listOf(session)
+                                    }
+                                    targets.forEach { GroupManager.removeSessionFromGroup(it.id, groupName) }
+                                    groupsState = GroupManager.getGroups()
+                                },
                                 onGroupUpdate = { group -> GroupManager.addOrUpdateGroup(group); groupsState = GroupManager.getGroups() },
                                 onGroupDelete = { groupName -> GroupManager.deleteGroup(groupName).also { if (activeGroupFilter == groupName) activeGroupFilter = null; groupsState = GroupManager.getGroups() } },
                                 onToggleGroupPin = { name, pinned -> GroupManager.setGroupPinned(name, pinned); groupsState = GroupManager.getGroups() },
@@ -955,6 +1004,8 @@ fun mainEntry() = application {
                 // Floating Drag & Drop Previews
                 if (dragDropState.draggingSession != null) {
                     val session = dragDropState.draggingSession!!
+                    val isPartOfSelection = selectedSessionIds.contains(session.id)
+                    val count = if (isPartOfSelection) selectedSessionIds.size else 1
                     Box(
                         modifier = Modifier
                             .offset(
@@ -968,7 +1019,7 @@ fun mainEntry() = application {
                             .padding(8.dp)
                     ) {
                         Text(
-                            text = session.threadName ?: "Dialogue Session",
+                            text = if (count > 1) "Moving $count conversations" else (session.threadName ?: "Dialogue Session"),
                             color = TextPrimary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
