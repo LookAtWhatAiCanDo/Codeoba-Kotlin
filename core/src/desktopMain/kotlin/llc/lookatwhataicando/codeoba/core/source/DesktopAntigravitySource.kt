@@ -492,4 +492,26 @@ class DesktopAntigravitySource : DesktopSourceAdapter() {
         }
         return sessions
     }
+
+    override fun refreshCachedSession(session: Session): Session {
+        val currentTitle = getSessionTitle(session.id)
+        val userHome = System.getProperty("user.home")
+        val annotationFile = File(userHome, ".gemini/antigravity/annotations/${session.id}.pbtxt")
+        val currentArchived = if (annotationFile.exists() && annotationFile.isFile) {
+            try {
+                val text = annotationFile.readText()
+                val normalized = text.replace(Regex("\\s+"), "")
+                normalized.contains("archived:true")
+            } catch (e: Exception) {
+                false
+            }
+        } else {
+            false
+        }
+
+        if (session.threadName != currentTitle || session.isArchived != currentArchived) {
+            return session.copy(threadName = currentTitle, isArchived = currentArchived)
+        }
+        return session
+    }
 }

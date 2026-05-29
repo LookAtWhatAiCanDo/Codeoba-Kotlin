@@ -81,12 +81,27 @@ abstract class DesktopSourceAdapter : SourceAdapter {
         throw UnsupportedOperationException("File-based parsing is not supported by this source.")
     }
 
+    /**
+     * Allows subclasses to dynamically refresh metadata on a cached session
+     * (e.g. thread name or archival status) from companion config files.
+     */
+    open fun refreshCachedSession(session: Session): Session {
+        return session
+    }
+
     override suspend fun parseSession(filePath: String): Session? {
         val file = File(filePath)
         if (!file.exists() || !file.isFile) return null
 
         val cached = SessionCacheManager.getCachedSessionForFile(id, filePath, file.lastModified(), file.length())
-        if (cached != null) return cached
+        if (cached != null) {
+            val refreshed = refreshCachedSession(cached)
+            if (refreshed != cached) {
+                val hash = SessionCacheManager.calculateMd5(file)
+                SessionCacheManager.putCachedSession(id, filePath, file.lastModified(), file.length(), hash, refreshed)
+            }
+            return refreshed
+        }
 
         val session = parseSessionContent(file) ?: return null
 

@@ -98,4 +98,66 @@ class CacheOptimizationTest {
         val hash2 = SessionCacheManager.calculateStringMd5(value)
         assertEquals(hash, hash2)
     }
+
+    @Test
+    fun testRefreshCachedSession() = runBlocking {
+        val tempFile = File.createTempFile("cache_refresh_test_", ".jsonl")
+        tempFile.deleteOnExit()
+        tempFile.writeText("some session text content")
+
+        var titleOverride = "Initial Thread Name"
+        var archiveOverride = false
+
+        val source = object : llc.lookatwhataicando.codeoba.core.source.DesktopSourceAdapter() {
+            override val id: String = "test_refresh_source"
+            override val displayName: String = "Test Refresh Source"
+
+            override fun getBaseDir(): File = tempFile.parentFile
+
+            override suspend fun parseAllSessions(): List<Session> = emptyList()
+
+            override fun refreshCachedSession(session: Session): Session {
+                if (session.threadName != titleOverride || session.isArchived != archiveOverride) {
+                    return session.copy(threadName = titleOverride, isArchived = archiveOverride)
+                }
+                return session
+            }
+
+            override suspend fun parseSessionContent(file: File): Session? {
+                return Session(
+                    id = "test_session_id",
+                    sourceId = id,
+                    filePath = file.absolutePath,
+                    timestamp = 1000L,
+                    updatedAt = 2000L,
+                    cwd = null,
+                    threadName = titleOverride,
+                    turns = emptyList(),
+                    isArchived = archiveOverride
+                )
+            }
+        }
+
+        SessionCacheManager.isCacheEnabled = true
+        SessionCacheManager.startScan(source.id)
+
+        // 1. Initial Parse (cache miss)
+        val s1 = source.parseSession(tempFile.absolutePath)
+        assertNotNull(s1)
+        assertEquals("Initial Thread Name", s1.threadName)
+        assertEquals(false, s1.isArchived)
+
+        // 2. Change metadata properties (simulating user renaming/archiving session)
+        titleOverride = "New Thread Name"
+        archiveOverride = true
+
+        // 3. Query again (cache hit, but should invoke refreshCachedSession and update)
+        val s2 = source.parseSession(tempFile.absolutePath)
+        assertNotNull(s2)
+        assertEquals("New Thread Name", s2.threadName)
+        assertEquals(true, s2.isArchived)
+
+        // Clean up
+        SessionCacheManager.endScan(source.id)
+    }
 }

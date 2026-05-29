@@ -46,13 +46,23 @@ class DesktopCodexSource : DesktopSourceAdapter() {
         return isExecutableInstalled("codex")
     }
 
+    @Volatile
     private var sessionTitleMap: Map<String, String>? = null
 
+    @Volatile
+    private var lastIndexFileModified: Long = 0L
+
     private fun getSessionTitle(sessionId: String): String {
-        if (sessionTitleMap == null) {
+        val indexFile = File(getBaseDir(), "session_index.jsonl")
+        val currentModified = if (indexFile.exists() && indexFile.isFile) indexFile.lastModified() else 0L
+
+        var map = sessionTitleMap
+        if (map == null || currentModified > lastIndexFileModified) {
             buildSessionTitleMap()
+            map = sessionTitleMap
+            lastIndexFileModified = currentModified
         }
-        return sessionTitleMap?.get(sessionId) ?: "Codex Session"
+        return map?.get(sessionId) ?: "Codex Session"
     }
 
     private fun buildSessionTitleMap() {
@@ -231,7 +241,16 @@ class DesktopCodexSource : DesktopSourceAdapter() {
 
     override fun getWatchFileFilter(): ((String) -> Boolean) = { path ->
         val file = File(path)
-        file.isFile && file.extension == "jsonl" && file.name.startsWith("rollout-")
+        (file.isFile && file.extension == "jsonl" && file.name.startsWith("rollout-")) ||
+                file.name == "session_index.jsonl"
+    }
+
+    override fun refreshCachedSession(session: Session): Session {
+        val currentTitle = getSessionTitle(session.id)
+        if (session.threadName != currentTitle) {
+            return session.copy(threadName = currentTitle)
+        }
+        return session
     }
 
     private data class RawTurn(val isUser: Boolean, val text: String, val timestamp: Long, val model: String? = null)
