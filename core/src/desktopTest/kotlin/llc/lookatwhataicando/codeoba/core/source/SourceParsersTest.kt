@@ -490,6 +490,39 @@ class SourceParsersTest {
         assertEquals(expectedAssistant, session.turns[0].assistantMessage)
     }
 
+    @Test
+    fun testAntigravityCompactionParsing() = runBlocking {
+        val tempFile = File.createTempFile("antigravity_compaction_", ".jsonl")
+        tempFile.deleteOnExit()
+
+        tempFile.writeText(
+            """
+            {"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-05-20T02:00:00Z","content":"<USER_REQUEST>Start task</USER_REQUEST>"}
+            {"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-05-20T02:00:05Z","content":"Okay, starting..."}
+            {"step_index":2,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-05-20T02:01:00Z","content":"<USER_REQUEST>Continue task</USER_REQUEST>"}
+            {"step_index":3,"source":"SYSTEM","type":"CHECKPOINT","status":"DONE","created_at":"2026-05-20T02:01:05Z","content":"# Resuming from a compaction\nSummary info"}
+            {"step_index":4,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-05-20T02:01:10Z","content":"Continued."}
+            """.trimIndent()
+        )
+
+        val source = DesktopAntigravitySource()
+        val session = source.parseSession(tempFile.absolutePath)
+
+        assertNotNull(session)
+        assertEquals(2, session.turns.size)
+
+        // Turn 0: should not have compaction
+        assertEquals("Start task", session.turns[0].userMessage)
+        assertEquals("Okay, starting...", session.turns[0].assistantMessage)
+        assertEquals(null, session.turns[0].extraData["isCompaction"])
+
+        // Turn 1: should have compaction with 5000ms duration (02:01:05 - 02:01:00)
+        assertEquals("Continue task", session.turns[1].userMessage)
+        assertEquals("Continued.", session.turns[1].assistantMessage)
+        assertEquals("true", session.turns[1].extraData["isCompaction"])
+        assertEquals("5000", session.turns[1].extraData["compactionTimeMs"])
+    }
+
     sealed class TempMessagePart {
         data class Text(val content: String) : TempMessagePart()
         data class Tool(

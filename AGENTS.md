@@ -131,6 +131,12 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - If the search query becomes empty, the active sort option falls back from Relevance to Updated automatically.
     - The sorting preference (sortBy and sortAscending) is persistently stored via `SettingsManager` (Java Preferences API) to remain persistent across application launches.
 
+18. **Context Compaction Tracking**:
+    - Identifies context compaction checkpoints (`"type":"CHECKPOINT"`) in Google Antigravity logs (`transcript.jsonl`).
+    - Calculates the estimated duration of each compaction event based on the timestamp gap relative to the preceding user input event.
+    - Persists statistics within `Turn.extraData` as `isCompaction` and `compactionTimeMs`.
+    - Exposes stats in the UI as a dedicated "Compactions: N" badge on active sessions and "Context Compactions" and "Est. Compaction Time" cards in the main workspace statistics dashboard.
+
 ---
 
 ## 🛠️ Common Gradle Development Commands

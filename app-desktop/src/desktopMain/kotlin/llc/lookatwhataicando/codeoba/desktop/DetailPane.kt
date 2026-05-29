@@ -441,6 +441,13 @@ fun DetailHeaderCard(session: Session) {
                         label = "Model(s): ${models.joinToString(", ")}"
                     )
                 }
+                val compactionCount = session.turns.count { it.extraData["isCompaction"] == "true" }
+                if (compactionCount > 0) {
+                    SessionStatBadge(
+                        icon = Icons.Default.Settings,
+                        label = "Compactions: $compactionCount"
+                    )
+                }
             }
 
             // Model Breakdown
@@ -618,9 +625,16 @@ fun DetailPane(
                             val responseTokens = (totalAssistantChars + 3) / 4
                             val totalEstTokens = promptTokens + responseTokens
                             val avgTurns = if (totalConversations > 0) totalTurns.toFloat() / totalConversations else 0f
-                val totalDurationMs = searchResults.sumOf { getSessionComputeTimeMs(it.session) }
+                            val totalDurationMs = searchResults.sumOf { getSessionComputeTimeMs(it.session) }
                             val avgDurationMs = if (totalConversations > 0) totalDurationMs / totalConversations else 0L
                             val avgSpeedText = formatSpeed(totalEstTokens.toLong(), totalDurationMs)
+
+                            val totalCompactions = searchResults.sumOf { res ->
+                                res.session.turns.count { it.extraData["isCompaction"] == "true" }
+                            }
+                            val totalCompactionTimeMs = searchResults.sumOf { res ->
+                                res.session.turns.sumOf { it.extraData["compactionTimeMs"]?.toLongOrNull() ?: 0L }
+                            }
 
                             val modelStatsList = remember(searchResults) {
                                 class ModelStats(
@@ -681,7 +695,7 @@ fun DetailPane(
                                 }
                             }
 
-                            // Grid of 6 main metrics
+                            // Grid of main metrics (4 rows of 2 cards each)
                             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -745,6 +759,32 @@ fun DetailPane(
                                             value = formatDuration(avgDurationMs),
                                             subtitle = "Average active work per session",
                                             icon = Icons.Default.Timer
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        StatCard(
+                                            title = "Context Compactions",
+                                            value = formatNumber(totalCompactions.toLong()),
+                                            subtitle = "Context summaries triggered",
+                                            icon = Icons.Default.Settings
+                                        )
+                                    }
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        val avgCompactionText = if (totalCompactions > 0) {
+                                            val avg = totalCompactionTimeMs.toDouble() / totalCompactions
+                                            if (avg < 1000.0) "${avg.toInt()} ms" else String.format("%.2f s", avg / 1000.0)
+                                        } else "0 ms"
+                                        StatCard(
+                                            title = "Est. Compaction Time",
+                                            value = formatDuration(totalCompactionTimeMs),
+                                            subtitle = "Avg: $avgCompactionText per compaction",
+                                            icon = Icons.Default.Refresh
                                         )
                                     }
                                 }

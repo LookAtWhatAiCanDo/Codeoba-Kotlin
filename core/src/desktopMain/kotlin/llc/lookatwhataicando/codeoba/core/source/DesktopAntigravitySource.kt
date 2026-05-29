@@ -263,7 +263,14 @@ class DesktopAntigravitySource : DesktopSourceAdapter() {
         val sessionId = file.parentFile?.parentFile?.parentFile?.name ?: file.nameWithoutExtension
 
         // We'll build a chronological list of "events" and then group them into turns
-        data class Event(val isUser: Boolean, val text: String, val timestamp: Long, val model: String?)
+        data class Event(
+            val isUser: Boolean,
+            val text: String,
+            val timestamp: Long,
+            val model: String?,
+            val isCompaction: Boolean = false,
+            val compactionTimeMs: Long = 0L
+        )
         val events = mutableListOf<Event>()
         var cwd: String? = null
         var currentModel: String? = null
@@ -368,6 +375,24 @@ class DesktopAntigravitySource : DesktopSourceAdapter() {
                         }
                     }
 
+                    // Compaction checkpoints
+                    type == "CHECKPOINT" -> {
+                        val precedingEvent = events.lastOrNull()
+                        val duration = if (precedingEvent != null && precedingEvent.isUser) {
+                            (timestamp - precedingEvent.timestamp).coerceAtLeast(0L)
+                        } else {
+                            0L
+                        }
+                        events.add(Event(
+                            isUser = false,
+                            text = "",
+                            timestamp = timestamp,
+                            model = currentModel,
+                            isCompaction = true,
+                            compactionTimeMs = duration
+                        ))
+                    }
+
                     // Error messages
                     type == "ERROR_MESSAGE" && source == "SYSTEM" -> {
                         val formatted = formatToolEntry(type, content, toolCalls, timestamp)
@@ -396,9 +421,18 @@ class DesktopAntigravitySource : DesktopSourceAdapter() {
                 var turnModel = ev.model
                 var activeTimeMs = 0L
                 var currentTimestamp = ev.timestamp
+                var hasCompaction = false
+                var compactionTimeMs = 0L
                 while (nextIdx < events.size && !events[nextIdx].isUser) {
                     val nextEv = events[nextIdx]
-                    assistantParts.add(nextEv.text)
+                    if (nextEv.isCompaction) {
+                        hasCompaction = true
+                        compactionTimeMs += nextEv.compactionTimeMs
+                    } else {
+                        if (nextEv.text.isNotEmpty()) {
+                            assistantParts.add(nextEv.text)
+                        }
+                    }
                     val gap = (nextEv.timestamp - currentTimestamp).coerceAtLeast(0L)
                     // Cap gaps at 2 minutes (120,000 ms), assuming > 2 min means waiting for user input/approval.
                     // If a gap is capped, we estimate 15 seconds of active work for that step.
@@ -413,6 +447,10 @@ class DesktopAntigravitySource : DesktopSourceAdapter() {
                 val extraData = mutableMapOf("computeTimeMs" to activeTimeMs.toString())
                 val finalModel = turnModel ?: "Unknown"
                 extraData["model"] = finalModel
+                if (hasCompaction) {
+                    extraData["isCompaction"] = "true"
+                    extraData["compactionTimeMs"] = compactionTimeMs.toString()
+                }
                 turns.add(
                     Turn(
                         turnId = "${sessionId}_${turnCount++}",
@@ -428,6 +466,10 @@ class DesktopAntigravitySource : DesktopSourceAdapter() {
                 val extraData = mutableMapOf("computeTimeMs" to "0")
                 val finalModel = ev.model ?: "Unknown"
                 extraData["model"] = finalModel
+                if (ev.isCompaction) {
+                    extraData["isCompaction"] = "true"
+                    extraData["compactionTimeMs"] = ev.compactionTimeMs.toString()
+                }
                 turns.add(
                     Turn(
                         turnId = "${sessionId}_${turnCount++}",
