@@ -8,6 +8,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextDecoration
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import llc.lookatwhataicando.codeoba.core.domain.model.Turn
 import llc.lookatwhataicando.codeoba.core.domain.search.buildFindRegex
@@ -416,9 +417,32 @@ fun parseInlineMarkdown(
                 }
             }
 
+            if (text[i] == '[') {
+                val closeBracket = text.indexOf(']', i + 1)
+                if (closeBracket != -1 && closeBracket + 1 < n && text[closeBracket + 1] == '(') {
+                    val closeParen = text.indexOf(')', closeBracket + 2)
+                    if (closeParen != -1) {
+                        val linkText = text.substring(i + 1, closeBracket)
+                        val url = text.substring(closeBracket + 2, closeParen)
+                        
+                        pushStringAnnotation(tag = "URL", annotation = url)
+                        withStyle(style = SpanStyle(
+                            color = AccentCyan,
+                            textDecoration = TextDecoration.Underline
+                        )) {
+                            append(linkText)
+                        }
+                        pop()
+                        
+                        i = closeParen + 1
+                        continue
+                    }
+                }
+            }
+
             var nextSpecial = n
             for (j in (i + 1) until n) {
-                if (text[j] == '`' || text[j] == '*') {
+                if (text[j] == '`' || text[j] == '*' || text[j] == '[') {
                     nextSpecial = j
                     break
                 }

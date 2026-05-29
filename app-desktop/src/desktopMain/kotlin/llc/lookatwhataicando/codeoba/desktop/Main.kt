@@ -412,6 +412,7 @@ fun mainEntry() = application {
     var isSidebarCollapsed by remember { mutableStateOf(SettingsManager.getSidebarCollapsed() ?: false) }
     var sidebarWidth by remember { mutableStateOf((SettingsManager.getSidebarWidth() ?: 360f).dp) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var activeFileToView by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(sidebarWidth, isSidebarCollapsed) {
         // Debounce saving sidebar settings
@@ -793,6 +794,34 @@ fun mainEntry() = application {
                             onSessionSelect = { navigateTo(it?.id) },
                             onOpenSettings = { showSettingsDialog = true },
                             onTogglePin = { toggleSessionPinned(it) },
+                            onUrlClick = { url ->
+                                if (url.startsWith("http://") || url.startsWith("https://")) {
+                                    openUrl(url)
+                                } else {
+                                    try {
+                                        var decodedPath = java.net.URLDecoder.decode(url, "UTF-8")
+                                        decodedPath = decodedPath.substringBefore('#').substringBefore('?')
+                                        if (decodedPath.startsWith("file:///")) {
+                                            decodedPath = "/" + decodedPath.removePrefix("file:///").removePrefix("file:/")
+                                        } else if (decodedPath.startsWith("file://")) {
+                                            decodedPath = decodedPath.removePrefix("file://")
+                                        } else if (decodedPath.startsWith("file:/")) {
+                                            decodedPath = "/" + decodedPath.removePrefix("file:/")
+                                        }
+                                        while (decodedPath.contains("//")) {
+                                            decodedPath = decodedPath.replace("//", "/")
+                                        }
+                                        val isWindows = System.getProperty("os.name").lowercase().contains("win")
+                                        if (isWindows && decodedPath.startsWith("/") && decodedPath.length > 2 && decodedPath[2] == ':') {
+                                            decodedPath = decodedPath.substring(1)
+                                        }
+                                        activeFileToView = decodedPath
+                                    } catch (e: Exception) {
+                                        log("Failed to parse file URL $url: ${e.message}")
+                                        activeFileToView = url
+                                    }
+                                }
+                            },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -825,6 +854,40 @@ fun mainEntry() = application {
                         },
                         onSettingsChanged = {
                             refreshTrigger++
+                        }
+                    )
+                }
+                if (activeFileToView != null) {
+                    FileViewerDialog(
+                        filePath = activeFileToView!!,
+                        onClose = { activeFileToView = null },
+                        onUrlClick = { url ->
+                            if (url.startsWith("http://") || url.startsWith("https://")) {
+                                openUrl(url)
+                            } else {
+                                try {
+                                    var decodedPath = java.net.URLDecoder.decode(url, "UTF-8")
+                                    decodedPath = decodedPath.substringBefore('#').substringBefore('?')
+                                    if (decodedPath.startsWith("file:///")) {
+                                        decodedPath = "/" + decodedPath.removePrefix("file:///").removePrefix("file:/")
+                                    } else if (decodedPath.startsWith("file://")) {
+                                        decodedPath = decodedPath.removePrefix("file://")
+                                    } else if (decodedPath.startsWith("file:/")) {
+                                        decodedPath = "/" + decodedPath.removePrefix("file:/")
+                                    }
+                                    while (decodedPath.contains("//")) {
+                                        decodedPath = decodedPath.replace("//", "/")
+                                    }
+                                    val isWindows = System.getProperty("os.name").lowercase().contains("win")
+                                    if (isWindows && decodedPath.startsWith("/") && decodedPath.length > 2 && decodedPath[2] == ':') {
+                                        decodedPath = decodedPath.substring(1)
+                                    }
+                                    activeFileToView = decodedPath
+                                } catch (e: Exception) {
+                                    log("Failed to parse file URL $url: ${e.message}")
+                                    activeFileToView = url
+                                }
+                            }
                         }
                     )
                 }

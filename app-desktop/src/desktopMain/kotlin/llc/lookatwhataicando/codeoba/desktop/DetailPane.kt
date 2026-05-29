@@ -51,6 +51,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.Dp
@@ -552,6 +557,7 @@ fun DetailPane(
     onSessionSelect: (Session?) -> Unit,
     onOpenSettings: () -> Unit,
     onTogglePin: (Session) -> Unit,
+    onUrlClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val lazyListState = remember(session?.id) {
@@ -1086,7 +1092,8 @@ fun DetailPane(
                                 turnIndex = turnIndex,
                                 query = query,
                                 findRegex = findRegex,
-                                activeMatch = activeMatch
+                                activeMatch = activeMatch,
+                                onUrlClick = onUrlClick
                             )
                         }
                         item(key = "bottom_spacer") {
@@ -1184,7 +1191,8 @@ fun TurnCard(
     turnIndex: Int,
     query: String,
     findRegex: Regex?,
-    activeMatch: FindMatch?
+    activeMatch: FindMatch?,
+    onUrlClick: (String) -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth()
@@ -1257,7 +1265,8 @@ fun TurnCard(
                                 findRegex = findRegex,
                                 activeMatch = activeMatch,
                                 color = TextPrimary,
-                                highlightColor = Color(0x66FF9100)
+                                highlightColor = Color(0x66FF9100),
+                                onUrlClick = onUrlClick
                             )
                         }
                     }
@@ -1355,7 +1364,8 @@ fun TurnCard(
                                 turnIndex = turnIndex,
                                 query = query,
                                 findRegex = findRegex,
-                                activeMatch = activeMatch
+                                activeMatch = activeMatch,
+                                onUrlClick = onUrlClick
                             )
 
                             responseParts.forEachIndexed { relativeIndex, part ->
@@ -1366,7 +1376,8 @@ fun TurnCard(
                                     partIndex = partIndex,
                                     query = query,
                                     findRegex = findRegex,
-                                    activeMatch = activeMatch
+                                    activeMatch = activeMatch,
+                                    onUrlClick = onUrlClick
                                 )
                             }
                         } else {
@@ -1377,7 +1388,8 @@ fun TurnCard(
                                     partIndex = partIndex,
                                     query = query,
                                     findRegex = findRegex,
-                                    activeMatch = activeMatch
+                                    activeMatch = activeMatch,
+                                    onUrlClick = onUrlClick
                                 )
                             }
                         }
@@ -1395,7 +1407,8 @@ fun MessagePartView(
     partIndex: Int,
     query: String,
     findRegex: Regex?,
-    activeMatch: FindMatch?
+    activeMatch: FindMatch?,
+    onUrlClick: (String) -> Unit
 ) {
     when (part) {
         is MessagePart.Text -> {
@@ -1412,7 +1425,8 @@ fun MessagePartView(
                         findRegex = findRegex,
                         activeMatch = activeMatch,
                         color = TextPrimary.copy(alpha = 0.9f),
-                        highlightColor = Color(0x66FF9100)
+                        highlightColor = Color(0x66FF9100),
+                        onUrlClick = onUrlClick
                     )
                 }
             }
@@ -1441,7 +1455,8 @@ fun WorkedForBlock(
     turnIndex: Int,
     query: String,
     findRegex: Regex?,
-    activeMatch: FindMatch?
+    activeMatch: FindMatch?,
+    onUrlClick: (String) -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
@@ -1516,7 +1531,8 @@ fun WorkedForBlock(
                             partIndex = partIndex,
                             query = query,
                             findRegex = findRegex,
-                            activeMatch = activeMatch
+                            activeMatch = activeMatch,
+                            onUrlClick = onUrlClick
                         )
                     }
                 }
@@ -1788,7 +1804,8 @@ fun MarkdownView(
     findRegex: Regex?,
     activeMatch: FindMatch?,
     color: Color,
-    highlightColor: Color
+    highlightColor: Color,
+    onUrlClick: (String) -> Unit
 ) {
     val lines = text.split("\n")
     val blocks = remember(text) { parseMarkdownBlocks(lines) }
@@ -1831,12 +1848,14 @@ fun MarkdownView(
                             )
                         }
                     }
-                    Text(
+                    ClickableMarkdownText(
                         text = annotatedText,
                         color = headerColor,
                         fontSize = fontSize,
                         fontWeight = fontWeight,
                         fontFamily = FontFamily.SansSerif,
+                        lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified,
+                        onUrlClick = onUrlClick,
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                     )
                 }
@@ -1935,12 +1954,13 @@ fun MarkdownView(
                                 )
                             }
                         }
-                        Text(
+                        ClickableMarkdownText(
                             text = annotatedText,
                             color = color,
                             fontSize = 13.5.sp,
                             fontFamily = FontFamily.SansSerif,
                             lineHeight = 20.sp,
+                            onUrlClick = onUrlClick,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -1971,12 +1991,13 @@ fun MarkdownView(
                                 )
                             }
                         }
-                        Text(
+                        ClickableMarkdownText(
                             text = annotatedText,
                             color = color,
                             fontSize = 13.5.sp,
                             fontFamily = FontFamily.SansSerif,
-                            lineHeight = 20.sp
+                            lineHeight = 20.sp,
+                            onUrlClick = onUrlClick
                         )
                     }
                 }
@@ -2002,3 +2023,88 @@ data class ModelItemStats(
     val totalTokens: Long,
     val speedTps: Double
 )
+
+@Composable
+fun ClickableMarkdownText(
+    text: AnnotatedString,
+    color: Color,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    fontFamily: FontFamily,
+    lineHeight: androidx.compose.ui.unit.TextUnit,
+    fontWeight: FontWeight? = null,
+    onUrlClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var isHoveringLink by remember { mutableStateOf(false) }
+
+    Text(
+        text = text,
+        color = color,
+        fontSize = fontSize,
+        fontFamily = fontFamily,
+        lineHeight = lineHeight,
+        fontWeight = fontWeight,
+        onTextLayout = { layoutResult = it },
+        modifier = modifier
+            .pointerHoverIcon(if (isHoveringLink) PointerIcon.Hand else PointerIcon.Default)
+            .pointerInput(text) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.type == PointerEventType.Exit) {
+                            isHoveringLink = false
+                        } else {
+                            val position = event.changes.firstOrNull()?.position
+                            if (position != null) {
+                                layoutResult?.let { layout ->
+                                    val offset = layout.getOffsetForPosition(position)
+                                    val annotation = text.getStringAnnotations(tag = "URL", start = offset, end = offset).firstOrNull()
+                                    if (annotation != null) {
+                                        val lineIndex = layout.getLineForOffset(offset)
+                                        val linkStart = maxOf(annotation.start, layout.getLineStart(lineIndex))
+                                        val linkEnd = minOf(annotation.end - 1, layout.getLineEnd(lineIndex) - 1)
+                                        if (linkStart <= linkEnd) {
+                                            val leftBound = layout.getBoundingBox(linkStart).left
+                                            val rightBound = layout.getBoundingBox(linkEnd).right
+                                            val topBound = layout.getLineTop(lineIndex)
+                                            val bottomBound = layout.getLineBottom(lineIndex)
+                                            isHoveringLink = position.x >= leftBound && position.x <= rightBound &&
+                                                             position.y >= topBound && position.y <= bottomBound
+                                        } else {
+                                            isHoveringLink = false
+                                        }
+                                    } else {
+                                        isHoveringLink = false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .pointerInput(text) {
+                detectTapGestures { offset ->
+                    layoutResult?.let { layout ->
+                        val position = layout.getOffsetForPosition(offset)
+                        text.getStringAnnotations(tag = "URL", start = position, end = position)
+                            .firstOrNull()?.let { annotation ->
+                                val lineIndex = layout.getLineForOffset(position)
+                                val linkStart = maxOf(annotation.start, layout.getLineStart(lineIndex))
+                                val linkEnd = minOf(annotation.end - 1, layout.getLineEnd(lineIndex) - 1)
+                                if (linkStart <= linkEnd) {
+                                    val leftBound = layout.getBoundingBox(linkStart).left
+                                    val rightBound = layout.getBoundingBox(linkEnd).right
+                                    val topBound = layout.getLineTop(lineIndex)
+                                    val bottomBound = layout.getLineBottom(lineIndex)
+                                    if (offset.x >= leftBound && offset.x <= rightBound &&
+                                        offset.y >= topBound && offset.y <= bottomBound) {
+                                        onUrlClick(annotation.item)
+                                    }
+                                }
+                            }
+                    }
+                }
+            }
+    )
+}
