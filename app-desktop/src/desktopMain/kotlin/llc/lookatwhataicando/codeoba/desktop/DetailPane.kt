@@ -2143,9 +2143,9 @@ fun ToolOutputBlock(
         "RUN_COMMAND" -> Pair(Icons.Default.Terminal, Color(0xFF2979FF))
         "CODE_ACTION" -> Pair(Icons.Default.Edit, Color(0xFFFFD600))
         "GREP_SEARCH", "SEARCH_WEB" -> Pair(Icons.Default.Search, Color(0xFFD500F9))
-        "SYSTEM_MESSAGE" -> Pair(Icons.Default.Info, Color(0xFFAB47BC))
+        "SYSTEM_MESSAGE" -> Pair(Icons.Default.Info, AccentPurple)
         "ERROR_MESSAGE" -> Pair(Icons.Default.Error, Color(0xFFEF5350))
-        else -> Pair(Icons.Default.Build, Color(0xFF00E5FF))
+        else -> Pair(Icons.Default.Build, AccentCyan)
     }
 
     Column(

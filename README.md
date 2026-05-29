@@ -15,7 +15,7 @@ Codeoba is a platform-agnostic, zero-dependency, 100% local search application t
 *   **Dual Search Engines**: Keyword search (lexical) + concept-matching local vector search (semantic).
 *   **Live Incremental Watchers**: Real-time thread index updates via background directory watchers.
 *   **Startup Caching & Profiling**: Persistently caches parsed conversation models locally (`~/.codeoba/cache/`) to speed up subsequent app launches, complete with a structured startup execution time profiler. Can be configured via the settings panel or overridden using CLI flags (`--cache` / `--no-cache`).
-*   **Sleek Multi-Pane UI**: Obsidian-dark theme with syntax highlighting, history navigation, and quick clipboard actions.
+*   **Sleek Multi-Pane UI**: Choice of 8 handsome dark color themes (including Obsidian, Nordic Frost, Dracula, and Emerald Forest) with syntax highlighting, history navigation, and quick clipboard actions.
 
 ---
 

@@ -39,14 +39,10 @@ To ensure the project context remains accurate:
 
 When modifying the Compose UI under `app-desktop`, adhere to these style guidelines:
 
-1. **Obsidian / Slate Styling Palette**:
-   - Background Color: `ObsidianBg` = `Color(0xFF0C0C0E)`
-   - Surface Color: `SlateSurface` = `Color(0xFF14141A)`
-   - Item Container Color: `CardSurface` = `Color(0xFF1E1E28)`
-   - Border Color: `BorderColor` = `Color(0xFF2C2C3A)`
-   - Highlights / Primary Accent: `AccentCyan` = `Color(0xFF00E5FF)`
-   - Secondary Accent: `AccentPurple` = `Color(0xFFAB47BC)`
-   - Text Colors: `TextPrimary` = `Color(0xFFF5F5F7)` and `TextSecondary` = `Color(0xFF9E9EAE)`
+1. **Dynamic Color Theme Styling Palette**:
+   - Background Color `ObsidianBg`, Surface Color `SlateSurface`, Item Container Color `CardSurface`, Border Color `BorderColor`, Highlights/Primary Accent `AccentCyan`, Secondary Accent `AccentPurple`, Text Primary `TextPrimary`, and Text Secondary `TextSecondary` are dynamic package-level properties defined in `./app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Theme.kt`.
+   - The values resolve dynamically based on the current theme loaded from `SettingsManager.getThemeCode()` into `ThemeManager.currentTheme`.
+   - Users can select from 8 handsome themes (Obsidian, Nordic Frost, Emerald Forest, Sunset Copper, Royal Amethyst, Dracula, Cyberpunk Neon, Monochrome Slate) in the General settings panel.
 
 2. **Mixed-Case Casing Constraint**:
    - Never display uppercase-only labels like "USER" or "ASSISTANT". Use capitalized words (e.g. "User", "Assistant").

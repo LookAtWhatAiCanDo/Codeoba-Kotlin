@@ -180,15 +180,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import kotlin.math.round
 
-// Premium Dark Color Palette
-val ObsidianBg = Color(0xFF0C0C0E)
-val SlateSurface = Color(0xFF14141A)
-val CardSurface = Color(0xFF1E1E28)
-val AccentCyan = Color(0xFF00E5FF)
-val AccentPurple = Color(0xFFAB47BC)
-val TextPrimary = Color(0xFFF5F5F7)
-val TextSecondary = Color(0xFF9E9EAE)
-val BorderColor = Color(0xFF2C2C3A)
+// Premium Dark Color Palette (dynamic definitions located in Theme.kt)
 
 enum class SearchMode {
     Lexical, Semantic

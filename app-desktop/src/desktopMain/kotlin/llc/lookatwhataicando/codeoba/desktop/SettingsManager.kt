@@ -175,6 +175,26 @@ object SettingsManager {
     fun setSelectedGroupFilter(value: String?) {
         prefs.put("selected_group_filter", value ?: "")
     }
+
+    fun getThemeCode(): String {
+        return prefs.get("theme_code", "obsidian")
+    }
+
+    fun setThemeCode(code: String) {
+        prefs.put("theme_code", code)
+    }
+
+    fun getCustomBg(): Int = prefs.getInt("custom_bg", 0xFF0C0C0E.toInt())
+    fun setCustomBg(value: Int) = prefs.putInt("custom_bg", value)
+
+    fun getCustomSurface(): Int = prefs.getInt("custom_surface", 0xFF14141A.toInt())
+    fun setCustomSurface(value: Int) = prefs.putInt("custom_surface", value)
+
+    fun getCustomAccent1(): Int = prefs.getInt("custom_accent1", 0xFF00E5FF.toInt())
+    fun setCustomAccent1(value: Int) = prefs.putInt("custom_accent1", value)
+
+    fun getCustomAccent2(): Int = prefs.getInt("custom_accent2", 0xFFAB47BC.toInt())
+    fun setCustomAccent2(value: Int) = prefs.putInt("custom_accent2", value)
 }
 
 fun SourceAdapter.isEffectiveEnabled(): Boolean {

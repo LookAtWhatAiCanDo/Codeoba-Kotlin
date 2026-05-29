@@ -14,6 +14,7 @@ import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,7 +30,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -37,6 +40,10 @@ import java.awt.Cursor
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceRegistry
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
+
 
 enum class SettingsCategory(val displayName: String) {
     General("General"),
@@ -49,7 +56,7 @@ fun SettingsDialog(
     onClose: () -> Unit,
     onSettingsChanged: () -> Unit
 ) {
-    var selectedCategory by remember { mutableStateOf(SettingsCategory.Sources) }
+    var selectedCategory by remember { mutableStateOf(SettingsCategory.General) }
     var deletingSource by remember { mutableStateOf<SourceAdapter?>(null) }
 
     Box(
@@ -163,7 +170,7 @@ fun SettingsDialog(
 
                                 Column(
                                     verticalArrangement = Arrangement.spacedBy(16.dp),
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                                 ) {
                                     Card(
                                         modifier = Modifier
@@ -209,6 +216,54 @@ fun SettingsDialog(
                                                 ),
                                                 modifier = Modifier.pointerHoverIcon(PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)))
                                             )
+                                        }
+                                    }
+
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                                        colors = CardDefaults.cardColors(containerColor = CardSurface),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Text(
+                                                    text = "Color Theme",
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                    color = TextPrimary
+                                                )
+                                                Text(
+                                                    text = "Select a handsome theme to style the workspace interface.",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = TextSecondary
+                                                )
+                                            }
+
+                                            val themeList = themes.values.toList()
+                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                themeList.chunked(3).forEach { rowThemes ->
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        rowThemes.forEach { theme ->
+                                                            ThemeSelectorItem(theme, onSettingsChanged)
+                                                        }
+                                                        repeat(3 - rowThemes.size) {
+                                                            Spacer(modifier = Modifier.weight(1f))
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            if (ThemeManager.currentThemeCode == "custom") {
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                CustomThemeEditorSection(onSettingsChanged)
+                                            }
                                         }
                                     }
                                 }
@@ -533,3 +588,300 @@ fun SourceSettingItem(
         }
     }
 }
+
+@Composable
+fun RowScope.ThemeSelectorItem(
+    theme: ColorTheme,
+    onSettingsChanged: () -> Unit
+) {
+    val isSelected = ThemeManager.currentThemeCode == theme.code
+    Card(
+        modifier = Modifier
+            .weight(1f)
+            .height(68.dp)
+            .border(
+                border = BorderStroke(
+                    width = if (isSelected) 2.dp else 1.dp,
+                    color = if (isSelected) theme.accentCyan else BorderColor
+                ),
+                shape = RoundedCornerShape(8.dp)
+            )
+            .clip(RoundedCornerShape(8.dp))
+            .clickable {
+                ThemeManager.currentThemeCode = theme.code
+                SettingsManager.setThemeCode(theme.code)
+                onSettingsChanged()
+            }
+            .pointerHoverIcon(PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR))),
+        colors = CardDefaults.cardColors(containerColor = theme.slateSurface)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = theme.name,
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                color = theme.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Background color dot
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(theme.obsidianBg)
+                        .border(0.5.dp, theme.borderColor, CircleShape)
+                )
+                // Surface/Card color dot
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(theme.cardSurface)
+                        .border(0.5.dp, theme.borderColor, CircleShape)
+                )
+                // Accent Cyan color dot
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(theme.accentCyan)
+                )
+                // Accent Purple color dot
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(theme.accentPurple)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CustomThemeEditorSection(onSettingsChanged: () -> Unit) {
+    var activeColorIndex by remember { mutableStateOf(2) } // default to Accent 1
+
+    val activeColorValue = when (activeColorIndex) {
+        0 -> ThemeManager.customBg
+        1 -> ThemeManager.customSurface
+        2 -> ThemeManager.customAccent1
+        else -> ThemeManager.customAccent2
+    }
+
+    val hsl = remember(activeColorValue) { colorToHsl(activeColorValue) }
+    var hue by remember(activeColorValue) { mutableStateOf(hsl[0]) }
+    var saturation by remember(activeColorValue) { mutableStateOf(hsl[1]) }
+    var lightness by remember(activeColorValue) { mutableStateOf(hsl[2]) }
+
+    fun updateActiveColor(h: Float, s: Float, l: Float) {
+        val newColor = hslToColor(h, s, l)
+        when (activeColorIndex) {
+            0 -> ThemeManager.updateCustomBg(newColor)
+            1 -> ThemeManager.updateCustomSurface(newColor)
+            2 -> ThemeManager.updateCustomAccent1(newColor)
+            3 -> ThemeManager.updateCustomAccent2(newColor)
+        }
+    }
+
+    fun rollComplementaryTheme() {
+        val h1 = (0..359).random().toFloat()
+        val relation = listOf(150, 180, 210).random()
+        val h2 = (h1 + relation) % 360f
+        val bgHue = (h1 + listOf(-30, 0, 30).random() + 360) % 360f
+        
+        val bgSat = (8..15).random() / 100f
+        val bgLight = (4..7).random() / 100f
+        val bg = hslToColor(bgHue, bgSat, bgLight)
+        
+        val surfaceLight = (8..11).random() / 100f
+        val surface = hslToColor(bgHue, bgSat, surfaceLight)
+        
+        val accent1 = hslToColor(h1, (85..100).random() / 100f, (50..60).random() / 100f)
+        val accent2 = hslToColor(h2, (75..95).random() / 100f, (55..65).random() / 100f)
+        
+        ThemeManager.updateCustomBg(bg)
+        ThemeManager.updateCustomSurface(surface)
+        ThemeManager.updateCustomAccent1(accent1)
+        ThemeManager.updateCustomAccent2(accent2)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SlateSurface.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+            .border(1.dp, BorderColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Custom Theme Designer",
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                color = TextPrimary
+            )
+
+            Button(
+                onClick = {
+                    rollComplementaryTheme()
+                    onSettingsChanged()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AccentCyan,
+                    contentColor = ObsidianBg
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier
+                    .height(28.dp)
+                    .pointerHoverIcon(PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)))
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bolt,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = "Roll Compliments",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.offset(y = (-0.5).dp)
+                    )
+                }
+            }
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            listOf(
+                "Bg" to ThemeManager.customBg,
+                "Surface" to ThemeManager.customSurface,
+                "Accent 1" to ThemeManager.customAccent1,
+                "Accent 2" to ThemeManager.customAccent2
+            ).forEachIndexed { index, (label, color) ->
+                val isActive = activeColorIndex == index
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clickable { activeColorIndex = index }
+                        .pointerHoverIcon(PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .border(
+                                width = if (isActive) 2.dp else 1.dp,
+                                color = if (isActive) AccentCyan else BorderColor.copy(alpha = 0.7f),
+                                shape = CircleShape
+                            )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 10.sp,
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
+                        ),
+                        color = if (isActive) AccentCyan else TextSecondary
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider(color = BorderColor.copy(alpha = 0.3f))
+
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Hue: ${hue.toInt()}°",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    modifier = Modifier.width(80.dp)
+                )
+                Slider(
+                    value = hue,
+                    onValueChange = {
+                        hue = it
+                        updateActiveColor(hue, saturation, lightness)
+                        onSettingsChanged()
+                    },
+                    valueRange = 0f..360f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = AccentCyan,
+                        activeTrackColor = AccentCyan,
+                        inactiveTrackColor = BorderColor
+                    ),
+                    modifier = Modifier.weight(1f).height(18.dp)
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Sat: ${(saturation * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    modifier = Modifier.width(80.dp)
+                )
+                Slider(
+                    value = saturation,
+                    onValueChange = {
+                        saturation = it
+                        updateActiveColor(hue, saturation, lightness)
+                        onSettingsChanged()
+                    },
+                    valueRange = 0f..1f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = AccentCyan,
+                        activeTrackColor = AccentCyan,
+                        inactiveTrackColor = BorderColor
+                    ),
+                    modifier = Modifier.weight(1f).height(18.dp)
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Light: ${(lightness * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    modifier = Modifier.width(80.dp)
+                )
+                Slider(
+                    value = lightness,
+                    onValueChange = {
+                        lightness = it
+                        updateActiveColor(hue, saturation, lightness)
+                        onSettingsChanged()
+                    },
+                    valueRange = 0f..1f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = AccentCyan,
+                        activeTrackColor = AccentCyan,
+                        inactiveTrackColor = BorderColor
+                    ),
+                    modifier = Modifier.weight(1f).height(18.dp)
+                )
+            }
+        }
+    }
+}
+
+
