@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -58,6 +59,8 @@ fun Sidebar(
     ignoredSources: Set<String>,
     activeStatusFilters: Set<ArchivalFilter>,
     onStatusFilterToggle: (ArchivalFilter) -> Unit,
+    pinnedSessionIds: Set<String>,
+    onTogglePin: (Session) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var toastMessage by remember { mutableStateOf<String?>(null) }
@@ -86,15 +89,24 @@ fun Sidebar(
         }
     }
 
-    val sortedSearchResults = remember(searchResults, effectiveSortBy, sortAscending) {
-        if (effectiveSortBy == SidebarSortDimension.RELEVANCE) {
+    val sortedSearchResults = remember(searchResults, effectiveSortBy, sortAscending, pinnedSessionIds) {
+        val mappedResults = searchResults.map { result ->
+            val pinned = pinnedSessionIds.contains(result.session.id)
+            if (result.session.isPinned != pinned) {
+                result.copy(session = result.session.copy(isPinned = pinned))
+            } else {
+                result
+            }
+        }
+
+        val baseSorted = if (effectiveSortBy == SidebarSortDimension.RELEVANCE) {
             if (sortAscending) {
-                searchResults.sortedWith(
+                mappedResults.sortedWith(
                     compareBy<SearchResult> { it.score }
                         .thenBy { it.session.updatedAt }
                 )
             } else {
-                searchResults.sortedWith(
+                mappedResults.sortedWith(
                     compareByDescending<SearchResult> { it.score }
                         .thenByDescending { it.session.updatedAt }
                 )
@@ -119,11 +131,13 @@ fun Sidebar(
                 else -> compareBy<SearchResult> { it.session.updatedAt }
             }
             if (sortAscending) {
-                searchResults.sortedWith(comparator)
+                mappedResults.sortedWith(comparator)
             } else {
-                searchResults.sortedWith(comparator.reversed())
+                mappedResults.sortedWith(comparator.reversed())
             }
         }
+
+        baseSorted.sortedByDescending { it.session.isPinned }
     }
 
     LaunchedEffect(toastMessage) {
@@ -569,7 +583,8 @@ fun Sidebar(
                                 onCopyPath = { path ->
                                     copyToClipboard(path)
                                     toastMessage = "Source file path copied to clipboard"
-                                }
+                                },
+                                onTogglePin = onTogglePin
                             )
                         }
                     }
@@ -632,7 +647,8 @@ fun SessionItem(
     result: SearchResult,
     isSelected: Boolean,
     onClick: () -> Unit,
-    onCopyPath: (String) -> Unit
+    onCopyPath: (String) -> Unit,
+    onTogglePin: (Session) -> Unit
 ) {
     val session = result.session
     val badgeColors = getSourceBadgeColors(session.sourceId)
@@ -708,14 +724,34 @@ fun SessionItem(
                             )
                         }
                     }
+
                 }
-                // Date
-                Text(
-                    text = formattedDate,
-                    color = TextSecondary,
-                    fontSize = 11.sp,
-                    lineHeight = 11.sp
-                )
+                // Date and Pin button
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = formattedDate,
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        lineHeight = 11.sp
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { onTogglePin(session) }
+                            .padding(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (session.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                            contentDescription = if (session.isPinned) "Unpin Conversation" else "Pin Conversation",
+                            tint = if (session.isPinned) AccentCyan else TextSecondary.copy(alpha = 0.4f),
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(6.dp))

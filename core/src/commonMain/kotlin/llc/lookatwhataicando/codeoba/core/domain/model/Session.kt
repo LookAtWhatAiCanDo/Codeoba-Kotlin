@@ -12,5 +12,6 @@ data class Session(
     val cwd: String?,           // detected project workspace directory
     val threadName: String?,    // thread name or title
     val turns: List<Turn>,
-    val isArchived: Boolean = false
+    val isArchived: Boolean = false,
+    val isPinned: Boolean = false
 )

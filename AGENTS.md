@@ -137,6 +137,12 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Persists statistics within `Turn.extraData` as `isCompaction` and `compactionTimeMs`.
     - Exposes stats in the UI as a dedicated "Compactions: N" badge on active sessions and "Context Compactions" and "Est. Compaction Time" cards in the main workspace statistics dashboard.
 
+19. **Conversation Pinning**:
+    - Allows users to pin/unpin conversation sessions via a context menu option in the sidebar list or an actions dropdown option in the detail toolbar.
+    - Persists the set of pinned session IDs locally using Java Preferences API (`SettingsManager`).
+    - Integrates with the local sidebar list sorting (`sortedSearchResults` remember block) by stable-sorting pinned items to float them to the top: `.sortedByDescending { it.session.isPinned }`. This keeps pinned sessions at the top while preserving sorting dimensions inside both pinned and unpinned groups.
+    - Renders a custom cyan "Pinned" badge in the sidebar items, and displays a small cyan pin icon next to the session title in the detail toolbar.
+
 ---
 
 ## 🛠️ Common Gradle Development Commands

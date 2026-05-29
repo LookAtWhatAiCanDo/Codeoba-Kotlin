@@ -37,7 +37,8 @@ data class Session(
     val cwd: String?,
     val threadName: String?,
     val turns: List<Turn>,
-    val isArchived: Boolean
+    val isArchived: Boolean,
+    val isPinned: Boolean
 )
 
 data class Turn(

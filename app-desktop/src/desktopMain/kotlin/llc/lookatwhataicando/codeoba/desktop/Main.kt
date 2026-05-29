@@ -383,6 +383,13 @@ fun mainEntry() = application {
     var searchResults by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
     var isIndexing by remember { mutableStateOf(true) }
 
+    var pinnedSessionIds by remember { mutableStateOf(SettingsManager.getPinnedSessionIds()) }
+
+    fun toggleSessionPinned(session: Session) {
+        SettingsManager.toggleSessionPinned(session.id)
+        pinnedSessionIds = SettingsManager.getPinnedSessionIds()
+    }
+
     var showDetailFindBar by remember { mutableStateOf(false) }
     var findQueryValue by remember { mutableStateOf(TextFieldValue("")) }
     var findMatchCase by remember { mutableStateOf(false) }
@@ -430,8 +437,11 @@ fun mainEntry() = application {
 
     val currentSessionId = if (navigationIndex in navigationStack.indices) navigationStack[navigationIndex] else null
 
-    LaunchedEffect(currentSessionId, searchResults) {
-        selectedSession = currentSessionId?.let { currentEngine.getSession(it) }
+    LaunchedEffect(currentSessionId, searchResults, pinnedSessionIds) {
+        selectedSession = currentSessionId?.let { id ->
+            val sess = currentEngine.getSession(id)
+            sess?.copy(isPinned = pinnedSessionIds.contains(id))
+        }
     }
 
     LaunchedEffect(selectedSession) {
@@ -710,6 +720,8 @@ fun mainEntry() = application {
                                         activeStatusFilters + filter
                                     }
                                 },
+                                pinnedSessionIds = pinnedSessionIds,
+                                onTogglePin = { toggleSessionPinned(it) },
                                 modifier = Modifier.width(sidebarWidth)
                             )
 
@@ -780,6 +792,7 @@ fun mainEntry() = application {
                             onRefresh = { refreshTrigger++ },
                             onSessionSelect = { navigateTo(it?.id) },
                             onOpenSettings = { showSettingsDialog = true },
+                            onTogglePin = { toggleSessionPinned(it) },
                             modifier = Modifier.weight(1f)
                         )
                     }

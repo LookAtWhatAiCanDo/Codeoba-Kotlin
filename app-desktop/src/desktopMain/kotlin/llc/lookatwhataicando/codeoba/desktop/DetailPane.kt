@@ -80,6 +80,7 @@ fun DetailPaneToolbar(
     onOpenSettings: () -> Unit,
     isHeaderExpanded: Boolean,
     onToggleHeader: () -> Unit,
+    onTogglePin: (Session) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -254,6 +255,16 @@ fun DetailPaneToolbar(
                                 modifier = Modifier.weight(1f, fill = false)
                             )
 
+                            if (session.isPinned) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.PushPin,
+                                    contentDescription = "Pinned",
+                                    tint = AccentCyan,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+
                             Spacer(modifier = Modifier.width(8.dp))
 
                             // Source Badge
@@ -304,6 +315,13 @@ fun DetailPaneToolbar(
                                     onDismissRequest = { showMenu = false },
                                     modifier = Modifier.background(CardSurface).border(1.dp, BorderColor, RoundedCornerShape(8.dp))
                                 ) {
+                                    DropdownMenuItem(
+                                        text = { Text(if (session.isPinned) "Unpin Conversation" else "Pin Conversation", color = TextPrimary, fontSize = 13.sp) },
+                                        onClick = {
+                                            showMenu = false
+                                            onTogglePin(session)
+                                        }
+                                    )
                                     DropdownMenuItem(
                                         text = { Text("Open Session File", color = TextPrimary, fontSize = 13.sp) },
                                         onClick = {
@@ -533,6 +551,7 @@ fun DetailPane(
     onRefresh: () -> Unit,
     onSessionSelect: (Session?) -> Unit,
     onOpenSettings: () -> Unit,
+    onTogglePin: (Session) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val lazyListState = remember(session?.id) {
@@ -1147,6 +1166,7 @@ fun DetailPane(
             onOpenSettings = onOpenSettings,
             isHeaderExpanded = isHeaderExpanded,
             onToggleHeader = { isHeaderExpanded = !isHeaderExpanded },
+            onTogglePin = onTogglePin,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(

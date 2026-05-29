@@ -142,6 +142,30 @@ object SettingsManager {
     fun setSidebarSortAscending(value: Boolean) {
         prefs.putBoolean("sidebar_sort_ascending", value)
     }
+
+    fun getPinnedSessionIds(): Set<String> {
+        val value = prefs.get("pinned_session_ids", "")
+        if (value.isEmpty()) return emptySet()
+        return value.split(",").toSet()
+    }
+
+    fun setPinnedSessionIds(ids: Set<String>) {
+        prefs.put("pinned_session_ids", ids.joinToString(","))
+    }
+
+    fun toggleSessionPinned(sessionId: String) {
+        val current = getPinnedSessionIds().toMutableSet()
+        if (current.contains(sessionId)) {
+            current.remove(sessionId)
+        } else {
+            current.add(sessionId)
+        }
+        setPinnedSessionIds(current)
+    }
+
+    fun isSessionPinned(sessionId: String): Boolean {
+        return getPinnedSessionIds().contains(sessionId)
+    }
 }
 
 fun SourceAdapter.isEffectiveEnabled(): Boolean {
