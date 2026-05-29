@@ -14,8 +14,33 @@ data class SearchFilter(
     val matchCase: Boolean = false,
     val wholeWord: Boolean = false,
     val useRegex: Boolean = false,
-    val archivalFilter: ArchivalFilter = ArchivalFilter.ALL
+    val archivalFilter: ArchivalFilter = ArchivalFilter.ALL,
+    val sessionIds: Set<String>? = null
 )
+
+fun SearchFilter.matches(session: Session): Boolean {
+    if (sourceIds.isNotEmpty() && !sourceIds.contains(session.sourceId)) {
+        return false
+    }
+    if (session.updatedAt < minTimestamp || session.updatedAt > maxTimestamp) {
+        return false
+    }
+    if (cwdFilter != null) {
+        val cwd = session.cwd ?: return false
+        if (!cwd.lowercase().contains(cwdFilter.lowercase())) {
+            return false
+        }
+    }
+    when (archivalFilter) {
+        ArchivalFilter.ACTIVE -> if (session.isArchived) return false
+        ArchivalFilter.ARCHIVED -> if (!session.isArchived) return false
+        ArchivalFilter.ALL -> {}
+    }
+    if (sessionIds != null && !sessionIds.contains(session.id)) {
+        return false
+    }
+    return true
+}
 
 fun buildFindRegex(query: String, matchCase: Boolean, wholeWord: Boolean, useRegex: Boolean): Regex? {
     if (query.isEmpty()) return null

@@ -74,6 +74,14 @@ class SemanticSearchEngine(
     }
 
     override suspend fun search(query: String, filter: SearchFilter): List<SearchResult> {
+        if (query.isBlank()) {
+            val allSessions = synchronized(sessionsMap) { sessionsMap.values.toList() }
+            return allSessions
+                .filter { filter.matches(it) }
+                .map { SearchResult(it, emptyList(), score = 1.0f) }
+                .sortedByDescending { it.session.updatedAt }
+        }
+
         val queryEmbedding = try {
             embedder.getEmbeddings(query)
         } catch (e: Exception) {
@@ -84,7 +92,7 @@ class SemanticSearchEngine(
         val currentSessions = synchronized(sessionsMap) { sessionsMap.values.toList() }
 
         for (session in currentSessions) {
-            if (!matchesFilter(session, filter)) continue
+            if (!filter.matches(session)) continue
 
             val index = synchronized(sessionsMap) { sessionEmbeddings[session.id] } ?: continue
             val matchedTurnIndexes = mutableListOf<Int>()
@@ -133,24 +141,4 @@ class SemanticSearchEngine(
         return (dotProduct / (sqrt(normA) * sqrt(normB))).toFloat()
     }
 
-    private fun matchesFilter(session: Session, filter: SearchFilter): Boolean {
-        if (filter.sourceIds.isNotEmpty() && !filter.sourceIds.contains(session.sourceId)) {
-            return false
-        }
-        if (session.updatedAt < filter.minTimestamp || session.updatedAt > filter.maxTimestamp) {
-            return false
-        }
-        if (filter.cwdFilter != null) {
-            val cwd = session.cwd ?: return false
-            if (!cwd.lowercase().contains(filter.cwdFilter.lowercase())) {
-                return false
-            }
-        }
-        when (filter.archivalFilter) {
-            ArchivalFilter.ACTIVE -> if (session.isArchived) return false
-            ArchivalFilter.ARCHIVED -> if (!session.isArchived) return false
-            ArchivalFilter.ALL -> {}
-        }
-        return true
-    }
 }

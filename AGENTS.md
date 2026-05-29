@@ -52,7 +52,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
    - Never display uppercase-only labels like "USER" or "ASSISTANT". Use capitalized words (e.g. "User", "Assistant").
 
 3. **macOS Window Layout & Navigation**:
-   - Clear a `76.dp` top-left spacer to avoid overlapping the macOS transparent titlebar window controls.
+   - Clear a `76.dp` top-left spacer on macOS to avoid overlapping the macOS transparent titlebar window controls.
    - **Navigation History Stack & Breadcrumbs Toolbar**:
      - `Main.kt` maintains `navigationStack` (selected session IDs) and `navigationIndex` for Back/Forward navigation.
      - Breadcrumbs display `Workspace Name / Active Session Title`. Clickable workspace root clears selection.
@@ -102,8 +102,8 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Sorting defaults prioritize user interest: numeric metrics (Turns, Tokens, Speed, Duration) default to descending order on first click, whereas lexical metrics (Model Name) default to ascending (A-Z) order.
     - The active sort selection is indicated by an arrow icon reflecting the current direction (Upward for ascending, Downward for descending), toggling direction on subsequent clicks.
 11. **Session Item Context Menu & Toast Notification**:
-    - Right-clicking a session item in the sidebar list view (`./app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Sidebar.kt`) opens a context menu via `ContextMenuArea` allowing the user to "Copy Source File Path".
-    - Clicking the copy menu action invokes the platform clipboard utilities to copy `session.filePath` and triggers a bottom-aligned floating toast notification (`AnimatedVisibility`) overlay inside the sidebar layout with standard premium accents (`AccentCyan`).
+    - Right-clicking a session item in the sidebar list view (`./app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Sidebar.kt`) opens a custom `DropdownMenu` at the click cursor location, matching the design and actions of the detail pane actions/tags overflow menu.
+    - It provides options to toggle pin status, edit groups/tags (via an inline filterable sub-menu checklist), open the session file, and copy the session ID or file path (which triggers the bottom-aligned floating toast notification (`AnimatedVisibility`) overlay with standard premium accents (`AccentCyan`)).
 12. **Search Filter State Persistence**:
     - Persist and restore the last used "Filter by Source" and "Filter by Status" settings via `SettingsManager` (Java Preferences API) to maintain selected search filters across application launches.
 13. **Multi-Level Expandable Conversation Details**:
@@ -149,6 +149,15 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Resolves external URLs to the system browser and local `file://` URLs to an in-app overlay previewer `FileViewerDialog`.
     - `FileViewerDialog` renders markdown files (`.md`) recursively using the app's rich `MarkdownView`, and other source code files as scrollable monospace text with line numbers.
     - Provides a fallback button in the file preview dialog to launch the file in the default OS handler.
+
+21. **Sidebar Session Item Tag Display**:
+    - Each conversation item in the sidebar list view (`Sidebar.kt`) displays its assigned tags/groups using a `FlowRow` of badges styled in `AccentPurple` (12% alpha background, 40% alpha border, 4.dp rounded corners) positioned below the last message snippet.
+    - To prevent Skia/JVM text vertical alignment issues, apply `Modifier.offset(y = 0.5.dp)` to the badge text.
+
+22. **Entire Sidebar Cell Draggable Hit-Testing**:
+    - When rendering draggable list items (such as `SessionItem`), place the `.clickable` modifier *before* (outer to) the `.pointerInput` modifiers in the chain. Placing `clickable` outer makes the entire layout shape hit-testable, which forces Compose to propagate pointer events down to the inner `pointerInput` modifiers even over empty transparent spacing and gaps in the cell.
+    - Always place custom `.pointerHoverIcon(PointerIcon.Hand)` modifiers *after* `.clickable` to prevent hover gesture filters from intercepting or consuming long-press pointer events meant for drag gesture detectors.
+    - To prevent vertical drag conflicts inside scrollable containers (like `verticalScroll` or `LazyColumn` lists on Desktop), use immediate `detectDragGestures` instead of `detectDragGesturesAfterLongPress`. Because scrolling on desktop with a mouse uses the mouse wheel, dragging inside list items can start dragging immediately (past touch slop) to optimize responsiveness and success rates across all directions. Clicks still propagate normally since they do not exceed touch slop.
 
 ---
 

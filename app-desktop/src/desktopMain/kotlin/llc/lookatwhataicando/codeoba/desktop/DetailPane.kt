@@ -54,6 +54,11 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.key.*
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -70,6 +75,10 @@ import llc.lookatwhataicando.codeoba.core.domain.model.Turn
 import llc.lookatwhataicando.codeoba.core.domain.search.SearchResult
 import llc.lookatwhataicando.codeoba.core.domain.search.buildFindRegex
 import kotlinx.coroutines.launch
+import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
+import llc.lookatwhataicando.codeoba.core.domain.model.GroupTask
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+
 
 @Composable
 fun DetailPaneToolbar(
@@ -86,9 +95,13 @@ fun DetailPaneToolbar(
     isHeaderExpanded: Boolean,
     onToggleHeader: () -> Unit,
     onTogglePin: (Session) -> Unit,
+    groups: List<ConversationGroup> = emptyList(),
+    onGroupAdd: (Session, String) -> Unit = { _, _ -> },
+    onGroupRemove: (Session, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    var showGroupsSubmenu by remember { mutableStateOf(false) }
 
     val workspaceName = remember(session?.cwd) {
         val cwd = session?.cwd
@@ -304,7 +317,10 @@ fun DetailPaneToolbar(
 
                             Box {
                                 IconButton(
-                                    onClick = { showMenu = true },
+                                    onClick = { 
+                                        showGroupsSubmenu = false
+                                        showMenu = true 
+                                    },
                                     modifier = Modifier.size(28.dp)
                                 ) {
                                     Icon(
@@ -317,42 +333,211 @@ fun DetailPaneToolbar(
 
                                 DropdownMenu(
                                     expanded = showMenu,
-                                    onDismissRequest = { showMenu = false },
-                                    modifier = Modifier.background(CardSurface).border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                    onDismissRequest = { 
+                                        showMenu = false
+                                        showGroupsSubmenu = false
+                                    },
+                                    modifier = Modifier
+                                        .width(220.dp)
+                                        .background(CardSurface)
+                                        .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
                                 ) {
-                                    DropdownMenuItem(
-                                        text = { Text(if (session.isPinned) "Unpin Conversation" else "Pin Conversation", color = TextPrimary, fontSize = 13.sp) },
-                                        onClick = {
-                                            showMenu = false
-                                            onTogglePin(session)
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Open Session File", color = TextPrimary, fontSize = 13.sp) },
-                                        onClick = {
-                                            showMenu = false
-                                            try {
-                                                val file = File(session.filePath)
-                                                if (file.exists()) {
-                                                    Desktop.getDesktop().open(file)
+                                    if (showGroupsSubmenu) {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.ArrowBack,
+                                                        contentDescription = "Back",
+                                                        tint = TextSecondary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Text("Back to Actions", color = TextSecondary, fontSize = 13.sp)
                                                 }
-                                            } catch (_: Exception) {}
+                                            },
+                                            onClick = {
+                                                showGroupsSubmenu = false
+                                            }
+                                        )
+                                        HorizontalDivider(color = BorderColor, thickness = 1.dp)
+
+                                        // Search / Create Tag Field
+                                        var newTagName by remember { mutableStateOf("") }
+                                        val focusRequester = remember { FocusRequester() }
+
+                                        OutlinedTextField(
+                                            value = newTagName,
+                                            onValueChange = { newTagName = it },
+                                            placeholder = { 
+                                                Text(
+                                                    "Filter or create tag...", 
+                                                    color = TextSecondary.copy(alpha = 0.5f), 
+                                                    fontSize = 11.sp,
+                                                    style = androidx.compose.ui.text.TextStyle.Default,
+                                                    lineHeight = 11.sp
+                                                ) 
+                                            },
+                                            singleLine = true,
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = AccentCyan,
+                                                unfocusedBorderColor = BorderColor,
+                                                focusedContainerColor = ObsidianBg,
+                                                unfocusedContainerColor = ObsidianBg,
+                                                focusedTextColor = TextPrimary,
+                                                unfocusedTextColor = TextPrimary
+                                            ),
+                                            textStyle = androidx.compose.ui.text.TextStyle(
+                                                color = TextPrimary,
+                                                fontSize = 11.sp,
+                                                lineHeight = 11.sp
+                                            ),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                .focusRequester(focusRequester)
+                                                .onPreviewKeyEvent { keyEvent ->
+                                                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.Enter) {
+                                                        val trimmed = newTagName.trim()
+                                                        if (trimmed.isNotBlank()) {
+                                                            val exists = groups.any { it.name.equals(trimmed, ignoreCase = true) }
+                                                            if (!exists) {
+                                                                onGroupAdd(session, trimmed)
+                                                            } else {
+                                                                val sessionGroups = groups.filter { it.sessionIds.contains(session.id) }
+                                                                val alreadyInGroup = sessionGroups.any { 
+                                                                    it.name.equals(trimmed, ignoreCase = true)
+                                                                }
+                                                                if (!alreadyInGroup) {
+                                                                    onGroupAdd(session, trimmed)
+                                                                }
+                                                            }
+                                                            newTagName = ""
+                                                        }
+                                                        true
+                                                    } else {
+                                                        false
+                                                    }
+                                                }
+                                        )
+                                        
+                                        LaunchedEffect(showGroupsSubmenu) {
+                                            if (showGroupsSubmenu) {
+                                                focusRequester.requestFocus()
+                                            }
                                         }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Copy Session ID", color = TextPrimary, fontSize = 13.sp) },
-                                        onClick = {
-                                            showMenu = false
-                                            copyToClipboard(session.id)
+
+                                        val sessionGroups = remember(groups, session.id) {
+                                            groups.filter { it.sessionIds.contains(session.id) }
                                         }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Copy File Path", color = TextPrimary, fontSize = 13.sp) },
-                                        onClick = {
-                                            showMenu = false
-                                            copyToClipboard(session.filePath)
+
+                                        // Option to create a new tag if it doesn't exist yet and input is not empty
+                                        if (newTagName.isNotBlank()) {
+                                            val exactMatchExists = groups.any { it.name.equals(newTagName.trim(), ignoreCase = true) }
+                                            if (!exactMatchExists) {
+                                                DropdownMenuItem(
+                                                    text = { 
+                                                        Text(
+                                                            "Create tag \"${newTagName.trim()}\"", 
+                                                            color = AccentCyan, 
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        ) 
+                                                    },
+                                                    onClick = {
+                                                        onGroupAdd(session, newTagName.trim())
+                                                        newTagName = ""
+                                                    }
+                                                )
+                                            }
                                         }
-                                    )
+
+                                        val filteredGroups = remember(groups, newTagName) {
+                                            groups.filter { group ->
+                                                group.name.contains(newTagName, ignoreCase = true)
+                                            }
+                                        }
+
+                                        if (filteredGroups.isNotEmpty()) {
+                                            filteredGroups.forEach { group ->
+                                                val inGroup = sessionGroups.any { it.name == group.name }
+                                                DropdownMenuItem(
+                                                    text = { 
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            modifier = Modifier.fillMaxWidth()
+                                                        ) {
+                                                            Text(group.name, color = TextPrimary, fontSize = 12.sp)
+                                                            if (inGroup) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Check,
+                                                                    contentDescription = "Assigned",
+                                                                    tint = AccentCyan,
+                                                                    modifier = Modifier.size(16.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    },
+                                                    onClick = {
+                                                        if (inGroup) {
+                                                            onGroupRemove(session, group.name)
+                                                        } else {
+                                                            onGroupAdd(session, group.name)
+                                                        }
+                                                    }
+                                                )
+                                            }
+                                        } else if (newTagName.isBlank()) {
+                                            DropdownMenuItem(
+                                                enabled = false,
+                                                text = { Text("No tags available", color = TextSecondary, fontSize = 11.sp) },
+                                                onClick = {}
+                                            )
+                                        }
+                                    } else {
+                                        DropdownMenuItem(
+                                            text = { Text(if (session.isPinned) "Unpin Conversation" else "Pin Conversation", color = TextPrimary, fontSize = 13.sp) },
+                                            onClick = {
+                                                showMenu = false
+                                                onTogglePin(session)
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Groups / Tags", color = TextPrimary, fontSize = 13.sp) },
+                                            onClick = {
+                                                showGroupsSubmenu = true
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Open Session File", color = TextPrimary, fontSize = 13.sp) },
+                                            onClick = {
+                                                showMenu = false
+                                                try {
+                                                    val file = File(session.filePath)
+                                                    if (file.exists()) {
+                                                        Desktop.getDesktop().open(file)
+                                                    }
+                                                } catch (_: Exception) {}
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Copy Session ID", color = TextPrimary, fontSize = 13.sp) },
+                                            onClick = {
+                                                showMenu = false
+                                                copyToClipboard(session.id)
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Copy File Path", color = TextPrimary, fontSize = 13.sp) },
+                                            onClick = {
+                                                showMenu = false
+                                                copyToClipboard(session.filePath)
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -386,7 +571,13 @@ fun DetailPaneToolbar(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DetailHeaderCard(session: Session) {
+fun DetailHeaderCard(
+    session: Session,
+    groups: List<ConversationGroup>,
+    onGroupAdd: (Session, String) -> Unit,
+    onGroupRemove: (Session, String) -> Unit,
+    dragDropState: DragDropState
+) {
     val durationMs = getSessionComputeTimeMs(session)
     val totalTurns = session.turns.size
     val userCharCount = session.turns.sumOf { it.userMessage.length }
@@ -396,8 +587,16 @@ fun DetailHeaderCard(session: Session) {
     val totalTokens = promptTokens + responseTokens
     val models = session.turns.mapNotNull { it.extraData["model"] }.distinct()
 
+    val sessionGroups = remember(groups, session.id) {
+        groups.filter { it.sessionIds.contains(session.id) }
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .onGloballyPositioned { coords ->
+                dragDropState.detailHeaderBounds = coords.boundsInRoot()
+            },
         colors = CardDefaults.cardColors(containerColor = SlateSurface),
         border = BorderStroke(1.dp, BorderColor),
         shape = RoundedCornerShape(12.dp)
@@ -436,6 +635,214 @@ fun DetailHeaderCard(session: Session) {
                 }
                 Spacer(modifier = Modifier.height(12.dp))
             }
+
+            // Group Tags Section
+            Text(
+                text = "Tags / Groups",
+                color = TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+            
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Existing tag chips
+                sessionGroups.forEach { group ->
+                    var chipCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(AccentCyan.copy(alpha = 0.12f))
+                            .border(1.dp, AccentCyan.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                            .onGloballyPositioned { chipCoords = it }
+                            .pointerInput(group.name) {
+                                detectDragGestures(
+                                    onDragStart = { offset ->
+                                        val rootOffset = chipCoords?.localToRoot(offset) ?: Offset.Zero
+                                        dragDropState.draggingTag = Pair(session, group.name)
+                                        dragDropState.dragPosition = rootOffset
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        dragDropState.updateDragPosition(dragDropState.dragPosition + dragAmount)
+                                    },
+                                    onDragEnd = {
+                                        val headerBounds = dragDropState.detailHeaderBounds
+                                        if (headerBounds != null && !headerBounds.contains(dragDropState.dragPosition)) {
+                                            onGroupRemove(session, group.name)
+                                        }
+                                        dragDropState.reset()
+                                    },
+                                    onDragCancel = {
+                                        dragDropState.reset()
+                                    }
+                                )
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = group.name,
+                                color = AccentCyan,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.offset(y = 1.dp)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Remove tag",
+                                tint = AccentCyan,
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .clickable { onGroupRemove(session, group.name) }
+                            )
+                        }
+                    }
+                }
+                
+                // Add Tag Button with DropdownMenu
+                var showAddTagMenu by remember { mutableStateOf(false) }
+                var newTagName by remember { mutableStateOf("") }
+                val focusRequester = remember { FocusRequester() }
+                
+                Box {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(CardSurface)
+                            .border(1.dp, BorderColor, RoundedCornerShape(6.dp))
+                            .clickable { 
+                                showAddTagMenu = true
+                                newTagName = ""
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Add tag",
+                                tint = TextSecondary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = "Add Tag...",
+                                color = TextSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.offset(y = 1.dp)
+                            )
+                        }
+                    }
+                    
+                    DropdownMenu(
+                        expanded = showAddTagMenu,
+                        onDismissRequest = { showAddTagMenu = false },
+                        modifier = Modifier
+                            .width(220.dp)
+                            .background(SlateSurface)
+                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                    ) {
+                        // Search / Create Tag Field
+                        OutlinedTextField(
+                            value = newTagName,
+                            onValueChange = { newTagName = it },
+                            placeholder = { 
+                                Text(
+                                    "Filter or create tag...", 
+                                    color = TextSecondary.copy(alpha = 0.5f), 
+                                    fontSize = 11.sp,
+                                    style = androidx.compose.ui.text.TextStyle.Default,
+                                    lineHeight = 11.sp
+                                ) 
+                            },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = AccentCyan,
+                                unfocusedBorderColor = BorderColor,
+                                focusedContainerColor = ObsidianBg,
+                                unfocusedContainerColor = ObsidianBg,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            textStyle = androidx.compose.ui.text.TextStyle(
+                                color = TextPrimary,
+                                fontSize = 11.sp,
+                                lineHeight = 11.sp
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp)
+                                .focusRequester(focusRequester)
+                        )
+                        
+                        LaunchedEffect(showAddTagMenu) {
+                            if (showAddTagMenu) {
+                                focusRequester.requestFocus()
+                            }
+                        }
+                        
+                        val filteredGroups = remember(groups, newTagName, sessionGroups) {
+                            groups.filter { group ->
+                                !sessionGroups.any { it.name == group.name } &&
+                                group.name.contains(newTagName, ignoreCase = true)
+                            }
+                        }
+                        
+                        // Option to create a new tag if it doesn't exist yet and input is not empty
+                        if (newTagName.isNotBlank()) {
+                            val exists = groups.any { it.name.equals(newTagName.trim(), ignoreCase = true) }
+                            if (!exists) {
+                                DropdownMenuItem(
+                                    text = { 
+                                        Text(
+                                            "Create tag \"${newTagName.trim()}\"", 
+                                            color = AccentCyan, 
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        ) 
+                                    },
+                                    onClick = {
+                                        onGroupAdd(session, newTagName.trim())
+                                        showAddTagMenu = false
+                                    }
+                                )
+                            }
+                        }
+                        
+                        if (filteredGroups.isNotEmpty()) {
+                            filteredGroups.forEach { group ->
+                                DropdownMenuItem(
+                                    text = { Text(group.name, color = TextPrimary, fontSize = 12.sp) },
+                                    onClick = {
+                                        onGroupAdd(session, group.name)
+                                        showAddTagMenu = false
+                                    }
+                                )
+                            }
+                        } else if (newTagName.isBlank()) {
+                            DropdownMenuItem(
+                                enabled = false,
+                                text = { Text("No other tags available", color = TextSecondary, fontSize = 11.sp) },
+                                onClick = {}
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = BorderColor, thickness = 1.dp)
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Stats FlowRow
             FlowRow(
@@ -557,6 +964,13 @@ fun DetailPane(
     onSessionSelect: (Session?) -> Unit,
     onOpenSettings: () -> Unit,
     onTogglePin: (Session) -> Unit,
+    groups: List<ConversationGroup>,
+    onGroupAdd: (Session, String) -> Unit,
+    onGroupRemove: (Session, String) -> Unit,
+    onGroupUpdate: (ConversationGroup) -> Unit,
+    onGroupDelete: (String) -> Unit,
+    onToggleGroupPin: (String, Boolean) -> Unit,
+    dragDropState: DragDropState = remember { DragDropState() },
     onUrlClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -614,418 +1028,470 @@ fun DetailPane(
 
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 if (session == null) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(start = 24.dp, top = 80.dp, end = 24.dp, bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(24.dp)
-                    ) {
-                        if (searchResults.isEmpty()) {
-                            // Empty state (no data at all)
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 64.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Search,
-                                    contentDescription = null,
-                                    tint = BorderColor,
-                                    modifier = Modifier.size(64.dp)
+                    var selectedTab by remember { mutableStateOf(0) }
+                    
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Spacer(modifier = Modifier.height(72.dp))
+                        
+                        TabRow(
+                            selectedTabIndex = selectedTab,
+                            containerColor = SlateSurface,
+                            contentColor = AccentCyan,
+                            indicator = { tabPositions ->
+                                TabRowDefaults.Indicator(
+                                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                    color = AccentCyan
                                 )
-                                Text(
-                                    text = "No conversations found matching filters",
-                                    color = TextSecondary,
-                                    fontSize = 14.sp
-                                )
-                            }
-                        } else {
-                            // Compute statistics
-                            val totalConversations = searchResults.size
-                            val totalTurns = searchResults.sumOf { it.session.turns.size }
-                            val totalUserChars = searchResults.sumOf { it.session.turns.sumOf { turn -> turn.userMessage.length } }
-                            val totalAssistantChars = searchResults.sumOf { it.session.turns.sumOf { turn -> turn.assistantMessage.length } }
-                            val promptTokens = (totalUserChars + 3) / 4
-                            val responseTokens = (totalAssistantChars + 3) / 4
-                            val totalEstTokens = promptTokens + responseTokens
-                            val avgTurns = if (totalConversations > 0) totalTurns.toFloat() / totalConversations else 0f
-                            val totalDurationMs = searchResults.sumOf { getSessionComputeTimeMs(it.session) }
-                            val avgDurationMs = if (totalConversations > 0) totalDurationMs / totalConversations else 0L
-                            val avgSpeedText = formatSpeed(totalEstTokens.toLong(), totalDurationMs)
-
-                            val totalCompactions = searchResults.sumOf { res ->
-                                res.session.turns.count { it.extraData["isCompaction"] == "true" }
-                            }
-                            val totalCompactionTimeMs = searchResults.sumOf { res ->
-                                res.session.turns.sumOf { it.extraData["compactionTimeMs"]?.toLongOrNull() ?: 0L }
-                            }
-
-                            val modelStatsList = remember(searchResults) {
-                                class ModelStats(
-                                    var turnCount: Int = 0,
-                                    var promptChars: Long = 0,
-                                    var responseChars: Long = 0,
-                                    var computeTimeMs: Long = 0
-                                )
-                                val modelStatsMap = mutableMapOf<String, ModelStats>()
-                                for (res in searchResults) {
-                                    for (turn in res.session.turns) {
-                                        val mName = turn.extraData["model"] ?: "Unknown Model"
-                                        val stats = modelStatsMap.getOrPut(mName) { ModelStats() }
-                                        stats.turnCount++
-                                        stats.promptChars += turn.userMessage.length
-                                        stats.responseChars += turn.assistantMessage.length
-                                        val ms = turn.extraData["computeTimeMs"]?.toLongOrNull()
-                                        if (ms != null && ms > 0) {
-                                            stats.computeTimeMs += ms.coerceAtMost(900_000L)
-                                        } else if (turn.assistantMessage.isNotEmpty()) {
-                                            val estMs = (turn.assistantMessage.length / 120.0 * 1000.0).toLong()
-                                            stats.computeTimeMs += estMs.coerceIn(2000L, 60000L)
-                                        }
-                                    }
-                                }
-
-                                modelStatsMap.entries.map { (modelName, stats) ->
-                                    val modelPromptTokens = (stats.promptChars + 3) / 4
-                                    val modelResponseTokens = (stats.responseChars + 3) / 4
-                                    val modelTotalTokens = modelPromptTokens + modelResponseTokens
-                                    val speedTps = if (stats.computeTimeMs > 0) {
-                                        (modelTotalTokens.toDouble() * 1000.0) / stats.computeTimeMs
-                                    } else 0.0
-                                    ModelItemStats(
-                                        modelName = modelName,
-                                        turnCount = stats.turnCount,
-                                        promptChars = stats.promptChars,
-                                        responseChars = stats.responseChars,
-                                        computeTimeMs = stats.computeTimeMs,
-                                        totalTokens = modelTotalTokens,
-                                        speedTps = speedTps
-                                    )
-                                }
-                            }
-
-                            val sortedModelStats = remember(modelStatsList, sortBy, sortAscending) {
-                                val comparator = when (sortBy) {
-                                    ModelSortDimension.TURNS -> compareBy<ModelItemStats> { it.turnCount }
-                                    ModelSortDimension.TOKENS -> compareBy<ModelItemStats> { it.totalTokens }
-                                    ModelSortDimension.SPEED -> compareBy<ModelItemStats> { it.speedTps }
-                                    ModelSortDimension.COMPUTE -> compareBy<ModelItemStats> { it.computeTimeMs }
-                                    ModelSortDimension.NAME -> compareBy<ModelItemStats> { it.modelName.lowercase() }
-                                }
-                                if (sortAscending) {
-                                    modelStatsList.sortedWith(comparator)
-                                } else {
-                                    modelStatsList.sortedWith(comparator.reversed())
-                                }
-                            }
-
-                            // Grid of main metrics (4 rows of 2 cards each)
-                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        StatCard(
-                                            title = "Total Conversations",
-                                            value = formatNumber(totalConversations.toLong()),
-                                            subtitle = "Indexed dialog histories",
-                                            icon = Icons.Default.Folder
-                                        )
-                                    }
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        StatCard(
-                                            title = "Dialogue Exchanges",
-                                            value = formatNumber(totalTurns.toLong()),
-                                            subtitle = "Avg. Depth: ${String.format("%.1f", avgTurns)} turns / session",
-                                            icon = Icons.Default.Chat
-                                        )
-                                    }
-                                }
-
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        StatCard(
-                                            title = "Avg. Generation Speed",
-                                            value = avgSpeedText,
-                                            subtitle = "Tokens generated per second",
-                                            icon = Icons.Default.History
-                                        )
-                                    }
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        StatCard(
-                                            title = "Est. Total Tokens",
-                                            value = formatNumber(totalEstTokens.toLong()),
-                                            subtitle = "Prompt + Completion tokens",
-                                            icon = Icons.Default.CompareArrows
-                                        )
-                                    }
-                                }
-
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        StatCard(
-                                            title = "Total Compute Time",
-                                            value = formatDuration(totalDurationMs),
-                                            subtitle = "Aggregated active agent work",
-                                            icon = Icons.Default.AccessTime
-                                        )
-                                    }
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        StatCard(
-                                            title = "Avg. Session Duration",
-                                            value = formatDuration(avgDurationMs),
-                                            subtitle = "Average active work per session",
-                                            icon = Icons.Default.Timer
-                                        )
-                                    }
-                                }
-
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        StatCard(
-                                            title = "Context Compactions",
-                                            value = formatNumber(totalCompactions.toLong()),
-                                            subtitle = "Context summaries triggered",
-                                            icon = Icons.Default.Settings
-                                        )
-                                    }
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        val avgCompactionText = if (totalCompactions > 0) {
-                                            val avg = totalCompactionTimeMs.toDouble() / totalCompactions
-                                            if (avg < 1000.0) "${avg.toInt()} ms" else String.format("%.2f s", avg / 1000.0)
-                                        } else "0 ms"
-                                        StatCard(
-                                            title = "Est. Compaction Time",
-                                            value = formatDuration(totalCompactionTimeMs),
-                                            subtitle = "Avg: $avgCompactionText per compaction",
-                                            icon = Icons.Default.Refresh
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Model Performance & Usage Breakdown Section
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = SlateSurface),
-                                border = BorderStroke(1.dp, BorderColor)
-                            ) {
+                            },
+                            divider = { HorizontalDivider(color = BorderColor) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                                .border(1.dp, BorderColor, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                        ) {
+                            Tab(
+                                selected = selectedTab == 0,
+                                onClick = { selectedTab = 0 },
+                                text = { Text("Global Stats", fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = 1.dp)) },
+                                unselectedContentColor = TextSecondary,
+                                selectedContentColor = AccentCyan
+                            )
+                            Tab(
+                                selected = selectedTab == 1,
+                                onClick = { selectedTab = 1 },
+                                text = { Text("Groups Dashboard", fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = 1.dp)) },
+                                unselectedContentColor = TextSecondary,
+                                selectedContentColor = AccentCyan
+                            )
+                        }
+                        
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            if (selectedTab == 0) {
                                 Column(
-                                    modifier = Modifier.padding(20.dp),
-                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 24.dp),
+                                    verticalArrangement = Arrangement.spacedBy(24.dp)
                                 ) {
-                                    Text(
-                                        text = "Model Performance & Usage Breakdown",
-                                        color = TextPrimary,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-
-                                    // Sort selection flow row
-                                    FlowRow(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Box(
-                                            contentAlignment = Alignment.CenterStart,
-                                            modifier = Modifier.height(24.dp)
+                                    if (searchResults.isEmpty()) {
+                                        // Empty state (no data at all)
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 64.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.spacedBy(16.dp)
                                         ) {
+                                            Icon(
+                                                Icons.Default.Search,
+                                                contentDescription = null,
+                                                tint = BorderColor,
+                                                modifier = Modifier.size(64.dp)
+                                            )
                                             Text(
-                                                text = "Sort by:",
+                                                text = "No conversations found matching filters",
                                                 color = TextSecondary,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                modifier = Modifier.offset(y = 1.dp)
+                                                fontSize = 14.sp
                                             )
                                         }
-                                        ModelSortDimension.entries.forEach { dimension ->
-                                            val isSelected = sortBy == dimension
-                                            val arrowIcon = if (sortAscending) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward
-                                            Box(
-                                                contentAlignment = Alignment.Center,
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(if (isSelected) AccentCyan.copy(alpha = 0.15f) else CardSurface)
-                                                    .border(
-                                                        width = 1.dp,
-                                                        color = if (isSelected) AccentCyan else BorderColor,
-                                                        shape = RoundedCornerShape(8.dp)
+                                    } else {
+                                        // Compute statistics
+                                        val totalConversations = searchResults.size
+                                        val totalTurns = searchResults.sumOf { it.session.turns.size }
+                                        val totalUserChars = searchResults.sumOf { it.session.turns.sumOf { turn -> turn.userMessage.length } }
+                                        val totalAssistantChars = searchResults.sumOf { it.session.turns.sumOf { turn -> turn.assistantMessage.length } }
+                                        val promptTokens = (totalUserChars + 3) / 4
+                                        val responseTokens = (totalAssistantChars + 3) / 4
+                                        val totalEstTokens = promptTokens + responseTokens
+                                        val avgTurns = if (totalConversations > 0) totalTurns.toFloat() / totalConversations else 0f
+                                        val totalDurationMs = searchResults.sumOf { getSessionComputeTimeMs(it.session) }
+                                        val avgDurationMs = if (totalConversations > 0) totalDurationMs / totalConversations else 0L
+                                        val avgSpeedText = formatSpeed(totalEstTokens.toLong(), totalDurationMs)
+
+                                        val totalCompactions = searchResults.sumOf { res ->
+                                            res.session.turns.count { it.extraData["isCompaction"] == "true" }
+                                        }
+                                        val totalCompactionTimeMs = searchResults.sumOf { res ->
+                                            res.session.turns.sumOf { it.extraData["compactionTimeMs"]?.toLongOrNull() ?: 0L }
+                                        }
+
+                                        val modelStatsList = remember(searchResults) {
+                                            class ModelStats(
+                                                var turnCount: Int = 0,
+                                                var promptChars: Long = 0,
+                                                var responseChars: Long = 0,
+                                                var computeTimeMs: Long = 0
+                                            )
+                                            val modelStatsMap = mutableMapOf<String, ModelStats>()
+                                            for (res in searchResults) {
+                                                for (turn in res.session.turns) {
+                                                    val mName = turn.extraData["model"] ?: "Unknown Model"
+                                                    val stats = modelStatsMap.getOrPut(mName) { ModelStats() }
+                                                    stats.turnCount++
+                                                    stats.promptChars += turn.userMessage.length
+                                                    stats.responseChars += turn.assistantMessage.length
+                                                    val ms = turn.extraData["computeTimeMs"]?.toLongOrNull()
+                                                    if (ms != null && ms > 0) {
+                                                        stats.computeTimeMs += ms.coerceAtMost(900_000L)
+                                                    } else if (turn.assistantMessage.isNotEmpty()) {
+                                                        val estMs = (turn.assistantMessage.length / 120.0 * 1000.0).toLong()
+                                                        stats.computeTimeMs += estMs.coerceIn(2000L, 60000L)
+                                                    }
+                                                }
+                                            }
+
+                                            modelStatsMap.entries.map { (modelName, stats) ->
+                                                val modelPromptTokens = (stats.promptChars + 3) / 4
+                                                val modelResponseTokens = (stats.responseChars + 3) / 4
+                                                val modelTotalTokens = modelPromptTokens + modelResponseTokens
+                                                val speedTps = if (stats.computeTimeMs > 0) {
+                                                    (modelTotalTokens.toDouble() * 1000.0) / stats.computeTimeMs
+                                                } else 0.0
+                                                ModelItemStats(
+                                                    modelName = modelName,
+                                                    turnCount = stats.turnCount,
+                                                    promptChars = stats.promptChars,
+                                                    responseChars = stats.responseChars,
+                                                    computeTimeMs = stats.computeTimeMs,
+                                                    totalTokens = modelTotalTokens,
+                                                    speedTps = speedTps
+                                                )
+                                            }
+                                        }
+
+                                        val sortedModelStats = remember(modelStatsList, sortBy, sortAscending) {
+                                            val comparator = when (sortBy) {
+                                                ModelSortDimension.TURNS -> compareBy<ModelItemStats> { it.turnCount }
+                                                ModelSortDimension.TOKENS -> compareBy<ModelItemStats> { it.totalTokens }
+                                                ModelSortDimension.SPEED -> compareBy<ModelItemStats> { it.speedTps }
+                                                ModelSortDimension.COMPUTE -> compareBy<ModelItemStats> { it.computeTimeMs }
+                                                ModelSortDimension.NAME -> compareBy<ModelItemStats> { it.modelName.lowercase() }
+                                            }
+                                            if (sortAscending) {
+                                                modelStatsList.sortedWith(comparator)
+                                            } else {
+                                                modelStatsList.sortedWith(comparator.reversed())
+                                            }
+                                        }
+
+                                        // Grid of main metrics (4 rows of 2 cards each)
+                                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Box(modifier = Modifier.weight(1f)) {
+                                                    StatCard(
+                                                        title = "Total Conversations",
+                                                        value = formatNumber(totalConversations.toLong()),
+                                                        subtitle = "Indexed dialog histories",
+                                                        icon = Icons.Default.Folder
                                                     )
-                                                    .clickable {
-                                                        if (sortBy == dimension) {
-                                                            sortAscending = !sortAscending
-                                                        } else {
-                                                            sortBy = dimension
-                                                            sortAscending = (dimension == ModelSortDimension.NAME)
+                                                }
+                                                Box(modifier = Modifier.weight(1f)) {
+                                                    StatCard(
+                                                        title = "Dialogue Exchanges",
+                                                        value = formatNumber(totalTurns.toLong()),
+                                                        subtitle = "Avg. Depth: ${String.format("%.1f", avgTurns)} turns / session",
+                                                        icon = Icons.Default.Chat
+                                                    )
+                                                }
+                                            }
+
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Box(modifier = Modifier.weight(1f)) {
+                                                    StatCard(
+                                                        title = "Avg. Generation Speed",
+                                                        value = avgSpeedText,
+                                                        subtitle = "Tokens generated per second",
+                                                        icon = Icons.Default.History
+                                                    )
+                                                }
+                                                Box(modifier = Modifier.weight(1f)) {
+                                                    StatCard(
+                                                        title = "Est. Total Tokens",
+                                                        value = formatNumber(totalEstTokens.toLong()),
+                                                        subtitle = "Prompt + Completion tokens",
+                                                        icon = Icons.Default.CompareArrows
+                                                    )
+                                                }
+                                            }
+
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Box(modifier = Modifier.weight(1f)) {
+                                                    StatCard(
+                                                        title = "Total Compute Time",
+                                                        value = formatDuration(totalDurationMs),
+                                                        subtitle = "Aggregated active agent work",
+                                                        icon = Icons.Default.AccessTime
+                                                    )
+                                                }
+                                                Box(modifier = Modifier.weight(1f)) {
+                                                    StatCard(
+                                                        title = "Avg. Session Duration",
+                                                        value = formatDuration(avgDurationMs),
+                                                        subtitle = "Average active work per session",
+                                                        icon = Icons.Default.Timer
+                                                    )
+                                                }
+                                            }
+
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Box(modifier = Modifier.weight(1f)) {
+                                                    StatCard(
+                                                        title = "Context Compactions",
+                                                        value = formatNumber(totalCompactions.toLong()),
+                                                        subtitle = "Context summaries triggered",
+                                                        icon = Icons.Default.Settings
+                                                    )
+                                                }
+                                                Box(modifier = Modifier.weight(1f)) {
+                                                    val avgCompactionText = if (totalCompactions > 0) {
+                                                        val avg = totalCompactionTimeMs.toDouble() / totalCompactions
+                                                        if (avg < 1000.0) "${avg.toInt()} ms" else String.format("%.2f s", avg / 1000.0)
+                                                    } else "0 ms"
+                                                    StatCard(
+                                                        title = "Est. Compaction Time",
+                                                        value = formatDuration(totalCompactionTimeMs),
+                                                        subtitle = "Avg: $avgCompactionText per compaction",
+                                                        icon = Icons.Default.Refresh
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // Model Performance & Usage Breakdown Section
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = SlateSurface),
+                                            border = BorderStroke(1.dp, BorderColor)
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(20.dp),
+                                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Model Performance & Usage Breakdown",
+                                                    color = TextPrimary,
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+
+                                                // Sort selection flow row
+                                                FlowRow(
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Box(
+                                                        contentAlignment = Alignment.CenterStart,
+                                                        modifier = Modifier.height(24.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "Sort by:",
+                                                            color = TextSecondary,
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Medium,
+                                                            modifier = Modifier.offset(y = 1.dp)
+                                                        )
+                                                    }
+                                                    ModelSortDimension.entries.forEach { dimension ->
+                                                        val isSelected = sortBy == dimension
+                                                        val arrowIcon = if (sortAscending) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward
+                                                        Box(
+                                                            contentAlignment = Alignment.Center,
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(8.dp))
+                                                                .background(if (isSelected) AccentCyan.copy(alpha = 0.15f) else CardSurface)
+                                                                .border(
+                                                                    width = 1.dp,
+                                                                    color = if (isSelected) AccentCyan else BorderColor,
+                                                                    shape = RoundedCornerShape(8.dp)
+                                                                )
+                                                                .clickable {
+                                                                    if (sortBy == dimension) {
+                                                                        sortAscending = !sortAscending
+                                                                    } else {
+                                                                        sortBy = dimension
+                                                                        sortAscending = (dimension == ModelSortDimension.NAME)
+                                                                    }
+                                                                }
+                                                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                                                        ) {
+                                                            Row(
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                            ) {
+                                                                Text(
+                                                                    text = dimension.displayName,
+                                                                    color = if (isSelected) AccentCyan else TextSecondary,
+                                                                    fontSize = 11.sp,
+                                                                    fontWeight = FontWeight.Medium,
+                                                                    lineHeight = 11.sp,
+                                                                    modifier = Modifier.offset(y = 1.dp)
+                                                                )
+                                                                if (isSelected) {
+                                                                    Icon(
+                                                                        imageVector = arrowIcon,
+                                                                        contentDescription = if (sortAscending) "Sorted Ascending" else "Sorted Descending",
+                                                                        tint = AccentCyan,
+                                                                        modifier = Modifier.size(10.dp)
+                                                                    )
+                                                                }
+                                                            }
                                                         }
                                                     }
-                                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                                                }
+
+                                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                    sortedModelStats.forEach { stats ->
+                                                        val pctTurns = if (totalTurns > 0) (stats.turnCount.toFloat() / totalTurns * 100) else 0f
+                                                        val pctTime = if (totalDurationMs > 0) (stats.computeTimeMs.toFloat() / totalDurationMs * 100) else 0f
+                                                        val speed = formatSpeed(stats.totalTokens, stats.computeTimeMs)
+
+                                                        Column(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .clip(RoundedCornerShape(8.dp))
+                                                                .background(CardSurface)
+                                                                .padding(12.dp)
+                                                        ) {
+                                                            Row(
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                                modifier = Modifier.fillMaxWidth()
+                                                            ) {
+                                                                Text(
+                                                                    text = stats.modelName,
+                                                                    color = AccentCyan,
+                                                                    fontSize = 13.sp,
+                                                                    fontWeight = FontWeight.Bold
+                                                                )
+                                                                Text(
+                                                                    text = speed,
+                                                                    color = TextPrimary,
+                                                                    fontSize = 12.sp,
+                                                                    fontWeight = FontWeight.SemiBold
+                                                                )
+                                                            }
+                                                            Spacer(modifier = Modifier.height(6.dp))
+                                                            Row(
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                                                modifier = Modifier.fillMaxWidth()
+                                                            ) {
+                                                                Column(modifier = Modifier.weight(1f)) {
+                                                                    Text("Tokens", color = TextSecondary, fontSize = 10.sp)
+                                                                    Text(formatNumber(stats.totalTokens), color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                                }
+                                                                Column(modifier = Modifier.weight(1.5f)) {
+                                                                    Text("Dialogue Turns", color = TextSecondary, fontSize = 10.sp)
+                                                                    Text("${stats.turnCount} turns (${String.format("%.1f", pctTurns)}%)", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                                }
+                                                                Column(modifier = Modifier.weight(1.5f)) {
+                                                                    Text("Compute Duration", color = TextSecondary, fontSize = 10.sp)
+                                                                    Text("${formatDuration(stats.computeTimeMs)} (${String.format("%.1f", pctTime)}%)", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Source Breakdown Section
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = SlateSurface),
+                                            border = BorderStroke(1.dp, BorderColor)
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(20.dp),
+                                                verticalArrangement = Arrangement.spacedBy(16.dp)
                                             ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                ) {
-                                                    Text(
-                                                        text = dimension.displayName,
-                                                        color = if (isSelected) AccentCyan else TextSecondary,
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Medium,
-                                                        lineHeight = 11.sp,
-                                                        modifier = Modifier.offset(y = 1.dp)
-                                                    )
-                                                    if (isSelected) {
-                                                        Icon(
-                                                            imageVector = arrowIcon,
-                                                            contentDescription = if (sortAscending) "Sorted Ascending" else "Sorted Descending",
-                                                            tint = AccentCyan,
-                                                            modifier = Modifier.size(10.dp)
+                                                Text(
+                                                    text = "Source Distribution Breakdown",
+                                                    color = TextPrimary,
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+
+                                                val sourceGroups = searchResults.groupBy { it.session.sourceId }
+                                                    .mapValues { it.value.size }
+                                                    .toList()
+                                                    .sortedByDescending { it.second }
+
+                                                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                                    sourceGroups.forEach { (sourceId, count) ->
+                                                        SourceDistributionRow(
+                                                            sourceId = sourceId,
+                                                            count = count,
+                                                            total = totalConversations
                                                         )
                                                     }
                                                 }
                                             }
                                         }
-                                    }
 
-                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        sortedModelStats.forEach { stats ->
-                                            val pctTurns = if (totalTurns > 0) (stats.turnCount.toFloat() / totalTurns * 100) else 0f
-                                            val pctTime = if (totalDurationMs > 0) (stats.computeTimeMs.toFloat() / totalDurationMs * 100) else 0f
-                                            val speed = formatSpeed(stats.totalTokens, stats.computeTimeMs)
-
+                                        // Dialogue Details Breakdown Card
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = SlateSurface),
+                                            border = BorderStroke(1.dp, BorderColor)
+                                        ) {
                                             Column(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(CardSurface)
-                                                    .padding(12.dp)
+                                                modifier = Modifier.padding(20.dp),
+                                                verticalArrangement = Arrangement.spacedBy(12.dp)
                                             ) {
+                                                Text(
+                                                    text = "Dialogue Metric Specifications",
+                                                    color = TextPrimary,
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+
                                                 Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    modifier = Modifier.fillMaxWidth()
+                                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
                                                 ) {
-                                                    Text(
-                                                        text = stats.modelName,
-                                                        color = AccentCyan,
-                                                        fontSize = 13.sp,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                    Text(
-                                                        text = speed,
-                                                        color = TextPrimary,
-                                                        fontSize = 12.sp,
-                                                        fontWeight = FontWeight.SemiBold
-                                                    )
-                                                }
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                                    modifier = Modifier.fillMaxWidth()
-                                                ) {
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Text("Tokens", color = TextSecondary, fontSize = 10.sp)
-                                                        Text(formatNumber(stats.totalTokens), color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        Text("Dialogue Side", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Text("User Prompts (Requests)", color = TextPrimary, fontSize = 13.sp)
+                                                        Text("AI Responses (Replies)", color = TextPrimary, fontSize = 13.sp)
                                                     }
-                                                    Column(modifier = Modifier.weight(1.5f)) {
-                                                        Text("Dialogue Turns", color = TextSecondary, fontSize = 10.sp)
-                                                        Text("${stats.turnCount} turns (${String.format("%.1f", pctTurns)}%)", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        Text("Total Count", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Text(formatNumber(totalTurns.toLong()), color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                                        Text(formatNumber(totalTurns.toLong()), color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                                     }
-                                                    Column(modifier = Modifier.weight(1.5f)) {
-                                                        Text("Compute Duration", color = TextSecondary, fontSize = 10.sp)
-                                                        Text("${formatDuration(stats.computeTimeMs)} (${String.format("%.1f", pctTime)}%)", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        Text("Est. Tokens", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Text(formatNumber(promptTokens.toLong()), color = AccentCyan, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                                        Text(formatNumber(responseTokens.toLong()), color = AccentCyan, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                                     }
                                                 }
                                             }
                                         }
                                     }
                                 }
-                            }
-
-                            // Source Breakdown Section
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = SlateSurface),
-                                border = BorderStroke(1.dp, BorderColor)
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(20.dp),
-                                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                                ) {
-                                    Text(
-                                        text = "Source Distribution Breakdown",
-                                        color = TextPrimary,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-
-                                    val sourceGroups = searchResults.groupBy { it.session.sourceId }
-                                        .mapValues { it.value.size }
-                                        .toList()
-                                        .sortedByDescending { it.second }
-
-                                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                        sourceGroups.forEach { (sourceId, count) ->
-                                            SourceDistributionRow(
-                                                sourceId = sourceId,
-                                                count = count,
-                                                total = totalConversations
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Dialogue Details Breakdown Card
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = SlateSurface),
-                                border = BorderStroke(1.dp, BorderColor)
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(20.dp),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Text(
-                                        text = "Dialogue Metric Specifications",
-                                        color = TextPrimary,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Text("Dialogue Side", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                            Text("User Prompts (Requests)", color = TextPrimary, fontSize = 13.sp)
-                                            Text("AI Responses (Replies)", color = TextPrimary, fontSize = 13.sp)
-                                        }
-                                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Text("Total Count", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                            Text(formatNumber(totalTurns.toLong()), color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                            Text(formatNumber(totalTurns.toLong()), color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Text("Est. Tokens", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                            Text(formatNumber(promptTokens.toLong()), color = AccentCyan, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                            Text(formatNumber(responseTokens.toLong()), color = AccentCyan, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                }
+                            } else {
+                                GroupsDashboard(
+                                    groups = groups,
+                                    searchResults = searchResults,
+                                    onGroupUpdate = onGroupUpdate,
+                                    onGroupDelete = onGroupDelete,
+                                    onToggleGroupPin = onToggleGroupPin,
+                                    onSessionSelect = onSessionSelect
+                                )
                             }
                         }
                     }
@@ -1084,7 +1550,13 @@ fun DetailPane(
                             .padding(end = 12.dp)
                     ) {
                         item(key = "header_card") {
-                            DetailHeaderCard(session = session)
+                            DetailHeaderCard(
+                                session = session,
+                                groups = groups,
+                                onGroupAdd = onGroupAdd,
+                                onGroupRemove = onGroupRemove,
+                                dragDropState = dragDropState
+                            )
                         }
                         itemsIndexed(session.turns, key = { _, turn -> turn.turnId }) { turnIndex, turn ->
                             TurnCard(
@@ -1174,6 +1646,9 @@ fun DetailPane(
             isHeaderExpanded = isHeaderExpanded,
             onToggleHeader = { isHeaderExpanded = !isHeaderExpanded },
             onTogglePin = onTogglePin,
+            groups = groups,
+            onGroupAdd = onGroupAdd,
+            onGroupRemove = onGroupRemove,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(
@@ -2108,3 +2583,759 @@ fun ClickableMarkdownText(
             }
     )
 }
+
+@Composable
+fun GroupsDashboard(
+    groups: List<ConversationGroup>,
+    searchResults: List<SearchResult>,
+    onGroupUpdate: (ConversationGroup) -> Unit,
+    onGroupDelete: (String) -> Unit,
+    onToggleGroupPin: (String, Boolean) -> Unit,
+    onSessionSelect: (Session?) -> Unit
+) {
+    // Sort groups so that pinned ones float to the top
+    val sortedGroups = remember(groups) {
+        groups.sortedWith(
+            compareByDescending<ConversationGroup> { it.isPinned }
+                .thenBy { it.name.lowercase() }
+        )
+    }
+
+    var selectedGroupName by remember { mutableStateOf<String?>(null) }
+    
+    // Auto-select first group if none selected and list is not empty
+    LaunchedEffect(sortedGroups) {
+        if (selectedGroupName == null && sortedGroups.isNotEmpty()) {
+            selectedGroupName = sortedGroups.first().name
+        }
+    }
+
+    val selectedGroup = remember(sortedGroups, selectedGroupName) {
+        sortedGroups.find { it.name == selectedGroupName }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+            .background(SlateSurface)
+            .clip(RoundedCornerShape(12.dp))
+    ) {
+        // Left Column: List of Groups (Width = 240.dp)
+        Column(
+            modifier = Modifier
+                .width(240.dp)
+                .fillMaxHeight()
+                .background(SlateSurface)
+        ) {
+            Text(
+                text = "Groups",
+                color = TextPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(16.dp)
+            )
+            
+            HorizontalDivider(color = BorderColor)
+            
+            if (sortedGroups.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No groups created",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        modifier = Modifier.offset(y = 1.dp)
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    items(sortedGroups, key = { it.name }) { group ->
+                        val isSelected = group.name == selectedGroupName
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isSelected) CardSurface else Color.Transparent)
+                                .clickable { selectedGroupName = group.name }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f, fill = false)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Folder,
+                                        contentDescription = null,
+                                        tint = if (group.isPinned) AccentCyan else TextSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = group.name,
+                                        color = if (isSelected) AccentCyan else TextPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.offset(y = 1.dp)
+                                    )
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (group.isPinned) {
+                                        Icon(
+                                            imageVector = Icons.Default.PushPin,
+                                            contentDescription = "Pinned",
+                                            tint = AccentCyan,
+                                            modifier = Modifier.size(10.dp)
+                                        )
+                                    }
+                                    
+                                    // Session Count Badge
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(BorderColor)
+                                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                                    ) {
+                                        Text(
+                                            text = "${group.sessionIds.size}",
+                                            color = TextSecondary,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            lineHeight = 9.sp,
+                                            modifier = Modifier.offset(y = 1.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Vertical Divider
+        Box(
+            modifier = Modifier
+                .width(1.dp)
+                .fillMaxHeight()
+                .background(BorderColor)
+        )
+        
+        // Right Column: Group details
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .background(ObsidianBg)
+        ) {
+            if (selectedGroup == null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Select a group from the list",
+                        color = TextSecondary,
+                        fontSize = 13.sp,
+                        modifier = Modifier.offset(y = 1.dp)
+                    )
+                }
+            } else {
+                GroupDetailsView(
+                    group = selectedGroup,
+                    searchResults = searchResults,
+                    onGroupUpdate = onGroupUpdate,
+                    onGroupDelete = {
+                        onGroupDelete(it)
+                        selectedGroupName = null
+                    },
+                    onToggleGroupPin = onToggleGroupPin,
+                    onSessionSelect = onSessionSelect
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun GroupDetailsView(
+    group: ConversationGroup,
+    searchResults: List<SearchResult>,
+    onGroupUpdate: (ConversationGroup) -> Unit,
+    onGroupDelete: (String) -> Unit,
+    onToggleGroupPin: (String, Boolean) -> Unit,
+    onSessionSelect: (Session?) -> Unit
+) {
+    // Group Sessions
+    val groupSessions = remember(searchResults, group.sessionIds) {
+        searchResults.filter { group.sessionIds.contains(it.session.id) }
+    }
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        // Row: Header and Actions
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f, fill = false)
+            ) {
+                Text(
+                    text = group.name,
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                IconButton(
+                    onClick = { onToggleGroupPin(group.name, !group.isPinned) },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PushPin,
+                        contentDescription = if (group.isPinned) "Unpin Group" else "Pin Group",
+                        tint = if (group.isPinned) AccentCyan else TextSecondary.copy(alpha = 0.5f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Status Dropdown
+                var statusExpanded by remember { mutableStateOf(false) }
+                val statusColors = when (group.status) {
+                    "Completed" -> Pair(Color(0xFF81C784), Color(0xFF1E3524)) // Green
+                    "Paused" -> Pair(Color(0xFFE57373), Color(0xFF381F1F)) // Red/Amber
+                    else -> Pair(AccentCyan, Color(0xFF00373E)) // Active (Cyan)
+                }
+                
+                Box {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(statusColors.second)
+                            .border(1.dp, statusColors.first, RoundedCornerShape(6.dp))
+                            .clickable { statusExpanded = true }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = group.status,
+                            color = statusColors.first,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.offset(y = 1.dp)
+                        )
+                    }
+                    
+                    DropdownMenu(
+                        expanded = statusExpanded,
+                        onDismissRequest = { statusExpanded = false },
+                        modifier = Modifier
+                            .background(CardSurface)
+                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                    ) {
+                        listOf("Active", "Completed", "Paused").forEach { statusOption ->
+                            DropdownMenuItem(
+                                text = { Text(statusOption, color = TextPrimary, fontSize = 12.sp) },
+                                onClick = {
+                                    statusExpanded = false
+                                    onGroupUpdate(group.copy(status = statusOption, updatedAt = System.currentTimeMillis()))
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                // Delete Action
+                IconButton(
+                    onClick = { onGroupDelete(group.name) },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete Group",
+                        tint = TextSecondary.copy(alpha = 0.8f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+        
+        HorizontalDivider(color = BorderColor)
+        
+        // Editable description & summary notes
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "Description",
+                color = TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+            
+            OutlinedTextField(
+                value = group.description,
+                onValueChange = {
+                    onGroupUpdate(group.copy(description = it, updatedAt = System.currentTimeMillis()))
+                },
+                placeholder = { 
+                    Text(
+                        "Enter group description...", 
+                        color = TextSecondary.copy(alpha = 0.4f), 
+                        fontSize = 12.sp,
+                        style = androidx.compose.ui.text.TextStyle.Default,
+                        lineHeight = 12.sp
+                    ) 
+                },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AccentCyan,
+                    unfocusedBorderColor = BorderColor,
+                    focusedContainerColor = CardSurface,
+                    unfocusedContainerColor = CardSurface,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                ),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    lineHeight = 12.sp
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "Past Work Summary & Notes",
+                color = TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+            
+            OutlinedTextField(
+                value = group.pastWorkSummary,
+                onValueChange = {
+                    onGroupUpdate(group.copy(pastWorkSummary = it, updatedAt = System.currentTimeMillis()))
+                },
+                placeholder = { 
+                    Text(
+                        "Summarize past research or decisions made across this group of agent runs...", 
+                        color = TextSecondary.copy(alpha = 0.4f), 
+                        fontSize = 12.sp,
+                        style = androidx.compose.ui.text.TextStyle.Default,
+                        lineHeight = 12.sp
+                    ) 
+                },
+                minLines = 4,
+                maxLines = 8,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AccentCyan,
+                    unfocusedBorderColor = BorderColor,
+                    focusedContainerColor = CardSurface,
+                    unfocusedContainerColor = CardSurface,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                ),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    color = TextPrimary,
+                    fontSize = 12.sp
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        
+        // Future Tasks Checklist
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = CardSurface),
+            border = BorderStroke(1.dp, BorderColor)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Tasks & Action Items",
+                        color = TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    var showAddTaskDialog by remember { mutableStateOf(false) }
+                    var newTaskTitle by remember { mutableStateOf("") }
+                    
+                    IconButton(
+                        onClick = { showAddTaskDialog = true },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add Task",
+                            tint = AccentCyan,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    
+                    if (showAddTaskDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showAddTaskDialog = false },
+                            title = { Text("Add New Task", color = TextPrimary) },
+                            text = {
+                                OutlinedTextField(
+                                    value = newTaskTitle,
+                                    onValueChange = { newTaskTitle = it },
+                                    label = { Text("Task description", color = TextSecondary) },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = AccentCyan,
+                                        unfocusedBorderColor = BorderColor,
+                                        focusedContainerColor = ObsidianBg,
+                                        unfocusedContainerColor = ObsidianBg,
+                                        focusedTextColor = TextPrimary,
+                                        unfocusedTextColor = TextPrimary
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        if (newTaskTitle.isNotBlank()) {
+                                            val newTask = GroupTask(
+                                                id = java.util.UUID.randomUUID().toString(),
+                                                title = newTaskTitle.trim(),
+                                                isCompleted = false
+                                            )
+                                            onGroupUpdate(group.copy(
+                                                tasks = group.tasks + newTask,
+                                                updatedAt = System.currentTimeMillis()
+                                            ))
+                                        }
+                                        newTaskTitle = ""
+                                        showAddTaskDialog = false
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = ObsidianBg)
+                                ) {
+                                    Text("Add")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showAddTaskDialog = false }) {
+                                    Text("Cancel", color = TextSecondary)
+                                }
+                            },
+                            containerColor = SlateSurface
+                        )
+                    }
+                }
+                
+                HorizontalDivider(color = BorderColor)
+                
+                if (group.tasks.isEmpty()) {
+                    Text(
+                        text = "No tasks listed. Add a task using the '+' button above.",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        group.tasks.forEach { task ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(ObsidianBg.copy(alpha = 0.5f))
+                                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f, fill = false)
+                                ) {
+                                    Checkbox(
+                                        checked = task.isCompleted,
+                                        onCheckedChange = { checked ->
+                                            val updatedTasks = group.tasks.map {
+                                                if (it.id == task.id) it.copy(isCompleted = checked) else it
+                                            }
+                                            onGroupUpdate(group.copy(tasks = updatedTasks, updatedAt = System.currentTimeMillis()))
+                                        },
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = AccentCyan,
+                                            checkmarkColor = ObsidianBg,
+                                            uncheckedColor = BorderColor
+                                        )
+                                    )
+                                    Text(
+                                        text = task.title,
+                                        color = if (task.isCompleted) TextSecondary else TextPrimary,
+                                        fontSize = 12.sp,
+                                        style = if (task.isCompleted) androidx.compose.ui.text.TextStyle(textDecoration = TextDecoration.LineThrough) else androidx.compose.ui.text.TextStyle.Default,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.offset(y = 1.dp)
+                                    )
+                                }
+                                
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    // Session link badge/button
+                                    var sessionLinkExpanded by remember { mutableStateOf(false) }
+                                    val linkedSession = groupSessions.find { it.session.id == task.associatedSessionId }
+                                    
+                                    Box {
+                                        if (linkedSession != null) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(AccentPurple.copy(alpha = 0.15f))
+                                                    .border(1.dp, AccentPurple.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                                    .clickable { onSessionSelect(linkedSession.session) }
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Link,
+                                                        contentDescription = null,
+                                                        tint = AccentPurple,
+                                                        modifier = Modifier.size(10.dp)
+                                                    )
+                                                    Text(
+                                                        text = linkedSession.session.threadName ?: "Untitled Run",
+                                                        color = AccentPurple,
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.widthIn(max = 100.dp).offset(y = 1.dp)
+                                                    )
+                                                    Icon(
+                                                        imageVector = Icons.Default.Close,
+                                                        contentDescription = "Unlink",
+                                                        tint = AccentPurple,
+                                                        modifier = Modifier
+                                                            .size(10.dp)
+                                                            .clickable {
+                                                                val updatedTasks = group.tasks.map {
+                                                                    if (it.id == task.id) it.copy(associatedSessionId = null) else it
+                                                                }
+                                                                onGroupUpdate(group.copy(tasks = updatedTasks, updatedAt = System.currentTimeMillis()))
+                                                            }
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            IconButton(
+                                                onClick = { sessionLinkExpanded = true },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Link,
+                                                    contentDescription = "Link Session",
+                                                    tint = TextSecondary,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        }
+                                        
+                                        DropdownMenu(
+                                            expanded = sessionLinkExpanded,
+                                            onDismissRequest = { sessionLinkExpanded = false },
+                                            modifier = Modifier
+                                                .background(CardSurface)
+                                                .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                        ) {
+                                            if (groupSessions.isEmpty()) {
+                                                DropdownMenuItem(
+                                                    enabled = false,
+                                                    text = { Text("No sessions in group", color = TextSecondary, fontSize = 11.sp) },
+                                                    onClick = {}
+                                                )
+                                            } else {
+                                                groupSessions.forEach { res ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(res.session.threadName ?: "Untitled Run", color = TextPrimary, fontSize = 12.sp) },
+                                                        onClick = {
+                                                            val updatedTasks = group.tasks.map {
+                                                                if (it.id == task.id) it.copy(associatedSessionId = res.session.id) else it
+                                                            }
+                                                            onGroupUpdate(group.copy(tasks = updatedTasks, updatedAt = System.currentTimeMillis()))
+                                                            sessionLinkExpanded = false
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Trash Icon
+                                    IconButton(
+                                        onClick = {
+                                            val updatedTasks = group.tasks.filter { it.id != task.id }
+                                            onGroupUpdate(group.copy(tasks = updatedTasks, updatedAt = System.currentTimeMillis()))
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete task",
+                                            tint = TextSecondary.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Agent Status Monitoring Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = CardSurface),
+            border = BorderStroke(1.dp, BorderColor)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Agent Run Monitoring",
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                HorizontalDivider(color = BorderColor)
+                
+                if (groupSessions.isEmpty()) {
+                    Text(
+                        text = "No active agent run logs tagged with this group.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                } else {
+                    val sdf = remember { SimpleDateFormat("MMM d, HH:mm") }
+                    val sourceSummary = remember(groupSessions) {
+                        groupSessions.groupBy { it.session.sourceId }
+                            .map { (sourceId, searchResults) ->
+                                val turnCount = searchResults.sumOf { it.session.turns.size }
+                                val maxUpdated = searchResults.maxOf { it.session.updatedAt }
+                                val models = searchResults.flatMap { res -> res.session.turns.mapNotNull { it.extraData["model"] } }.distinct()
+                                Triple(sourceId, turnCount, Pair(maxUpdated, models))
+                            }
+                    }
+                    
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        sourceSummary.forEach { (sourceId, turns, meta) ->
+                            val badgeColors = getSourceBadgeColors(sourceId)
+                            val (lastUpdated, models) = meta
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(ObsidianBg.copy(alpha = 0.5f))
+                                    .padding(10.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    // Source Badge
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(badgeColors.second)
+                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = formatSourceDisplayName(sourceId),
+                                            color = badgeColors.first,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            lineHeight = 9.sp,
+                                            modifier = Modifier.offset(y = 1.dp)
+                                        )
+                                    }
+                                    
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            text = "Dialogue turns: $turns",
+                                            color = TextPrimary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        if (models.isNotEmpty()) {
+                                            Text(
+                                                text = "Model(s): ${models.joinToString(", ")}",
+                                                color = TextSecondary,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    }
+                                }
+                                
+                                Text(
+                                    text = "Last Active: ${sdf.format(Date(lastUpdated))}",
+                                    color = TextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

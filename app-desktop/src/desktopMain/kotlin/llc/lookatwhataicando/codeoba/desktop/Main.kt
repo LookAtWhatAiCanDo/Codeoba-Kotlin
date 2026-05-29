@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -148,7 +149,10 @@ import androidx.compose.ui.awt.ComposeWindow
 import kotlinx.coroutines.launch
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import llc.lookatwhataicando.codeoba.core.domain.model.Turn
+import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
+import llc.lookatwhataicando.codeoba.core.manager.GroupManager
 import llc.lookatwhataicando.codeoba.core.domain.search.ArchivalFilter
+import llc.lookatwhataicando.codeoba.core.domain.search.SearchEngine
 import llc.lookatwhataicando.codeoba.core.domain.search.HashSemanticEmbedder
 import llc.lookatwhataicando.codeoba.core.domain.search.LexicalSearchEngine
 import llc.lookatwhataicando.codeoba.core.domain.search.SearchFilter
@@ -384,6 +388,30 @@ fun mainEntry() = application {
     var isIndexing by remember { mutableStateOf(true) }
 
     var pinnedSessionIds by remember { mutableStateOf(SettingsManager.getPinnedSessionIds()) }
+    
+    var activeGroupFilter by remember { mutableStateOf(SettingsManager.getSelectedGroupFilter()) }
+    var groupsState by remember { mutableStateOf(emptyList<ConversationGroup>()) }
+
+    var unassignedSessionCount by remember { mutableStateOf(0) }
+    LaunchedEffect(indexUpdateTrigger, groupsState, searchMode) {
+        try {
+            val allSessions = currentEngine.search("", SearchFilter(archivalFilter = ArchivalFilter.ALL))
+            val allSessionIds = allSessions.map { it.session.id }.toSet()
+            val assignedSessionIds = groupsState.flatMap { it.sessionIds }.toSet()
+            unassignedSessionCount = (allSessionIds - assignedSessionIds).size
+        } catch (_: Exception) {
+            unassignedSessionCount = 0
+        }
+    }
+
+    LaunchedEffect(activeGroupFilter) {
+        SettingsManager.setSelectedGroupFilter(activeGroupFilter)
+    }
+
+    LaunchedEffect(Unit) {
+        GroupManager.loadGroups()
+        groupsState = GroupManager.getGroups()
+    }
 
     fun toggleSessionPinned(session: Session) {
         SettingsManager.toggleSessionPinned(session.id)
@@ -467,12 +495,18 @@ fun mainEntry() = application {
                 log("Main UI: Index update callback received")
                 indexUpdateTrigger++
                 scope.launch {
+                    val allSessions = currentEngine.search("", SearchFilter(archivalFilter = ArchivalFilter.ALL))
+                    val allSessionIds = allSessions.map { it.session.id }.toSet()
+                    GroupManager.cleanOrphanedSessions(allSessionIds)
+                    groupsState = GroupManager.getGroups()
+
                     val filter = SearchFilter(
                         sourceIds = activeFilters.toSet(),
                         matchCase = searchMatchCase,
                         wholeWord = searchWholeWord,
                         useRegex = searchUseRegex,
-                        archivalFilter = activeArchivedFilter
+                        archivalFilter = activeArchivedFilter,
+                        sessionIds = getSessionIdsForGroupAndDescendants(activeGroupFilter, groupsState, currentEngine)
                     )
                     searchResults = currentEngine.search(queryValue.text, filter)
                     log("Main UI: Search results updated inside listener, count: ${searchResults.size}")
@@ -481,12 +515,18 @@ fun mainEntry() = application {
             log("Main UI: Calling manager.initialScanAndWatch()...")
             manager.initialScanAndWatch()
             log("Main UI: manager.initialScanAndWatch() completed.")
+            val allSessions = currentEngine.search("", SearchFilter(archivalFilter = ArchivalFilter.ALL))
+            val allSessionIds = allSessions.map { it.session.id }.toSet()
+            GroupManager.cleanOrphanedSessions(allSessionIds)
+            groupsState = GroupManager.getGroups()
+
             val filter = SearchFilter(
                 sourceIds = activeFilters.toSet(),
                 matchCase = searchMatchCase,
                 wholeWord = searchWholeWord,
                 useRegex = searchUseRegex,
-                archivalFilter = activeArchivedFilter
+                archivalFilter = activeArchivedFilter,
+                sessionIds = getSessionIdsForGroupAndDescendants(activeGroupFilter, groupsState, currentEngine)
             )
             searchResults = currentEngine.search(queryValue.text, filter)
             log("Main UI: Initial search done, found ${searchResults.size} results.")
@@ -499,13 +539,14 @@ fun mainEntry() = application {
     }
 
     // Refresh search results when query or filters change
-    LaunchedEffect(queryValue.text, activeFilters.size, searchMatchCase, searchWholeWord, searchUseRegex, activeArchivedFilter) {
+    LaunchedEffect(queryValue.text, activeFilters.size, searchMatchCase, searchWholeWord, searchUseRegex, activeArchivedFilter, activeGroupFilter, groupsState) {
         val filter = SearchFilter(
             sourceIds = activeFilters.toSet(),
             matchCase = searchMatchCase,
             wholeWord = searchWholeWord,
             useRegex = searchUseRegex,
-            archivalFilter = activeArchivedFilter
+            archivalFilter = activeArchivedFilter,
+            sessionIds = getSessionIdsForGroupAndDescendants(activeGroupFilter, groupsState, currentEngine)
         )
         searchResults = currentEngine.search(queryValue.text, filter)
     }
@@ -687,6 +728,7 @@ fun mainEntry() = application {
                 onSurface = TextPrimary
             )
         ) {
+            val dragDropState = remember { DragDropState() }
             Box(modifier = Modifier.fillMaxSize()) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -723,6 +765,17 @@ fun mainEntry() = application {
                                 },
                                 pinnedSessionIds = pinnedSessionIds,
                                 onTogglePin = { toggleSessionPinned(it) },
+                                groups = groupsState,
+                                activeGroupFilter = activeGroupFilter,
+                                onActiveGroupFilterChange = { activeGroupFilter = it },
+                                unassignedSessionCount = unassignedSessionCount,
+                                onAddGroup = { name -> GroupManager.addGroup(name).also { if (it) groupsState = GroupManager.getGroups() } },
+                                onRenameGroup = { old, new -> GroupManager.renameGroup(old, new).also { if (it) { if (activeGroupFilter == old) activeGroupFilter = new; groupsState = GroupManager.getGroups() } } },
+                                onDeleteGroup = { name -> GroupManager.deleteGroup(name).also { if (activeGroupFilter == name) activeGroupFilter = null; groupsState = GroupManager.getGroups() } },
+                                onToggleGroupPin = { name, pinned -> GroupManager.setGroupPinned(name, pinned); groupsState = GroupManager.getGroups() },
+                                onGroupAdd = { session, groupName -> GroupManager.assignSessionToGroup(session.id, groupName); groupsState = GroupManager.getGroups() },
+                                onGroupRemove = { session, groupName -> GroupManager.removeSessionFromGroup(session.id, groupName); groupsState = GroupManager.getGroups() },
+                                dragDropState = dragDropState,
                                 modifier = Modifier.width(sidebarWidth)
                             )
 
@@ -755,45 +808,52 @@ fun mainEntry() = application {
                         }
 
                         // Detail Pane
-                        DetailPane(
-                            session = selectedSession,
-                            searchResults = searchResults,
-                            query = queryValue.text,
-                            showFindBar = showDetailFindBar,
-                            queryValue = findQueryValue,
-                            onQueryValueChange = { findQueryValue = it },
-                            matchCase = findMatchCase,
-                            onMatchCaseChange = { findMatchCase = it },
-                            wholeWord = findWholeWord,
-                            onWholeWordChange = { findWholeWord = it },
-                            useRegex = findUseRegex,
-                            onUseRegexChange = { findUseRegex = it },
-                            matches = matches,
-                            activeMatchIndex = activeMatchIndex,
-                            onPrevMatch = {
-                                if (matches.isNotEmpty()) {
-                                    activeMatchIndex = (activeMatchIndex - 1 + matches.size) % matches.size
-                                }
-                            },
-                            onNextMatch = {
-                                if (matches.isNotEmpty()) {
-                                    activeMatchIndex = (activeMatchIndex + 1) % matches.size
-                                }
-                            },
-                            onCloseFind = {
-                                showDetailFindBar = false
-                                findQueryValue = TextFieldValue("")
-                            },
-                            isSidebarCollapsed = isSidebarCollapsed,
-                            onToggleSidebar = { isSidebarCollapsed = !isSidebarCollapsed },
-                            canGoBack = navigationIndex > 0,
-                            canGoForward = navigationIndex < navigationStack.lastIndex,
-                            onBack = { navigateBack() },
-                            onForward = { navigateForward() },
-                            onRefresh = { refreshTrigger++ },
-                            onSessionSelect = { navigateTo(it?.id) },
-                            onOpenSettings = { showSettingsDialog = true },
-                            onTogglePin = { toggleSessionPinned(it) },
+                            DetailPane(
+                                session = selectedSession,
+                                searchResults = searchResults,
+                                dragDropState = dragDropState,
+                                query = queryValue.text,
+                                showFindBar = showDetailFindBar,
+                                queryValue = findQueryValue,
+                                onQueryValueChange = { findQueryValue = it },
+                                matchCase = findMatchCase,
+                                onMatchCaseChange = { findMatchCase = it },
+                                wholeWord = findWholeWord,
+                                onWholeWordChange = { findWholeWord = it },
+                                useRegex = findUseRegex,
+                                onUseRegexChange = { findUseRegex = it },
+                                matches = matches,
+                                activeMatchIndex = activeMatchIndex,
+                                onPrevMatch = {
+                                    if (matches.isNotEmpty()) {
+                                        activeMatchIndex = (activeMatchIndex - 1 + matches.size) % matches.size
+                                    }
+                                },
+                                onNextMatch = {
+                                    if (matches.isNotEmpty()) {
+                                        activeMatchIndex = (activeMatchIndex + 1) % matches.size
+                                    }
+                                },
+                                onCloseFind = {
+                                    showDetailFindBar = false
+                                    findQueryValue = TextFieldValue("")
+                                },
+                                isSidebarCollapsed = isSidebarCollapsed,
+                                onToggleSidebar = { isSidebarCollapsed = !isSidebarCollapsed },
+                                canGoBack = navigationIndex > 0,
+                                canGoForward = navigationIndex < navigationStack.lastIndex,
+                                onBack = { navigateBack() },
+                                onForward = { navigateForward() },
+                                onRefresh = { refreshTrigger++ },
+                                onSessionSelect = { navigateTo(it?.id) },
+                                onOpenSettings = { showSettingsDialog = true },
+                                onTogglePin = { toggleSessionPinned(it) },
+                                groups = groupsState,
+                                onGroupAdd = { session, groupName -> GroupManager.assignSessionToGroup(session.id, groupName); groupsState = GroupManager.getGroups() },
+                                onGroupRemove = { session, groupName -> GroupManager.removeSessionFromGroup(session.id, groupName); groupsState = GroupManager.getGroups() },
+                                onGroupUpdate = { group -> GroupManager.addOrUpdateGroup(group); groupsState = GroupManager.getGroups() },
+                                onGroupDelete = { groupName -> GroupManager.deleteGroup(groupName).also { if (activeGroupFilter == groupName) activeGroupFilter = null; groupsState = GroupManager.getGroups() } },
+                                onToggleGroupPin = { name, pinned -> GroupManager.setGroupPinned(name, pinned); groupsState = GroupManager.getGroups() },
                             onUrlClick = { url ->
                                 if (url.startsWith("http://") || url.startsWith("https://")) {
                                     openUrl(url)
@@ -891,7 +951,81 @@ fun mainEntry() = application {
                         }
                     )
                 }
+
+                // Floating Drag & Drop Previews
+                if (dragDropState.draggingSession != null) {
+                    val session = dragDropState.draggingSession!!
+                    Box(
+                        modifier = Modifier
+                            .offset(
+                                x = with(LocalDensity.current) { dragDropState.dragPosition.x.toDp() } - 100.dp,
+                                y = with(LocalDensity.current) { dragDropState.dragPosition.y.toDp() } - 20.dp
+                            )
+                            .width(200.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(CardSurface.copy(alpha = 0.85f))
+                            .border(1.5.dp, AccentCyan, RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = session.threadName ?: "Dialogue Session",
+                            color = TextPrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                if (dragDropState.draggingTag != null) {
+                    val (_, tagName) = dragDropState.draggingTag!!
+                    Box(
+                        modifier = Modifier
+                            .offset(
+                                x = with(LocalDensity.current) { dragDropState.dragPosition.x.toDp() } - 50.dp,
+                                y = with(LocalDensity.current) { dragDropState.dragPosition.y.toDp() } - 15.dp
+                            )
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(AccentCyan.copy(alpha = 0.85f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = tagName,
+                            color = ObsidianBg,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         }
     }
 }
+
+private suspend fun getSessionIdsForGroupAndDescendants(
+    groupName: String?,
+    groups: List<ConversationGroup>,
+    engine: SearchEngine
+): Set<String>? {
+    if (groupName == null) return null
+    if (groupName == "_none_") {
+        val assigned = groups.flatMap { it.sessionIds }.toSet()
+        val allSessionIds = try {
+            engine.search("", SearchFilter(archivalFilter = ArchivalFilter.ALL))
+                .map { it.session.id }
+                .toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+        return allSessionIds - assigned
+    }
+    val targetName = groupName.lowercase()
+    val targetPrefix = "$targetName/"
+    val matchingGroups = groups.filter {
+        val nameLower = it.name.lowercase()
+        nameLower == targetName || nameLower.startsWith(targetPrefix)
+    }
+    return matchingGroups.flatMap { it.sessionIds }.toSet()
+}
+

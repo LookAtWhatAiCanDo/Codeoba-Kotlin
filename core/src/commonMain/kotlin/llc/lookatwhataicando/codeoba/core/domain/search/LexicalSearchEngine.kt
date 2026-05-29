@@ -46,7 +46,7 @@ class LexicalSearchEngine : SearchEngine {
         if (query.isBlank()) {
             val allSessions = synchronized(sessionsMap) { sessionsMap.values.toList() }
             return allSessions
-                .filter { matchesFilter(it, filter) }
+                .filter { filter.matches(it) }
                 .map { SearchResult(it, emptyList(), score = 1.0f) }
                 .sortedByDescending { it.session.updatedAt }
         }
@@ -68,7 +68,7 @@ class LexicalSearchEngine : SearchEngine {
         val currentSessions = synchronized(sessionsMap) { sessionsMap.values.toList() }
 
         for (session in currentSessions) {
-            if (!matchesFilter(session, filter)) continue
+            if (!filter.matches(session)) continue
 
             var score = 0.0f
             val matchedTurnIndexes = mutableListOf<Int>()
@@ -118,24 +118,4 @@ class LexicalSearchEngine : SearchEngine {
         )
     }
 
-    private fun matchesFilter(session: Session, filter: SearchFilter): Boolean {
-        if (filter.sourceIds.isNotEmpty() && !filter.sourceIds.contains(session.sourceId)) {
-            return false
-        }
-        if (session.updatedAt < filter.minTimestamp || session.updatedAt > filter.maxTimestamp) {
-            return false
-        }
-        if (filter.cwdFilter != null) {
-            val cwd = session.cwd ?: return false
-            if (!cwd.lowercase().contains(filter.cwdFilter.lowercase())) {
-                return false
-            }
-        }
-        when (filter.archivalFilter) {
-            ArchivalFilter.ACTIVE -> if (session.isArchived) return false
-            ArchivalFilter.ARCHIVED -> if (!session.isArchived) return false
-            ArchivalFilter.ALL -> {}
-        }
-        return true
-    }
 }

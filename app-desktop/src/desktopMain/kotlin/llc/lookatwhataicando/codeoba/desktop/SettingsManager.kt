@@ -166,6 +166,15 @@ object SettingsManager {
     fun isSessionPinned(sessionId: String): Boolean {
         return getPinnedSessionIds().contains(sessionId)
     }
+
+    fun getSelectedGroupFilter(): String? {
+        val value = prefs.get("selected_group_filter", "")
+        return if (value.isEmpty()) null else value
+    }
+
+    fun setSelectedGroupFilter(value: String?) {
+        prefs.put("selected_group_filter", value ?: "")
+    }
 }
 
 fun SourceAdapter.isEffectiveEnabled(): Boolean {

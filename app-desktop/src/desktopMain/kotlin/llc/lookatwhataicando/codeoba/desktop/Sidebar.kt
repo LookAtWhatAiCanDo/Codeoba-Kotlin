@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
@@ -33,10 +35,26 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import llc.lookatwhataicando.codeoba.core.domain.search.ArchivalFilter
 import llc.lookatwhataicando.codeoba.core.domain.search.SearchResult
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceRegistry
+
+import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
 
 @Composable
 fun Sidebar(
@@ -61,9 +79,31 @@ fun Sidebar(
     onStatusFilterToggle: (ArchivalFilter) -> Unit,
     pinnedSessionIds: Set<String>,
     onTogglePin: (Session) -> Unit,
+    groups: List<ConversationGroup>,
+    activeGroupFilter: String?,
+    onActiveGroupFilterChange: (String?) -> Unit,
+    onAddGroup: (String) -> Unit,
+    onRenameGroup: (String, String) -> Unit,
+    onDeleteGroup: (String) -> Unit,
+    onToggleGroupPin: (String, Boolean) -> Unit,
+    onGroupAdd: (Session, String) -> Unit = { _, _ -> },
+    onGroupRemove: (Session, String) -> Unit = { _, _ -> },
+    dragDropState: DragDropState = remember { DragDropState() },
+    unassignedSessionCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
     var toastMessage by remember { mutableStateOf<String?>(null) }
+
+    var showCreateGroupDialog by remember { mutableStateOf(false) }
+    var showRenameGroupDialog by remember { mutableStateOf<String?>(null) }
+    var showDeleteGroupDialog by remember { mutableStateOf<String?>(null) }
+    var groupInputText by remember { mutableStateOf("") }
+
+    var isGroupsSectionExpanded by remember { mutableStateOf(true) }
+
+    val groupTree = remember(groups, pinnedSessionIds) {
+        buildGroupTree(groups, pinnedSessionIds)
+    }
 
     var sortBy by remember { mutableStateOf(SettingsManager.getSidebarSortBy()) }
     var sortAscending by remember { mutableStateOf(SettingsManager.getSidebarSortAscending()) }
@@ -431,6 +471,162 @@ fun Sidebar(
                 }
             }
 
+            // Group Filters
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { isGroupsSectionExpanded = !isGroupsSectionExpanded }
+                ) {
+                    Icon(
+                        imageVector = if (isGroupsSectionExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text(
+                        text = "Filter by Group",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextSecondary,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        groupInputText = ""
+                        showCreateGroupDialog = true
+                    },
+                    modifier = Modifier.size(18.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Create Group",
+                        tint = AccentCyan,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = isGroupsSectionExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(start = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (groupTree.isEmpty()) {
+                        Text(
+                            text = "No groups defined. Click + to add.",
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp)
+                        )
+                    } else {
+                        // Unassigned / No Group filter row
+                        val isNoGroupSelected = activeGroupFilter == "_none_"
+                        val isNoGroupHovered = dragDropState.hoveredGroupByName == "_none_"
+                        
+                        DisposableEffect(Unit) {
+                            onDispose {
+                                dragDropState.dropTargetBounds.remove("_none_")
+                            }
+                        }
+                        
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(
+                                    if (isNoGroupSelected) CardSurface 
+                                    else if (isNoGroupHovered) AccentCyan.copy(alpha = 0.15f)
+                                    else Color.Transparent
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isNoGroupSelected) AccentCyan 
+                                            else if (isNoGroupHovered) AccentCyan
+                                            else Color.Transparent,
+                                    shape = RoundedCornerShape(6.dp)
+                                )
+                                .onGloballyPositioned { coords ->
+                                    dragDropState.dropTargetBounds["_none_"] = coords.boundsInRoot()
+                                }
+                                .clickable {
+                                    if (isNoGroupSelected) {
+                                        onActiveGroupFilterChange(null)
+                                    } else {
+                                        onActiveGroupFilterChange("_none_")
+                                    }
+                                }
+                                .padding(vertical = 4.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Spacer(modifier = Modifier.width(16.dp)) // Identical alignment spacing (no expand arrow)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = if (isNoGroupSelected) AccentCyan else TextSecondary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "[No Group]",
+                                color = if (isNoGroupSelected) TextPrimary else TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = if (isNoGroupSelected) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f).offset(y = 1.dp)
+                            )
+                            
+                            // Unassigned Session Count Badge
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(BorderColor)
+                                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                            ) {
+                                Text(
+                                    text = unassignedSessionCount.toString(),
+                                    color = AccentCyan,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    lineHeight = 9.sp,
+                                    modifier = Modifier.offset(y = 0.5.dp)
+                                )
+                            }
+                        }
+
+                        groupTree.forEach { rootNode ->
+                            GroupTreeItem(
+                                node = rootNode,
+                                depth = 0,
+                                activeGroupFilter = activeGroupFilter,
+                                onSelect = onActiveGroupFilterChange,
+                                onRename = onRenameGroup,
+                                onDelete = { showDeleteGroupDialog = it },
+                                onTogglePin = onToggleGroupPin,
+                                onShowRenameDialog = { old ->
+                                    groupInputText = old
+                                    showRenameGroupDialog = old
+                                },
+                                dragDropState = dragDropState
+                            )
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(6.dp))
 
             // Sort Section
@@ -584,7 +780,12 @@ fun Sidebar(
                                     copyToClipboard(path)
                                     toastMessage = "Source file path copied to clipboard"
                                 },
-                                onTogglePin = onTogglePin
+                                onTogglePin = onTogglePin,
+                                dragDropState = dragDropState,
+                                onGroupAdd = onGroupAdd,
+                                onGroupRemove = onGroupRemove,
+                                activeGroupFilter = activeGroupFilter,
+                                groups = groups
                             )
                         }
                     }
@@ -638,19 +839,279 @@ fun Sidebar(
                 )
             }
         }
+
+        // Slide-up Drop Zone for removing tags/trash
+        AnimatedVisibility(
+            visible = dragDropState.draggingSession != null,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
+        ) {
+            val isTrashActive = dragDropState.isHoveringRemoveZone
+            val activeFilter = activeGroupFilter
+            val label = if (activeFilter != null && activeFilter != "_none_") {
+                "Remove from '$activeFilter'"
+            } else {
+                "Clear all tags"
+            }
+
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (isTrashActive) Color(0xFF3A1E1E) else Color(0xFF231818)
+                    )
+                    .border(
+                        width = 1.5.dp,
+                        color = if (isTrashActive) Color(0xFFE57373) else Color(0xFFC62828),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .onGloballyPositioned { coords ->
+                        dragDropState.removeZoneBounds = coords.boundsInRoot()
+                    }
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Remove tag",
+                        tint = if (isTrashActive) Color(0xFFFF8A80) else Color(0xFFEF5350),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = label,
+                        color = if (isTrashActive) Color(0xFFF5F5F5) else Color(0xFFEF5350),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+
+    if (showCreateGroupDialog) {
+        val createFocusRequester = remember { FocusRequester() }
+        AlertDialog(
+            onDismissRequest = { showCreateGroupDialog = false },
+            title = { Text("Create New Group", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = groupInputText,
+                    onValueChange = { groupInputText = it },
+                    placeholder = { 
+                        Text(
+                            "e.g. Project/Area", 
+                            color = TextSecondary.copy(alpha = 0.5f), 
+                            fontSize = 12.sp,
+                            style = TextStyle.Default,
+                            lineHeight = 12.sp
+                        ) 
+                    },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentCyan,
+                        unfocusedBorderColor = BorderColor,
+                        focusedContainerColor = ObsidianBg,
+                        unfocusedContainerColor = ObsidianBg,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    textStyle = TextStyle(
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        lineHeight = 12.sp
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(createFocusRequester)
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.Enter) {
+                                if (groupInputText.isNotBlank()) {
+                                    onAddGroup(groupInputText.trim())
+                                }
+                                groupInputText = ""
+                                showCreateGroupDialog = false
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (groupInputText.isNotBlank()) {
+                            onAddGroup(groupInputText.trim())
+                        }
+                        groupInputText = ""
+                        showCreateGroupDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = ObsidianBg)
+                ) {
+                    Text("Create", fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = 1.dp))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        groupInputText = ""
+                        showCreateGroupDialog = false
+                    }
+                ) {
+                    Text("Cancel", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.offset(y = 1.dp))
+                }
+            },
+            containerColor = SlateSurface,
+            shape = RoundedCornerShape(12.dp)
+        )
+        LaunchedEffect(Unit) {
+            createFocusRequester.requestFocus()
+        }
+    }
+
+    val renameTarget = showRenameGroupDialog
+    if (renameTarget != null) {
+        val renameFocusRequester = remember { FocusRequester() }
+        AlertDialog(
+            onDismissRequest = { showRenameGroupDialog = null },
+            title = { Text("Rename Group", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = groupInputText,
+                    onValueChange = { groupInputText = it },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentCyan,
+                        unfocusedBorderColor = BorderColor,
+                        focusedContainerColor = ObsidianBg,
+                        unfocusedContainerColor = ObsidianBg,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    textStyle = TextStyle(
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        lineHeight = 12.sp
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(renameFocusRequester)
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.Enter) {
+                                if (groupInputText.isNotBlank()) {
+                                    onRenameGroup(renameTarget, groupInputText.trim())
+                                }
+                                groupInputText = ""
+                                showRenameGroupDialog = null
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (groupInputText.isNotBlank()) {
+                            onRenameGroup(renameTarget, groupInputText.trim())
+                        }
+                        groupInputText = ""
+                        showRenameGroupDialog = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = ObsidianBg)
+                ) {
+                    Text("Rename", fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = 1.dp))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        groupInputText = ""
+                        showRenameGroupDialog = null
+                    }
+                ) {
+                    Text("Cancel", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.offset(y = 1.dp))
+                }
+            },
+            containerColor = SlateSurface,
+            shape = RoundedCornerShape(12.dp)
+        )
+        LaunchedEffect(Unit) {
+            renameFocusRequester.requestFocus()
+        }
+    }
+
+    val deleteTarget = showDeleteGroupDialog
+    if (deleteTarget != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteGroupDialog = null },
+            title = { Text("Delete Group", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    text = "Are you sure you want to delete '$deleteTarget'? Conversations will not be deleted, but this tag will be removed.",
+                    color = TextPrimary,
+                    fontSize = 12.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteGroup(deleteTarget)
+                        showDeleteGroupDialog = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = ObsidianBg)
+                ) {
+                    Text("Delete", fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = 1.dp))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteGroupDialog = null
+                    }
+                ) {
+                    Text("Cancel", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.offset(y = 1.dp))
+                }
+            },
+            containerColor = SlateSurface,
+            shape = RoundedCornerShape(12.dp)
+        )
     }
 }
 }
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun SessionItem(
     result: SearchResult,
     isSelected: Boolean,
     onClick: () -> Unit,
     onCopyPath: (String) -> Unit,
-    onTogglePin: (Session) -> Unit
+    onTogglePin: (Session) -> Unit,
+    dragDropState: DragDropState,
+    onGroupAdd: (Session, String) -> Unit,
+    onGroupRemove: (Session, String) -> Unit,
+    activeGroupFilter: String?,
+    groups: List<ConversationGroup>
 ) {
     val session = result.session
+    val sessionGroups = remember(groups, session.id) {
+        groups.filter { it.sessionIds.contains(session.id) }
+    }
+    val currentSessionGroups by rememberUpdatedState(sessionGroups)
+    val currentActiveGroupFilter by rememberUpdatedState(activeGroupFilter)
+    val currentOnGroupRemove by rememberUpdatedState(onGroupRemove)
+    val currentOnGroupAdd by rememberUpdatedState(onGroupAdd)
+
     val badgeColors = getSourceBadgeColors(session.sourceId)
     val formatter = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
     val formattedDate = remember(session.updatedAt) { formatter.format(java.util.Date(session.updatedAt)) }
@@ -659,14 +1120,13 @@ fun SessionItem(
 
     val alpha = if (session.isArchived) 0.5f else 1.0f
 
-    ContextMenuArea(items = {
-        listOf(
-            ContextMenuItem("Copy Source File Path") {
-                onCopyPath(session.filePath)
-            }
-        )
-    }) {
-        Box(
+    var showContextMenu by remember { mutableStateOf(false) }
+    var showGroupsSubmenu by remember { mutableStateOf(false) }
+    var pressOffset by remember { mutableStateOf(DpOffset.Zero) }
+    val density = LocalDensity.current
+
+    var itemCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
@@ -677,7 +1137,67 @@ fun SessionItem(
                 shape = RoundedCornerShape(12.dp)
             )
             .alpha(alpha)
+            .onGloballyPositioned { itemCoords = it }
             .clickable { onClick() }
+            .pointerInput(session.id) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.type == PointerEventType.Press && event.button == PointerButton.Secondary) {
+                            val change = event.changes.firstOrNull()
+                            if (change != null) {
+                                val position = change.position
+                                pressOffset = with(density) {
+                                    DpOffset(position.x.toDp(), position.y.toDp())
+                                }
+                            }
+                            showContextMenu = true
+                            showGroupsSubmenu = false
+                            event.changes.forEach { it.consume() }
+                        }
+                    }
+                }
+            }
+            .pointerInput(session.id) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        val rootOffset = itemCoords?.localToRoot(offset) ?: Offset.Zero
+                        dragDropState.draggingSession = session
+                        dragDropState.dragPosition = rootOffset
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        dragDropState.updateDragPosition(dragDropState.dragPosition + dragAmount)
+                    },
+                    onDragEnd = {
+                        val activeGroup = dragDropState.hoveredGroupByName
+                        val isTrash = dragDropState.isHoveringRemoveZone
+                        if (activeGroup != null) {
+                            if (activeGroup == "_none_") {
+                                currentSessionGroups.forEach { group ->
+                                    currentOnGroupRemove(session, group.name)
+                                }
+                            } else {
+                                currentOnGroupAdd(session, activeGroup)
+                            }
+                        } else if (isTrash) {
+                            val activeFilter = currentActiveGroupFilter
+                            if (activeFilter != null && activeFilter != "_none_") {
+                                currentOnGroupRemove(session, activeFilter)
+                            } else {
+                                currentSessionGroups.forEach { group ->
+                                    currentOnGroupRemove(session, group.name)
+                                }
+                            }
+                        }
+                        dragDropState.reset()
+                    },
+                    onDragCancel = {
+                        dragDropState.reset()
+                    }
+                )
+            }
+            .pointerHoverIcon(PointerIcon.Hand)
             .padding(12.dp)
     ) {
         Column {
@@ -825,6 +1345,35 @@ fun SessionItem(
                 )
             }
 
+            if (sessionGroups.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    sessionGroups.forEach { group ->
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(AccentPurple.copy(alpha = 0.12f))
+                                .border(1.dp, AccentPurple.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = group.name,
+                                color = AccentPurple,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 9.sp,
+                                modifier = Modifier.offset(y = 0.5.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             val cwd = session.cwd
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -917,8 +1466,212 @@ fun SessionItem(
                 }
             }
         }
+
+        DropdownMenu(
+            expanded = showContextMenu,
+            onDismissRequest = { 
+                showContextMenu = false
+                showGroupsSubmenu = false
+            },
+            offset = pressOffset,
+            modifier = Modifier
+                .width(220.dp)
+                .background(CardSurface)
+                .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+        ) {
+            if (showGroupsSubmenu) {
+                DropdownMenuItem(
+                    text = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Back",
+                                tint = TextSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text("Back to Actions", color = TextSecondary, fontSize = 13.sp)
+                        }
+                    },
+                    onClick = {
+                        showGroupsSubmenu = false
+                    }
+                )
+                HorizontalDivider(color = BorderColor, thickness = 1.dp)
+
+                // Search / Create Tag Field
+                var newTagName by remember { mutableStateOf("") }
+                val focusRequester = remember { FocusRequester() }
+
+                OutlinedTextField(
+                    value = newTagName,
+                    onValueChange = { newTagName = it },
+                    placeholder = { 
+                        Text(
+                            "Filter or create tag...", 
+                            color = TextSecondary.copy(alpha = 0.5f), 
+                            fontSize = 11.sp,
+                            style = androidx.compose.ui.text.TextStyle.Default,
+                            lineHeight = 11.sp
+                        ) 
+                    },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentCyan,
+                        unfocusedBorderColor = BorderColor,
+                        focusedContainerColor = ObsidianBg,
+                        unfocusedContainerColor = ObsidianBg,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        color = TextPrimary,
+                        fontSize = 11.sp,
+                        lineHeight = 11.sp
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .focusRequester(focusRequester)
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.Enter) {
+                                val trimmed = newTagName.trim()
+                                if (trimmed.isNotBlank()) {
+                                    val exists = groups.any { it.name.equals(trimmed, ignoreCase = true) }
+                                    if (!exists) {
+                                        onGroupAdd(session, trimmed)
+                                    } else {
+                                        val alreadyInGroup = sessionGroups.any { 
+                                            it.name.equals(trimmed, ignoreCase = true)
+                                        }
+                                        if (!alreadyInGroup) {
+                                            onGroupAdd(session, trimmed)
+                                        }
+                                    }
+                                    newTagName = ""
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                )
+                
+                LaunchedEffect(showGroupsSubmenu) {
+                    if (showGroupsSubmenu) {
+                        focusRequester.requestFocus()
+                    }
+                }
+
+                // Option to create a new tag if it doesn't exist yet and input is not empty
+                if (newTagName.isNotBlank()) {
+                    val exactMatchExists = groups.any { it.name.equals(newTagName.trim(), ignoreCase = true) }
+                    if (!exactMatchExists) {
+                        DropdownMenuItem(
+                            text = { 
+                                Text(
+                                    "Create tag \"${newTagName.trim()}\"", 
+                                    color = AccentCyan, 
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                ) 
+                            },
+                            onClick = {
+                                onGroupAdd(session, newTagName.trim())
+                                newTagName = ""
+                            }
+                        )
+                    }
+                }
+
+                val filteredGroups = remember(groups, newTagName) {
+                    groups.filter { group ->
+                        group.name.contains(newTagName, ignoreCase = true)
+                    }
+                }
+
+                if (filteredGroups.isNotEmpty()) {
+                    filteredGroups.forEach { group ->
+                        val inGroup = sessionGroups.any { it.name == group.name }
+                        DropdownMenuItem(
+                            text = { 
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(group.name, color = TextPrimary, fontSize = 12.sp)
+                                    if (inGroup) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Assigned",
+                                            tint = AccentCyan,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            onClick = {
+                                if (inGroup) {
+                                    onGroupRemove(session, group.name)
+                                } else {
+                                    onGroupAdd(session, group.name)
+                                }
+                            }
+                        )
+                    }
+                } else if (newTagName.isBlank()) {
+                    DropdownMenuItem(
+                        enabled = false,
+                        text = { Text("No tags available", color = TextSecondary, fontSize = 11.sp) },
+                        onClick = {}
+                    )
+                }
+            } else {
+                DropdownMenuItem(
+                    text = { Text(if (session.isPinned) "Unpin Conversation" else "Pin Conversation", color = TextPrimary, fontSize = 13.sp) },
+                    onClick = {
+                        showContextMenu = false
+                        onTogglePin(session)
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Groups / Tags", color = TextPrimary, fontSize = 13.sp) },
+                    onClick = {
+                        showGroupsSubmenu = true
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Open Session File", color = TextPrimary, fontSize = 13.sp) },
+                    onClick = {
+                        showContextMenu = false
+                        try {
+                            val file = java.io.File(session.filePath)
+                            if (file.exists()) {
+                                java.awt.Desktop.getDesktop().open(file)
+                            }
+                        } catch (_: Exception) {}
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Copy Session ID", color = TextPrimary, fontSize = 13.sp) },
+                    onClick = {
+                        showContextMenu = false
+                        copyToClipboard(session.id)
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Copy File Path", color = TextPrimary, fontSize = 13.sp) },
+                    onClick = {
+                        showContextMenu = false
+                        onCopyPath(session.filePath)
+                    }
+                )
+            }
+        }
     }
-}
 }
 
 enum class SidebarSortDimension(val displayName: String) {
@@ -929,3 +1682,245 @@ enum class SidebarSortDimension(val displayName: String) {
     TURNS("Turns"),
     DURATION("Duration")
 }
+
+class GroupTreeNode(
+    val segment: String,
+    val fullName: String,
+    val children: MutableList<GroupTreeNode> = mutableListOf(),
+    var isPinned: Boolean = false,
+    var directSessionCount: Int = 0,
+    var recursiveSessionCount: Int = 0,
+    var containsPinnedSessions: Boolean = false
+)
+
+fun buildGroupTree(
+    groups: List<ConversationGroup>,
+    pinnedSessionIds: Set<String>
+): List<GroupTreeNode> {
+    val rootNodes = mutableListOf<GroupTreeNode>()
+
+    for (group in groups) {
+        val parts = group.name.split("/")
+        var currentLevel = rootNodes
+        var currentFullName = ""
+
+        for (i in parts.indices) {
+            val part = parts[i]
+            currentFullName = if (currentFullName.isEmpty()) part else "$currentFullName/$part"
+            
+            var node = currentLevel.find { it.segment.lowercase() == part.lowercase() }
+            if (node == null) {
+                node = GroupTreeNode(segment = part, fullName = currentFullName)
+                currentLevel.add(node)
+            }
+            
+            if (i == parts.lastIndex) {
+                node.isPinned = group.isPinned
+                node.directSessionCount = group.sessionIds.size
+                node.containsPinnedSessions = group.sessionIds.any { pinnedSessionIds.contains(it) }
+            }
+            currentLevel = node.children
+        }
+    }
+
+    fun finalizeNode(node: GroupTreeNode): Pair<Int, Boolean> {
+        var childSessionsCount = 0
+        var childHasPinnedSessions = false
+
+        for (child in node.children) {
+            val (cCount, cPinned) = finalizeNode(child)
+            childSessionsCount += cCount
+            if (cPinned) {
+                childHasPinnedSessions = true
+            }
+        }
+
+        node.recursiveSessionCount = node.directSessionCount + childSessionsCount
+        node.containsPinnedSessions = node.containsPinnedSessions || childHasPinnedSessions
+
+        node.children.sortWith(
+            compareByDescending<GroupTreeNode> { it.isPinned }
+                .thenBy { it.segment.lowercase() }
+        )
+
+        return Pair(node.recursiveSessionCount, node.containsPinnedSessions)
+    }
+
+    for (root in rootNodes) {
+        finalizeNode(root)
+    }
+
+    rootNodes.sortWith(
+        compareByDescending<GroupTreeNode> { it.isPinned }
+            .thenBy { it.segment.lowercase() }
+    )
+
+    return rootNodes
+}
+
+@Composable
+fun GroupTreeItem(
+    node: GroupTreeNode,
+    depth: Int,
+    activeGroupFilter: String?,
+    onSelect: (String?) -> Unit,
+    onRename: (String, String) -> Unit,
+    onDelete: (String) -> Unit,
+    onTogglePin: (String, Boolean) -> Unit,
+    onShowRenameDialog: (String) -> Unit,
+    dragDropState: DragDropState
+) {
+    var isExpanded by remember { mutableStateOf(true) }
+    val isSelected = activeGroupFilter != null && activeGroupFilter.lowercase() == node.fullName.lowercase()
+    val isHovered = dragDropState.hoveredGroupByName == node.fullName
+
+    DisposableEffect(node.fullName) {
+        onDispose {
+            dragDropState.dropTargetBounds.remove(node.fullName)
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ContextMenuArea(
+            items = {
+                listOf(
+                    ContextMenuItem(if (node.isPinned) "Unpin Group" else "Pin Group") {
+                        onTogglePin(node.fullName, !node.isPinned)
+                    },
+                    ContextMenuItem("Rename Group") {
+                        onShowRenameDialog(node.fullName)
+                    },
+                    ContextMenuItem("Delete Group") {
+                        onDelete(node.fullName)
+                    }
+                )
+            }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        if (isSelected) CardSurface 
+                        else if (isHovered) AccentCyan.copy(alpha = 0.15f)
+                        else Color.Transparent
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (isSelected) AccentCyan 
+                                else if (isHovered) AccentCyan
+                                else Color.Transparent,
+                        shape = RoundedCornerShape(6.dp)
+                    )
+                    .onGloballyPositioned { coords ->
+                        dragDropState.dropTargetBounds[node.fullName] = coords.boundsInRoot()
+                    }
+                    .clickable {
+                        if (isSelected) {
+                            onSelect(null)
+                        } else {
+                            onSelect(node.fullName)
+                        }
+                    }
+                    .padding(vertical = 4.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Spacer(modifier = Modifier.width((depth * 10).dp))
+
+                if (node.children.isNotEmpty()) {
+                    IconButton(
+                        onClick = { isExpanded = !isExpanded },
+                        modifier = Modifier.size(16.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.width(16.dp))
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Icon(
+                    imageVector = Icons.Default.Folder,
+                    contentDescription = null,
+                    tint = if (isSelected) AccentCyan else TextSecondary,
+                    modifier = Modifier.size(14.dp)
+                )
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                Text(
+                    text = node.segment,
+                    color = if (isSelected) TextPrimary else TextSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).offset(y = 1.dp)
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (node.isPinned) {
+                        Icon(
+                            imageVector = Icons.Default.PushPin,
+                            contentDescription = "Pinned Group",
+                            tint = AccentCyan,
+                            modifier = Modifier.size(10.dp)
+                        )
+                    } else if (node.containsPinnedSessions) {
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .clip(RoundedCornerShape(2.5.dp))
+                                .background(AccentCyan)
+                        )
+                    }
+
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(BorderColor)
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = node.recursiveSessionCount.toString(),
+                            color = AccentCyan,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 9.sp,
+                            modifier = Modifier.offset(y = 0.5.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        if (node.children.isNotEmpty() && isExpanded) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                node.children.forEach { child ->
+                    GroupTreeItem(
+                        node = child,
+                        depth = depth + 1,
+                        activeGroupFilter = activeGroupFilter,
+                        onSelect = onSelect,
+                        onRename = onRename,
+                        onDelete = onDelete,
+                        onTogglePin = onTogglePin,
+                        onShowRenameDialog = onShowRenameDialog,
+                        dragDropState = dragDropState
+                    )
+                }
+            }
+        }
+    }
+}
+
