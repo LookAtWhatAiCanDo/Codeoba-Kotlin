@@ -94,6 +94,19 @@ class DesktopClaudeSource : DesktopSourceAdapter() {
                     if (text.isNotEmpty()) {
                         rawTurns.add(RawTurn(isUser = false, text = text, timestamp = timestamp, model = modelName))
                     }
+                } else if (type == "system") {
+                    val subtype = element["subtype"]?.jsonPrimitive?.content
+                    if (subtype == "compact_boundary") {
+                        val compactMetadata = element["compactMetadata"]?.jsonObject
+                        val durationMs = compactMetadata?.get("durationMs")?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+                        rawTurns.add(RawTurn(
+                            isUser = false,
+                            text = "",
+                            timestamp = timestamp,
+                            isCompaction = true,
+                            compactionTimeMs = durationMs
+                        ))
+                    }
                 }
             } catch (e: Exception) {
                 // Ignore parsing errors for individual lines
@@ -112,17 +125,37 @@ class DesktopClaudeSource : DesktopSourceAdapter() {
                 var assistantText = ""
                 var computeTimeMs = 0L
                 var modelName: String? = null
-                if (currentIdx + 1 < rawTurns.size && !rawTurns[currentIdx + 1].isUser) {
-                    val assistantRaw = rawTurns[currentIdx + 1]
-                    assistantText = assistantRaw.text
-                    computeTimeMs = (assistantRaw.timestamp - userRaw.timestamp).coerceAtLeast(0L)
-                    modelName = assistantRaw.model
-                    currentIdx += 2
-                } else {
-                    currentIdx += 1
+                var hasCompaction = false
+                var compactionTimeMs = 0L
+                var nextIdx = currentIdx + 1
+                val assistantParts = mutableListOf<String>()
+                var lastTimestamp = userRaw.timestamp
+                while (nextIdx < rawTurns.size && !rawTurns[nextIdx].isUser) {
+                    val nextRaw = rawTurns[nextIdx]
+                    if (nextRaw.isCompaction) {
+                        hasCompaction = true
+                        compactionTimeMs += nextRaw.compactionTimeMs
+                    } else {
+                        if (nextRaw.text.isNotEmpty()) {
+                            assistantParts.add(nextRaw.text)
+                        }
+                    }
+                    lastTimestamp = nextRaw.timestamp
+                    if (nextRaw.model != null) {
+                        modelName = nextRaw.model
+                    }
+                    nextIdx++
                 }
-                 val extraData = mutableMapOf("computeTimeMs" to computeTimeMs.toString())
+                assistantText = assistantParts.joinToString("\n\n")
+                computeTimeMs = (lastTimestamp - userRaw.timestamp).coerceAtLeast(0L)
+                currentIdx = nextIdx
+
+                val extraData = mutableMapOf("computeTimeMs" to computeTimeMs.toString())
                 extraData["model"] = modelName ?: "Unknown"
+                if (hasCompaction) {
+                    extraData["isCompaction"] = "true"
+                    extraData["compactionTimeMs"] = compactionTimeMs.toString()
+                }
                 turns.add(
                     Turn(
                         turnId = "${sessionId}_${turnCount++}",
@@ -135,6 +168,10 @@ class DesktopClaudeSource : DesktopSourceAdapter() {
             } else {
                 val extraData = mutableMapOf("computeTimeMs" to "0")
                 extraData["model"] = userRaw.model ?: "Unknown"
+                if (userRaw.isCompaction) {
+                    extraData["isCompaction"] = "true"
+                    extraData["compactionTimeMs"] = userRaw.compactionTimeMs.toString()
+                }
                 turns.add(
                     Turn(
                         turnId = "${sessionId}_${turnCount++}",
@@ -210,5 +247,12 @@ class DesktopClaudeSource : DesktopSourceAdapter() {
         path.endsWith(".jsonl")
     }
 
-    private data class RawTurn(val isUser: Boolean, val text: String, val timestamp: Long, val model: String? = null)
+    private data class RawTurn(
+        val isUser: Boolean,
+        val text: String,
+        val timestamp: Long,
+        val model: String? = null,
+        val isCompaction: Boolean = false,
+        val compactionTimeMs: Long = 0L
+    )
 }

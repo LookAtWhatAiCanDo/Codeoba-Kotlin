@@ -36,6 +36,32 @@ class SourceParsersTest {
     }
 
     @Test
+    fun testClaudeCompactionParsing() = runBlocking {
+        val tempFile = File.createTempFile("claude_compaction_", ".jsonl")
+        tempFile.deleteOnExit()
+
+        tempFile.writeText(
+            """
+            {"type":"user","timestamp":"2026-05-20T02:00:00Z","message":{"role":"user","content":"Hello Claude"},"sessionId":"sessionCompact","cwd":"/path/to/project","slug":"test-session"}
+            {"parentUuid":null,"logicalParentUuid":"123","isSidechain":false,"type":"system","subtype":"compact_boundary","content":"Conversation compacted","isMeta":false,"timestamp":"2026-05-20T02:00:30Z","uuid":"abc","level":"info","compactMetadata":{"trigger":"auto","preTokens":1000,"postTokens":100,"durationMs":5000},"sessionId":"sessionCompact"}
+            {"type":"assistant","timestamp":"2026-05-20T02:01:00Z","message":{"role":"assistant","content":[{"type":"text","text":"Hello User"}]}}
+            """.trimIndent()
+        )
+
+        val source = DesktopClaudeSource()
+        val session = source.parseSession(tempFile.absolutePath)
+
+        assertNotNull(session)
+        assertEquals("sessionCompact", session.id)
+        assertEquals(1, session.turns.size)
+        assertEquals("Hello Claude", session.turns[0].userMessage)
+        assertEquals("Hello User", session.turns[0].assistantMessage)
+        assertEquals("true", session.turns[0].extraData["isCompaction"])
+        assertEquals("5000", session.turns[0].extraData["compactionTimeMs"])
+    }
+
+
+    @Test
     fun testAntigravitySourceParsing() = runBlocking {
         val tempFile = File.createTempFile("antigravity_test_", ".jsonl")
         tempFile.deleteOnExit()
