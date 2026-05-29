@@ -69,7 +69,7 @@ interface SourceAdapter {
 ```
 
 ### Implementations:
-All desktop source implementations inherit from the abstract base class [DesktopSourceAdapter](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/DesktopSourceAdapter.kt) under `desktopMain`, which centralizes common caching, folder validation (`getBaseDir()`), directory deletion, and command execution availability checking.
+All desktop source implementations inherit from the abstract base class [DesktopSourceAdapter](../core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/DesktopSourceAdapter.kt) under `desktopMain`, which centralizes common caching, folder validation (`getBaseDir()`), directory deletion, and command execution availability checking.
 
 1. **`DesktopCursorSource`**: Parses Cursor's global SQLite (`state.vscdb`). Filters sessions against each workspace's local `allComposers` list to exclude deleted sessions. Overrides the base `parseSession` to handle row-level database hashing.
 2. **`DesktopClaudeSource`**: Parses JSONL log files under `~/.claude/projects/`. Implements `parseSessionContent(File)`.

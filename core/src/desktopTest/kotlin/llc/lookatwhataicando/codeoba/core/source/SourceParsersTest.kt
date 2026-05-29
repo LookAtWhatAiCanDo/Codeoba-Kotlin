@@ -7,6 +7,7 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import llc.lookatwhataicando.codeoba.core.manager.SessionCacheManager
 
 class SourceParsersTest {
 
@@ -645,14 +646,44 @@ class SourceParsersTest {
         val file = File(targetPath)
         if (file.exists()) {
             val source = DesktopAntigravitySource()
+            
+            // 1. Initial parse
             val session = source.parseSession(targetPath)
             assertNotNull(session)
-            println("SESSION PARSED SUCCESSFULLY! Turns: ${session.turns.size}")
-            val turn = session.turns[0]
+            println("INITIAL SESSION PARSED: Turns: ${session.turns.size}")
+            
+            // 2. Put in cache and end scan (saves to cache file)
+            SessionCacheManager.isCacheEnabled = true
+            SessionCacheManager.startScan(source.id)
+            val md5 = SessionCacheManager.calculateMd5(file)
+            SessionCacheManager.putCachedSession(
+                sourceId = source.id,
+                filePath = targetPath,
+                lastModified = file.lastModified(),
+                size = file.length(),
+                hash = md5,
+                session = session
+            )
+            SessionCacheManager.endScan(source.id)
+            
+            // 3. Load from cache in a new scan
+            SessionCacheManager.startScan(source.id)
+            val cachedSession = SessionCacheManager.getCachedSessionForFile(
+                sourceId = source.id,
+                filePath = targetPath,
+                lastModified = file.lastModified(),
+                size = file.length()
+            )
+            assertNotNull(cachedSession)
+            println("CACHED SESSION LOADED: Turns: ${cachedSession.turns.size}")
+            SessionCacheManager.endScan(source.id)
+            
+            // 4. Parse the cached session turns
+            val turn = cachedSession.turns[0]
             val parts = tempParseAssistantMessage(turn.assistantMessage)
             for (pIdx in 22..28) {
                 if (pIdx < parts.size) {
-                    println("  PART $pIdx: ${parts[pIdx]}")
+                    println("  CACHED PART $pIdx: ${parts[pIdx]}")
                 }
             }
         } else {

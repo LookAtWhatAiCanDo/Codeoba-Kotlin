@@ -45,7 +45,7 @@ This document outlines the problematic strings, variations, and tokens that can 
   - Instead of doing search-based substring slicing on the entire message string, match the tags at the outer boundaries, or extract using a non-greedy regex match that anchors the tags at the beginning and end of the envelope structure.
 
 ### F. Windows Cursor Database File Paths (`file:///` vs Drive Letters)
-- **Example String**: `file:///C:/Users/pv/Dev/Project`
+- **Example String**: `file:///C:/path/to/project`
 - **Occurrence Context**: Parsing workspace directories from Cursor workspace databases on Windows.
 - **Problem**: Storing the sliced path directly (e.g. using `substringAfter("file://")`) yields `/C:/Users/...`, which is an invalid path prefix on Windows platforms.
 - **Remedy**:
