@@ -37,7 +37,7 @@ object FirebaseAuthClient {
             } else {
                 "https://securetoken.googleapis.com/v1/token?key=$FIREBASE_API_KEY"
             }
-            val bodyStr = "grant_type=refresh_token&refresh_token=$refreshToken"
+            val bodyStr = "grant_type=refresh_token&refresh_token=${java.net.URLEncoder.encode(refreshToken, \"UTF-8\")}"
             
             val response: HttpResponse = client.post(url) {
                 contentType(ContentType.Application.FormUrlEncoded)
