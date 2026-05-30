@@ -12,7 +12,7 @@ object LocalAuthServer {
         // Stop any running instance first
         stop()
 
-        val activeServer = HttpServer.create(InetSocketAddress(0), 0)
+        val activeServer = HttpServer.create(InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 0)
         val port = activeServer.address.port
         log("LocalAuthServer: Started on port $port")
 
