@@ -107,6 +107,72 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CompareArrows
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -144,6 +210,14 @@ import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
 import llc.lookatwhataicando.codeoba.core.domain.model.GroupTask
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import llc.lookatwhataicando.codeoba.core.domain.model.Turn
+import llc.lookatwhataicando.codeoba.core.domain.search.SearchResult
+import llc.lookatwhataicando.codeoba.core.domain.search.buildFindRegex
+import kotlinx.coroutines.launch
+import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
+import llc.lookatwhataicando.codeoba.core.domain.model.GroupTask
+import llc.lookatwhataicando.codeoba.core.domain.model.Session
+import llc.lookatwhataicando.codeoba.core.domain.model.Turn
+import llc.lookatwhataicando.codeoba.core.domain.parser.SessionSummary
 import llc.lookatwhataicando.codeoba.core.domain.search.SearchResult
 import llc.lookatwhataicando.codeoba.core.domain.search.buildFindRegex
 import java.awt.Desktop
@@ -1061,6 +1135,7 @@ fun DetailPane(
     }
 
     var isHeaderExpanded by remember(session?.id) { mutableStateOf(true) }
+    var showRawLogs by remember(session?.id) { mutableStateOf(false) }
 
     LaunchedEffect(isScrollLocked) {
         isHeaderExpanded = isScrollLocked
@@ -1635,15 +1710,72 @@ fun DetailPane(
                                 dragDropState = dragDropState
                             )
                         }
-                        itemsIndexed(session.turns, key = { _, turn -> turn.turnId }) { turnIndex, turn ->
-                            TurnCard(
-                                turn = turn,
-                                turnIndex = turnIndex,
-                                query = query,
-                                findRegex = findRegex,
-                                activeMatch = activeMatch,
-                                onUrlClick = onUrlClick
-                            )
+                        val summary = session.summary
+                        if (summary != null) {
+                            item(key = "ai_summary") {
+                                AiSummaryCard(summary = summary)
+                            }
+                            item(key = "raw_logs_header") {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                        .clickable { showRawLogs = !showRawLogs }
+                                        .pointerHoverIcon(PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR))),
+                                    colors = CardDefaults.cardColors(containerColor = CardSurface),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (showRawLogs) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                contentDescription = "Toggle Raw Logs",
+                                                tint = AccentCyan
+                                            )
+                                            Text(
+                                                text = "Raw Dialogue Logs (${session.turns.size} turns)",
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                color = TextPrimary
+                                            )
+                                        }
+                                        Text(
+                                            text = if (showRawLogs) "Hide Dialogue" else "Show Dialogue",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = AccentCyan
+                                        )
+                                    }
+                                }
+                            }
+                            if (showRawLogs) {
+                                itemsIndexed(session.turns, key = { _, turn -> turn.turnId }) { turnIndex, turn ->
+                                    TurnCard(
+                                        turn = turn,
+                                        turnIndex = turnIndex,
+                                        query = query,
+                                        findRegex = findRegex,
+                                        activeMatch = activeMatch,
+                                        onUrlClick = onUrlClick
+                                    )
+                                }
+                            }
+                        } else {
+                            itemsIndexed(session.turns, key = { _, turn -> turn.turnId }) { turnIndex, turn ->
+                                TurnCard(
+                                    turn = turn,
+                                    turnIndex = turnIndex,
+                                    query = query,
+                                    findRegex = findRegex,
+                                    activeMatch = activeMatch,
+                                    onUrlClick = onUrlClick
+                                )
+                            }
                         }
                         item(key = "bottom_spacer") {
                             Spacer(modifier = Modifier.height(1.dp))
@@ -3425,4 +3557,191 @@ fun GroupDetailsView(
     )
 }
 }
+
+@Composable
+fun AiSummaryCard(summary: SessionSummary) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, AccentCyan.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+        colors = CardDefaults.cardColors(containerColor = CardSurface),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Header with Premium AI Badge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bolt,
+                        contentDescription = null,
+                        tint = AccentCyan,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "AI Session Summary",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        color = TextPrimary
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(AccentCyan.copy(alpha = 0.15f))
+                        .border(1.dp, AccentCyan.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "AI Parser Mode",
+                        color = AccentCyan,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 10.sp
+                        ),
+                        modifier = Modifier.offset(y = 0.5.dp)
+                    )
+                }
+            }
+
+            // Key Actions Section
+            if (summary.keyActions.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Key Actions Identified",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                        color = TextPrimary
+                    )
+                    summary.keyActions.forEach { action ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Text("•", color = AccentCyan, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                text = action,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Errors/Warnings Section
+            if (summary.errors.isNotEmpty()) {
+                val isCritical = summary.errors.any { !it.contains("No critical") }
+                val errorColor = if (isCritical) Color(0xFFD32F2F) else Color(0xFFE65100)
+                val errorBgColor = errorColor.copy(alpha = 0.12f)
+                val errorBorderColor = errorColor.copy(alpha = 0.4f)
+                
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, errorBorderColor, RoundedCornerShape(8.dp)),
+                    colors = CardDefaults.cardColors(containerColor = errorBgColor),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isCritical) Icons.Default.Error else Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = errorColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = if (isCritical) "Diagnostics & Errors Detected" else "System Messages",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                color = errorColor
+                            )
+                        }
+                        
+                        summary.errors.forEach { err ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Text("•", color = errorColor, style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    text = err,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextPrimary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Performance Insights Charts
+            if (summary.performanceCharts.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Performance Metrics",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                        color = TextPrimary
+                    )
+
+                    val maxVal = summary.performanceCharts.maxOfOrNull { it.value } ?: 1.0
+
+                    summary.performanceCharts.forEachIndexed { index, chartPoint ->
+                        val barColor = if (index % 2 == 0) AccentCyan else AccentPurple
+                        val progress = if (maxVal > 0) (chartPoint.value / maxVal).toFloat().coerceIn(0f, 1f) else 0f
+
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = chartPoint.label,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary
+                                )
+                                Text(
+                                    text = if (chartPoint.label.contains("Latency")) "${chartPoint.value} ms" else "${chartPoint.value} tokens/s",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                    color = TextPrimary
+                                )
+                            }
+
+                            // Custom Premium Progress/Bar chart
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(BorderColor.copy(alpha = 0.3f))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .fillMaxWidth(progress)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(barColor)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 

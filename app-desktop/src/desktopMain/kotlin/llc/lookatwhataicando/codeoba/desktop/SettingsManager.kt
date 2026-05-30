@@ -1,5 +1,6 @@
 package llc.lookatwhataicando.codeoba.desktop
 
+import llc.lookatwhataicando.codeoba.core.domain.parser.ParserMode
 import llc.lookatwhataicando.codeoba.core.domain.search.ArchivalFilter
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import java.util.prefs.Preferences
@@ -149,6 +150,121 @@ object SettingsManager {
 
     fun setSidebarSortAscending(value: Boolean) {
         prefs.putBoolean("sidebar_sort_ascending", value)
+    }
+
+    fun getFirebaseUserEmail(): String? = prefs.get("firebase_user_email", null)
+    fun setFirebaseUserEmail(value: String?) = putOrRemove("firebase_user_email", value)
+
+    fun getFirebaseUserUid(): String? = prefs.get("firebase_user_uid", null)
+    fun setFirebaseUserUid(value: String?) = putOrRemove("firebase_user_uid", value)
+
+    fun getFirebaseAuthIdToken(): String? = prefs.get("firebase_auth_id_token", null)
+    fun setFirebaseAuthIdToken(value: String?) = putOrRemove("firebase_auth_id_token", value)
+
+    fun getFirebaseAuthRefreshToken(): String? = prefs.get("firebase_auth_refresh_token", null)
+    fun setFirebaseAuthRefreshToken(value: String?) = putOrRemove("firebase_auth_refresh_token", value)
+
+    fun getLicensingJwt(): String? = prefs.get("licensing_jwt", null)
+    fun setLicensingJwt(value: String?) = putOrRemove("licensing_jwt", value)
+
+    fun getDecryptionKey(): String? = prefs.get("decryption_key", null)
+    fun setDecryptionKey(value: String?) = putOrRemove("decryption_key", value)
+
+    fun getParserConfigJson(): String? = prefs.get("parser_config_json", null)
+    fun setParserConfigJson(value: String?) = putOrRemove("parser_config_json", value)
+
+    fun getDeviceId(): String {
+        val os = System.getProperty("os.name") ?: "Unknown"
+        val userHome = System.getProperty("user.home") ?: "Unknown"
+        val userName = System.getProperty("user.name") ?: "Unknown"
+        val rawId = "$os:$userHome:$userName"
+        return java.util.UUID.nameUUIDFromBytes(rawId.toByteArray()).toString()
+    }
+
+    enum class SyncMode {
+        LOCAL_ONLY,
+        METADATA_ONLY,
+        SUMMARIES_ONLY,
+        FULL_SYNC
+    }
+
+    fun getSyncMode(): SyncMode {
+        val value = prefs.get("ecosystem_sync_mode", SyncMode.METADATA_ONLY.name)
+        return try {
+            SyncMode.valueOf(value)
+        } catch (e: Exception) {
+            SyncMode.METADATA_ONLY
+        }
+    }
+
+    fun setSyncMode(mode: SyncMode) {
+        prefs.put("ecosystem_sync_mode", mode.name)
+    }
+
+    fun getEcosystemActive(): Boolean {
+        return prefs.getBoolean("ecosystem_active", false)
+    }
+
+    fun setEcosystemActive(value: Boolean) {
+        prefs.putBoolean("ecosystem_active", value)
+    }
+
+    fun getPreferredParserMode(): ParserMode {
+        val name = prefs.get("preferred_parser_mode", ParserMode.SUMMARIZING.name)
+        return try {
+            ParserMode.valueOf(name)
+        } catch (e: Exception) {
+            ParserMode.SUMMARIZING
+        }
+    }
+
+    fun setPreferredParserMode(mode: ParserMode) {
+        prefs.put("preferred_parser_mode", mode.name)
+    }
+
+    fun getEffectiveParserMode(): ParserMode {
+        return if (getEcosystemActive()) {
+            getPreferredParserMode()
+        } else {
+            ParserMode.STANDARD
+        }
+    }
+
+    enum class RemoteControlPolicy {
+        ALLOW_ALL,
+        ALLOW_PAIRED_ONLY,
+        BLOCK_ALL
+    }
+
+    fun getRemoteControlPolicy(): RemoteControlPolicy {
+        val value = prefs.get("remote_control_policy", RemoteControlPolicy.ALLOW_PAIRED_ONLY.name)
+        return try {
+            RemoteControlPolicy.valueOf(value)
+        } catch (e: Exception) {
+            RemoteControlPolicy.ALLOW_PAIRED_ONLY
+        }
+    }
+
+    fun setRemoteControlPolicy(policy: RemoteControlPolicy) {
+        prefs.put("remote_control_policy", policy.name)
+    }
+
+    fun getExcludedPaths(): List<String> {
+        val value = prefs.get("excluded_paths", "")
+        if (value.isEmpty()) return emptyList()
+        return value.split(",")
+    }
+
+    fun setExcludedPaths(paths: List<String>) {
+        prefs.put("excluded_paths", paths.filter { it.isNotBlank() }.joinToString(","))
+    }
+
+    private fun putOrRemove(key: String, value: String?) {
+        if (value == null) {
+            prefs.remove(key)
+        } else {
+            prefs.put(key, value)
+        }
     }
 
     fun getPinnedSessionIds(): Set<String> {

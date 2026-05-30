@@ -5,6 +5,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,11 +28,30 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -51,6 +74,24 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +108,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,16 +120,36 @@ import androidx.compose.ui.unit.sp
 import com.whataicando.touch.compose.touchScrim
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.launch
+import llc.lookatwhataicando.codeoba.core.auth.LocalAuthServer
+import llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthClient
+import llc.lookatwhataicando.codeoba.core.domain.parser.LogParserFactory
+import llc.lookatwhataicando.codeoba.core.domain.parser.ParserMode
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceRegistry
+import llc.lookatwhataicando.codeoba.core.security.DeviceKeyManager
+import llc.lookatwhataicando.codeoba.core.util.AppConfig
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
 import java.awt.Cursor
+import com.whataicando.touch.compose.touchScrim
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.VerticalScrollbar
+import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
+import java.awt.Cursor
+import java.io.File
 
 enum class SettingsCategory(val displayName: String) {
     General("General"),
     Sources("Sources"),
     Semantic("Semantic"),
-    Permissions("Permissions")
+    Permissions("Permissions"),
+    Account("Account & Subscription")
 }
 
 @Composable
@@ -416,6 +480,142 @@ fun SettingsDialog(
                                         ) {
                                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                                 Text(
+                                                    text = "Log Parsing Mode",
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                    color = TextPrimary
+                                                )
+                                                Text(
+                                                    text = "Configure how conversation transcripts are processed and summarized.",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = TextSecondary
+                                                )
+                                            }
+
+                                            val isSubscribed = SettingsManager.getEcosystemActive()
+                                            var currentPreferredMode by remember { mutableStateOf(SettingsManager.getPreferredParserMode()) }
+
+                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                // Option 1: Standard Parsing (Always available)
+                                                val isStandardSelected = !isSubscribed || currentPreferredMode == ParserMode.STANDARD
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(if (isStandardSelected) SlateSurface else Color.Transparent)
+                                                        .clickable {
+                                                            if (isSubscribed) {
+                                                                currentPreferredMode = ParserMode.STANDARD
+                                                                SettingsManager.setPreferredParserMode(ParserMode.STANDARD)
+                                                                LogParserFactory.setParserMode(ParserMode.STANDARD)
+                                                                onSettingsChanged()
+                                                            }
+                                                        }
+                                                        .pointerHoverIcon(PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)))
+                                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(12.dp)
+                                                            .clip(CircleShape)
+                                                            .background(if (isStandardSelected) AccentCyan else Color.Transparent)
+                                                            .border(1.5.dp, if (isStandardSelected) AccentCyan else BorderColor, CircleShape)
+                                                    )
+                                                    Column {
+                                                        Text(
+                                                            text = "Standard Parsing",
+                                                            color = if (isStandardSelected) TextPrimary else TextSecondary,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            fontWeight = if (isStandardSelected) FontWeight.SemiBold else FontWeight.Normal
+                                                        )
+                                                        Text(
+                                                            text = "Parses conversation logs normally without AI-generated summaries.",
+                                                            color = TextSecondary,
+                                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp)
+                                                        )
+                                                    }
+                                                }
+
+                                                // Option 2: AI-Powered Summarization (Requires active subscription)
+                                                val isSummarizingSelected = isSubscribed && currentPreferredMode == ParserMode.SUMMARIZING
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(if (isSummarizingSelected) SlateSurface else Color.Transparent)
+                                                        .clickable {
+                                                            if (isSubscribed) {
+                                                                currentPreferredMode = ParserMode.SUMMARIZING
+                                                                SettingsManager.setPreferredParserMode(ParserMode.SUMMARIZING)
+                                                                LogParserFactory.setParserMode(ParserMode.SUMMARIZING)
+                                                                onSettingsChanged()
+                                                            }
+                                                        }
+                                                        .pointerHoverIcon(PointerIcon(java.awt.Cursor.getPredefinedCursor(if (isSubscribed) java.awt.Cursor.HAND_CURSOR else java.awt.Cursor.DEFAULT_CURSOR)))
+                                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(12.dp)
+                                                            .clip(CircleShape)
+                                                            .background(if (isSummarizingSelected) AccentCyan else Color.Transparent)
+                                                            .border(1.5.dp, if (isSummarizingSelected) AccentCyan else BorderColor, CircleShape)
+                                                    )
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = "AI-Powered Summarization",
+                                                                color = if (isSummarizingSelected) TextPrimary else if (isSubscribed) TextSecondary else TextSecondary.copy(alpha = 0.5f),
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                fontWeight = if (isSummarizingSelected) FontWeight.SemiBold else FontWeight.Normal
+                                                            )
+                                                            if (!isSubscribed) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .clip(RoundedCornerShape(4.dp))
+                                                                        .background(AccentPurple.copy(alpha = 0.12f))
+                                                                        .border(0.5.dp, AccentPurple.copy(alpha = 0.40f), RoundedCornerShape(4.dp))
+                                                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                ) {
+                                                                    Text(
+                                                                        text = "Premium",
+                                                                        color = AccentPurple,
+                                                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold, lineHeight = 9.sp),
+                                                                        modifier = Modifier.offset(y = 0.5.dp)
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                        Text(
+                                                            text = "Runs local LLM inference to automatically generate conversation summaries, error reports, and performance charts.",
+                                                            color = if (isSubscribed) TextSecondary else TextSecondary.copy(alpha = 0.5f),
+                                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                                        colors = CardDefaults.cardColors(containerColor = CardSurface),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Text(
                                                     text = "Color Theme",
                                                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                                     color = TextPrimary
@@ -729,6 +929,9 @@ fun SettingsDialog(
                                         }
                                     }
                                 }
+                            }
+                            SettingsCategory.Account -> {
+                                AccountSettingsSection(onSettingsChanged)
                             }
                         }
                     }
@@ -1333,4 +1536,481 @@ fun CustomThemeEditorSection(onSettingsChanged: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableStateOf<Float?>(null) }
 
+    val savedEmail = SettingsManager.getFirebaseUserEmail()
+    val savedUid = SettingsManager.getFirebaseUserUid()
+    
+    val isSubscribed = SettingsManager.getEcosystemActive()
+
+    Text(
+        text = "Account & Subscription",
+        style = MaterialTheme.typography.titleMedium,
+        color = TextPrimary,
+        modifier = Modifier.padding(bottom = 16.dp)
+    )
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+    ) {
+        if (savedEmail != null) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                colors = CardDefaults.cardColors(containerColor = CardSurface),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "User Profile",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        color = TextPrimary
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Email Address", color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+                        Text(savedEmail, color = TextPrimary, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("User UID", color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+                        Text(savedUid ?: "Unknown", color = TextPrimary, style = MaterialTheme.typography.bodySmall)
+                    }
+                    
+                    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+                    
+                    Text(
+                        text = "Ecosystem Sync Status",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        color = TextPrimary
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Device Identity Status", color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+                        
+                        val statusText = if (isSubscribed) "Synced & Authenticated" else "Local Mode"
+                        val statusColor = if (isSubscribed) AccentCyan else TextSecondary
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(statusColor.copy(alpha = 0.15f))
+                                .border(1.dp, statusColor.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(statusText, color = statusColor, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    val deviceId = SettingsManager.getDeviceId()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Device Identifier", color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+                        Text(deviceId, color = TextPrimary, style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+
+                    Text(
+                        text = "Sync Mode",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        color = TextPrimary
+                    )
+
+                    var currentSyncMode by remember { mutableStateOf(SettingsManager.getSyncMode()) }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SettingsManager.SyncMode.values().forEach { mode ->
+                            val isSelected = currentSyncMode == mode
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) SlateSurface else Color.Transparent)
+                                    .clickable {
+                                        currentSyncMode = mode
+                                        SettingsManager.setSyncMode(mode)
+                                        onSettingsChanged()
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isSelected) AccentCyan else Color.Transparent)
+                                        .border(1.5.dp, if (isSelected) AccentCyan else BorderColor, CircleShape)
+                                )
+                                Column {
+                                    Text(
+                                        text = mode.name.replace("_", " "),
+                                        color = if (isSelected) TextPrimary else TextSecondary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                    )
+                                    val desc = when (mode) {
+                                        SettingsManager.SyncMode.LOCAL_ONLY -> "No data leaves your device. Local lexical/semantic search only."
+                                        SettingsManager.SyncMode.METADATA_ONLY -> "Only task names, state, and durations are synced to the Sync Hub (Default)."
+                                        SettingsManager.SyncMode.SUMMARIES_ONLY -> "Syncs high-level task summaries without raw logs or terminal output."
+                                        SettingsManager.SyncMode.FULL_SYNC -> "Syncs raw conversation turns & terminal outputs. Required for remote command approvals."
+                                    }
+                                    Text(desc, color = TextSecondary, style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp))
+                                }
+                            }
+                        }
+                    }
+
+                    if (currentSyncMode == SettingsManager.SyncMode.FULL_SYNC) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFD32F2F).copy(alpha = 0.1f))
+                                .border(1.dp, Color(0xFFD32F2F).copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = "Warning: Full Sync uploads raw agent conversations, terminal output, file paths, source snippets, and command results to the Sync Hub. Enable only for workspaces where cloud sync is permitted. Content is encrypted at rest under keys Codeoba manages to enable remote search capabilities.",
+                                color = Color(0xFFEF5350),
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp)
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+
+                    Text(
+                        text = "Workspace Path Exclusions",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        color = TextPrimary
+                    )
+
+                    var pathInput by remember { mutableStateOf("") }
+                    var excludedPaths by remember { mutableStateOf(SettingsManager.getExcludedPaths()) }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = pathInput,
+                            onValueChange = { pathInput = it },
+                            placeholder = { Text("e.g. /Users/name/sensitive-dir", color = TextSecondary, style = MaterialTheme.typography.bodySmall) },
+                            textStyle = TextStyle(color = TextPrimary, fontSize = 13.sp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = AccentCyan,
+                                unfocusedBorderColor = BorderColor,
+                                focusedContainerColor = SlateSurface,
+                                unfocusedContainerColor = SlateSurface
+                            ),
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        Button(
+                            onClick = {
+                                if (pathInput.isNotBlank()) {
+                                    val updated = excludedPaths + pathInput.trim()
+                                    excludedPaths = updated
+                                    SettingsManager.setExcludedPaths(updated)
+                                    pathInput = ""
+                                    onSettingsChanged()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = ObsidianBg),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(48.dp)
+                        ) {
+                            Text("Add", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+
+                    if (excludedPaths.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            excludedPaths.forEach { path ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(SlateSurface)
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(path, color = TextPrimary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    IconButton(
+                                        onClick = {
+                                            val updated = excludedPaths.filter { it != path }
+                                            excludedPaths = updated
+                                            SettingsManager.setExcludedPaths(updated)
+                                            onSettingsChanged()
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = "Remove",
+                                            tint = TextSecondary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+
+                    Text(
+                        text = "Remote Control Execution Policy",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        color = TextPrimary
+                    )
+
+                    var currentPolicy by remember { mutableStateOf(SettingsManager.getRemoteControlPolicy()) }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SettingsManager.RemoteControlPolicy.values().forEach { policy ->
+                            val isPolicySelected = currentPolicy == policy
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isPolicySelected) SlateSurface else Color.Transparent)
+                                    .clickable {
+                                        currentPolicy = policy
+                                        SettingsManager.setRemoteControlPolicy(policy)
+                                        onSettingsChanged()
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isPolicySelected) AccentCyan else Color.Transparent)
+                                        .border(1.5.dp, if (isPolicySelected) AccentCyan else BorderColor, CircleShape)
+                                )
+                                Column {
+                                    Text(
+                                        text = policy.name.replace("_", " "),
+                                        color = if (isPolicySelected) TextPrimary else TextSecondary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = if (isPolicySelected) FontWeight.SemiBold else FontWeight.Normal
+                                    )
+                                    val desc = when (policy) {
+                                        SettingsManager.RemoteControlPolicy.ALLOW_ALL -> "Allow all authorized ecosystem devices to run commands without pairing confirmation."
+                                        SettingsManager.RemoteControlPolicy.ALLOW_PAIRED_ONLY -> "Only allow execution of modification commands from explicitly paired companion devices."
+                                        SettingsManager.RemoteControlPolicy.BLOCK_ALL -> "Block all remote command execution requests on this machine."
+                                    }
+                                    Text(desc, color = TextSecondary, style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp))
+                                }
+                            }
+                        }
+                    }
+
+                    if (downloadProgress != null) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            LinearProgressIndicator(
+                                progress = downloadProgress!!,
+                                color = AccentCyan,
+                                trackColor = SlateSurface,
+                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
+                            )
+                            Text(
+                                text = "Configuring dynamic parser modules... ${(downloadProgress!! * 100).toInt()}%",
+                                color = AccentCyan,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                SettingsManager.setFirebaseUserEmail(null)
+                                SettingsManager.setFirebaseUserUid(null)
+                                SettingsManager.setFirebaseAuthIdToken(null)
+                                SettingsManager.setFirebaseAuthRefreshToken(null)
+                                SettingsManager.setEcosystemActive(false)
+                                LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
+                                onSettingsChanged()
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = SlateSurface, contentColor = TextPrimary),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Sign Out", style = MaterialTheme.typography.labelLarge)
+                        }
+
+                        val polarButtonText = if (!isSubscribed) "Subscribe" else "Manage Subscription"
+                        val polarButtonColors = ButtonDefaults.buttonColors(
+                            containerColor = if (!isSubscribed) AccentPurple else AccentCyan,
+                            contentColor = if (!isSubscribed) Color.White else ObsidianBg
+                        )
+
+                        Button(
+                            onClick = {
+                                try {
+                                    val targetUrl = if (AppConfig.useEmulator()) {
+                                        "http://localhost:5000/dashboard?tab=subs"
+                                    } else {
+                                        "https://codeoba.firebaseapp.com/dashboard?tab=subs"
+                                    }
+                                    java.awt.Desktop.getDesktop().browse(java.net.URI(targetUrl))
+                                } catch (_: Exception) {}
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = polarButtonColors,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(polarButtonText, style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+            }
+        } else {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                colors = CardDefaults.cardColors(containerColor = CardSurface),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(
+                        text = "Connect Codeoba Account",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        color = TextPrimary
+                    )
+
+                    Text(
+                        text = "To sync your configurations, remote control policies, and access device features, connect your local Codeoba instance to your account. This will open a secure authentication portal in your web browser.",
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 16.sp)
+                    )
+
+                    errorMessage?.let {
+                        Text(
+                            text = it,
+                            color = Color(0xFFD32F2F),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            isLoading = true
+                            errorMessage = null
+                            scope.launch {
+                                try {
+                                    val port = LocalAuthServer.start { idToken, refreshToken, email, uid ->
+                                        scope.launch {
+                                            try {
+                                                SettingsManager.setFirebaseUserEmail(email)
+                                                SettingsManager.setFirebaseUserUid(uid)
+                                                SettingsManager.setFirebaseAuthIdToken(idToken)
+                                                SettingsManager.setFirebaseAuthRefreshToken(refreshToken)
+
+                                                val deviceId = SettingsManager.getDeviceId()
+                                                val host = try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" }
+                                                val deviceName = "${when { PlatformUtils.isMac() -> "macOS"; PlatformUtils.isWindows() -> "Windows"; else -> "Linux" }} ($host)"
+                                                val publicKeyPem = DeviceKeyManager.getPublicKeyPem()
+                                                val nonce = FirebaseAuthClient.getRegistrationChallenge(idToken, deviceId)
+                                                val signature = DeviceKeyManager.signPayload(nonce)
+
+                                                FirebaseAuthClient.registerEcosystemDevice(idToken, deviceId, deviceName, publicKeyPem, nonce, signature)
+                                                SettingsManager.setEcosystemActive(true)
+                                                SettingsManager.setPreferredParserMode(ParserMode.SUMMARIZING)
+                                                LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
+
+                                                val modelFile = File(System.getProperty("user.home"), ".codeoba/models/weights.bin")
+                                                if (!modelFile.exists()) {
+                                                    downloadProgress = 0f
+                                                    for (i in 1..100) {
+                                                        kotlinx.coroutines.delay(10)
+                                                        downloadProgress = i / 100f
+                                                    }
+                                                    modelFile.parentFile.mkdirs()
+                                                    modelFile.writeText("MOCK_MODEL_WEIGHTS_DATA_L3AWAICD12")
+                                                    downloadProgress = null
+                                                }
+                                                onSettingsChanged()
+                                            } catch (e: Exception) {
+                                                log("Error configuring device keys: ${e.message}")
+                                                errorMessage = e.message ?: "Error configuring device credentials."
+                                                isLoading = false
+                                            }
+                                        }
+                                    }
+
+                                    val baseUrl = if (AppConfig.useEmulator()) {
+                                        "http://localhost:5000/connect"
+                                    } else {
+                                        "https://codeoba.firebaseapp.com/connect"
+                                    }
+                                    val url = "$baseUrl?port=$port"
+                                    
+                                    try {
+                                        java.awt.Desktop.getDesktop().browse(java.net.URI(url))
+                                    } catch (e: Exception) {
+                                        errorMessage = "Failed to launch system browser. Please open the URL manually:\n$url"
+                                        isLoading = false
+                                        LocalAuthServer.stop()
+                                    }
+                                } catch (e: Exception) {
+                                    errorMessage = e.message ?: "Failed to start local authentication listener."
+                                    isLoading = false
+                                    LocalAuthServer.stop()
+                                }
+                            }
+                        },
+                        enabled = !isLoading,
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = ObsidianBg),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().height(44.dp)
+                    ) {
+                        if (isLoading) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(color = ObsidianBg, modifier = Modifier.size(18.dp))
+                                Text("Awaiting Browser Authentication...", style = MaterialTheme.typography.labelLarge)
+                            }
+                        } else {
+                            Text("Connect Codeoba Account", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

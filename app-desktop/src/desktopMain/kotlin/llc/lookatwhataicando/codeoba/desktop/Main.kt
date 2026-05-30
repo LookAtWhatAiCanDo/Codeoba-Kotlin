@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -74,9 +76,16 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.whataicando.touch.compose.WindowsTouch
+import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.launch
 import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
+import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
+import llc.lookatwhataicando.codeoba.core.domain.model.Session
+import llc.lookatwhataicando.codeoba.core.domain.parser.LogParserFactory
 import llc.lookatwhataicando.codeoba.core.domain.search.ArchivalFilter
 import llc.lookatwhataicando.codeoba.core.domain.search.HashSemanticEmbedder
 import llc.lookatwhataicando.codeoba.core.domain.search.LexicalSearchEngine
@@ -101,10 +110,16 @@ import llc.lookatwhataicando.codeoba.core.util.LocalFileResolution
 import llc.lookatwhataicando.codeoba.core.util.LocalFileResolver
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
 import llc.lookatwhataicando.codeoba.core.util.ModelDownloader
+import llc.lookatwhataicando.codeoba.core.util.Logger.log
+import llc.lookatwhataicando.codeoba.core.util.ModelDownloader
+import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
 import java.awt.Cursor
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.Date
+import kotlin.math.round
+import java.awt.Desktop
+import java.net.URI
 
 // Premium Dark Color Palette (dynamic definitions located in Theme.kt)
 
@@ -147,6 +162,14 @@ fun main(args: Array<String>) {
 
     System.setProperty("apple.awt.application.name", "Codeoba")
     System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Codeoba")
+
+    // Run startup initialization
+    log("Main: Initializing Codeoba client components...")
+
+    val initialMode = SettingsManager.getEffectiveParserMode()
+    LogParserFactory.setParserMode(initialMode)
+    log("Main: Initializing parser mode to $initialMode")
+
     val sources = listOf(
         llc.lookatwhataicando.codeoba.core.source.DesktopClaudeSource(),
         llc.lookatwhataicando.codeoba.core.source.DesktopAntigravitySource(),
@@ -502,6 +525,46 @@ fun mainEntry() = application {
                     }
                 }
             }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        // Run background ecosystem sync loop
+        while (true) {
+            val email = SettingsManager.getFirebaseUserEmail()
+            val refreshToken = SettingsManager.getFirebaseAuthRefreshToken()
+            if (email != null && refreshToken != null) {
+                log("Main Background Loop: Refreshing ecosystem sync token...")
+                try {
+                    // 1. Refresh ID Token using the refresh token
+                    val refreshedAuth = llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthClient.refreshIdToken(refreshToken)
+                    SettingsManager.setFirebaseAuthIdToken(refreshedAuth.idToken)
+                    SettingsManager.setFirebaseAuthRefreshToken(refreshedAuth.refreshToken)
+                    
+                    // 2. Perform background device registration/sync in the Hub
+                    val deviceId = SettingsManager.getDeviceId()
+                    val deviceName = System.getProperty("user.name") + "@" + (if (PlatformUtils.isMac()) "macOS" else if (PlatformUtils.isWindows()) "Windows" else "Linux")
+                    val publicKey = llc.lookatwhataicando.codeoba.core.security.DeviceKeyManager.getPublicKeyPem()
+                    
+                    val nonce = llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthClient.getRegistrationChallenge(
+                        refreshedAuth.idToken, deviceId
+                    )
+                    val signature = llc.lookatwhataicando.codeoba.core.security.DeviceKeyManager.signPayload(nonce)
+                    
+                    val success = llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthClient.registerEcosystemDevice(
+                        refreshedAuth.idToken, deviceId, deviceName, publicKey, nonce, signature
+                    )
+                    if (success) {
+                        log("Main Background Loop: Ecosystem device successfully synced with Hub.")
+                    } else {
+                        log("Main Background Loop: Sync Hub returned failure status for device registration.")
+                    }
+                } catch (e: Exception) {
+                    log("Main Background Loop: Ecosystem sync refresh failed: ${e.message}")
+                }
+            }
+            // Sleep for 1 hour before next refresh check
+            kotlinx.coroutines.delay(3600000)
         }
     }
 

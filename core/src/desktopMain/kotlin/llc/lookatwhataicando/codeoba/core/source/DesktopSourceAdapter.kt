@@ -117,21 +117,24 @@ abstract class DesktopSourceAdapter : SourceAdapter {
         val file = File(filePath)
         if (!file.exists() || !file.isFile) return null
 
-        val cached = SessionCacheManager.getCachedSessionForFile(id, filePath, file.lastModified(), file.length())
-        if (cached != null) {
-            val refreshed = refreshCachedSession(cached)
-            if (refreshed != cached) {
-                val hash = SessionCacheManager.calculateMd5(file)
-                SessionCacheManager.putCachedSession(id, filePath, file.lastModified(), file.length(), hash, refreshed)
+        val parser = llc.lookatwhataicando.codeoba.core.domain.parser.LogParserFactory.getParser()
+        return parser.parse(file) {
+            val cached = SessionCacheManager.getCachedSessionForFile(id, filePath, file.lastModified(), file.length())
+            if (cached != null) {
+                val refreshed = refreshCachedSession(cached)
+                if (refreshed != cached) {
+                    val hash = SessionCacheManager.calculateMd5(file)
+                    SessionCacheManager.putCachedSession(id, filePath, file.lastModified(), file.length(), hash, refreshed)
+                }
+                refreshed
+            } else {
+                val session = parseSessionContent(file)
+                if (session != null) {
+                    val hash = SessionCacheManager.calculateMd5(file)
+                    SessionCacheManager.putCachedSession(id, filePath, file.lastModified(), file.length(), hash, session)
+                }
+                session
             }
-            return refreshed
         }
-
-        val session = parseSessionContent(file) ?: return null
-
-        val hash = SessionCacheManager.calculateMd5(file)
-        SessionCacheManager.putCachedSession(id, filePath, file.lastModified(), file.length(), hash, session)
-
-        return session
     }
 }

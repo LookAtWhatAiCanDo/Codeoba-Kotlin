@@ -1,6 +1,7 @@
 package llc.lookatwhataicando.codeoba.core.domain.model
 
 import kotlinx.serialization.Serializable
+import llc.lookatwhataicando.codeoba.core.domain.parser.SessionSummary
 
 @Serializable
 data class Session(
@@ -13,5 +14,6 @@ data class Session(
     val threadName: String?,    // thread name or title
     val turns: List<Turn>,
     val isArchived: Boolean = false,
-    val isPinned: Boolean = false
+    val isPinned: Boolean = false,
+    val summary: SessionSummary? = null
 )

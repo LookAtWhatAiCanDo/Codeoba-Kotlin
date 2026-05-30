@@ -43,6 +43,10 @@ kotlin {
                 implementation(compose.desktop.currentOs)
                 implementation(libs.kotlinx.coroutines.swing)
 
+                // JNA for native signature checks
+                implementation("net.java.dev.jna:jna:5.14.0")
+                implementation("net.java.dev.jna:jna-platform:5.14.0")
+
                 // Ktor Server (for local Hub API)
                 implementation(libs.ktor.serialization.kotlinx.json)
                 implementation(libs.ktor.server.core)
