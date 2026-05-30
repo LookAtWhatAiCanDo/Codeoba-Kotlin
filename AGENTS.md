@@ -123,6 +123,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
 15. **Persistent Startup Cache & Index Profiler**:
     - A thread-safe file caching system in `SessionCacheManager` serializes parsed `Session` objects to `~/.codeoba/cache/cache_<sourceId>.json` using `kotlinx.serialization`.
     - File-based sources check if `filePath`, `lastModified` timestamp, and `size` match the cached entry before reading and parsing. Database-based sources (Cursor) query the SQLite DB and match the row value's size and MD5 hash to bypass JSON parsing.
+    - When `ParserMode.SUMMARIZING` is enabled, the cache is queried outside of the parser delegate block (before parsing and summarization run). On cache hits, the fully cached session (with its generated AI summaries) is returned immediately, completely bypassing local model inference and making log re-scans extremely efficient.
     - Orphaned cache entries are automatically deleted during the scan process via an in-memory tracking list (`seenPaths`).
     - Startup scanning timings are measured at millisecond precision for each active adapter and overall total. A detailed and formatted profiling summary is printed in the logs, sorting the sources by their duration in descending order.
     - Caching reduces the average startup log scanning/load time from ~2.5s down to ~0.25s (a ~90% performance improvement).
@@ -189,6 +190,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Free local lexical and semantic searches are enabled by default for all users, while AI-powered summarization is a premium subscription feature.
     - Paid subscription entitlements are enforced strictly on the backend to gate access to the Device Sync Hub and remote command relay APIs.
     - Implements secure, browser-delegated OAuth flow utilizing a temporary JDK-native HTTP loopback server (listening on a random port for `/callback` parameters) and a unified Web Console SPA (running on Firebase Hosting) to prevent in-app credential handling.
+    - Stores all sensitive authentication credentials (ID and refresh tokens, licensing JWT, decryption key) in the OS-native keyring (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux) using a secure utility with automatic self-healing migration and a Java Preferences fallback.
     - Billing webhooks query subscriptions using the user's immutable Firebase `uid` mapped in checkout custom metadata rather than mutable emails to support profile email updates.
     - Implements challenge-response authentication utilizing 90-second single-use nonces and device public/private key pairs.
     - Integrates a best-effort local regex secrets scanner to redact sensitive credentials on the client side before synchronizing data.

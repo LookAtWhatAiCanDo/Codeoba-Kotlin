@@ -3,6 +3,7 @@ package llc.lookatwhataicando.codeoba.desktop
 import llc.lookatwhataicando.codeoba.core.domain.parser.ParserMode
 import llc.lookatwhataicando.codeoba.core.domain.search.ArchivalFilter
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
+import llc.lookatwhataicando.codeoba.core.util.SecureStorage
 import java.util.prefs.Preferences
 
 object SettingsManager {
@@ -158,27 +159,30 @@ object SettingsManager {
     fun getFirebaseUserUid(): String? = prefs.get("firebase_user_uid", null)
     fun setFirebaseUserUid(value: String?) = putOrRemove("firebase_user_uid", value)
 
-    fun getFirebaseAuthIdToken(): String? = prefs.get("firebase_auth_id_token", null)
-    fun setFirebaseAuthIdToken(value: String?) = putOrRemove("firebase_auth_id_token", value)
+    fun setFirebaseAuthIdToken(value: String?) = SecureStorage.put("firebase_auth_id_token", value)
 
-    fun getFirebaseAuthRefreshToken(): String? = prefs.get("firebase_auth_refresh_token", null)
-    fun setFirebaseAuthRefreshToken(value: String?) = putOrRemove("firebase_auth_refresh_token", value)
-
-    fun getLicensingJwt(): String? = prefs.get("licensing_jwt", null)
-    fun setLicensingJwt(value: String?) = putOrRemove("licensing_jwt", value)
-
-    fun getDecryptionKey(): String? = prefs.get("decryption_key", null)
-    fun setDecryptionKey(value: String?) = putOrRemove("decryption_key", value)
-
-    fun getParserConfigJson(): String? = prefs.get("parser_config_json", null)
-    fun setParserConfigJson(value: String?) = putOrRemove("parser_config_json", value)
+    fun getFirebaseAuthRefreshToken(): String? = SecureStorage.get("firebase_auth_refresh_token")
+    fun setFirebaseAuthRefreshToken(value: String?) = SecureStorage.put("firebase_auth_refresh_token", value)
 
     fun getDeviceId(): String {
-        val os = System.getProperty("os.name") ?: "Unknown"
-        val userHome = System.getProperty("user.home") ?: "Unknown"
-        val userName = System.getProperty("user.name") ?: "Unknown"
-        val rawId = "$os:$userHome:$userName"
-        return java.util.UUID.nameUUIDFromBytes(rawId.toByteArray()).toString()
+        var deviceId = prefs.get("device_id", null)
+        if (deviceId.isNullOrEmpty()) {
+            // For existing logged-in users, migrate legacy device ID to preserve backend pairing.
+            // For new users, generate a clean, random, non-PII UUID.
+            val hasLegacyAccount = !prefs.get("firebase_user_uid", null).isNullOrEmpty() ||
+                    !prefs.get("firebase_user_email", null).isNullOrEmpty()
+            if (hasLegacyAccount) {
+                val os = System.getProperty("os.name") ?: "Unknown"
+                val userHome = System.getProperty("user.home") ?: "Unknown"
+                val userName = System.getProperty("user.name") ?: "Unknown"
+                val rawId = "$os:$userHome:$userName"
+                deviceId = java.util.UUID.nameUUIDFromBytes(rawId.toByteArray()).toString()
+            } else {
+                deviceId = java.util.UUID.randomUUID().toString()
+            }
+            prefs.put("device_id", deviceId)
+        }
+        return deviceId
     }
 
     enum class SyncMode {

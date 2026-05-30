@@ -55,6 +55,13 @@ kotlin {
 
                 // SQLite JDBC — pure-Java, no subprocess needed
                 implementation(libs.sqlite.jdbc)
+                // Ktor Server (for local Hub API)
+                implementation("io.ktor:ktor-server-core:2.3.12")
+                implementation("io.ktor:ktor-server-netty:2.3.12")
+                implementation("io.ktor:ktor-server-content-negotiation:2.3.12")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
+                implementation("io.ktor:ktor-server-cors:2.3.12")
+                implementation("com.github.javakeyring:java-keyring:1.0.4")
             }
         }
 

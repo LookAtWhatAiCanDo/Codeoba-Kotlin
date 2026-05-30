@@ -94,8 +94,8 @@ All desktop source implementations inherit from the abstract base class [Desktop
   - Parallel indexing runs with `Semaphore(4)` to prevent blocking the UI thread.
 - **`SearchFilter`**: Restricts search results by source IDs, timestamp ranges, workspace paths, and active vs archived status (Active/Archived chips).
 - **`IndexManager`**: Coordinates scanning, index updates, directory watchers, and timing instrumentation.
-- **`SessionCacheManager`**: Persistently caches pre-parsed `Session` models under `~/.codeoba/cache/cache_<sourceId>.json` using `kotlinx.serialization` to avoid expensive startup JSON/Markdown parsing:
-  - File-based sources: Check file metadata (path, size, modification timestamp) to hit cache instantly.
+- **`SessionCacheManager`**: Persistently caches pre-parsed `Session` models under `~/.codeoba/cache/cache_<sourceId>.json` using `kotlinx.serialization` to avoid expensive startup JSON/Markdown parsing and semantic embedding computation:
+  - File-based sources: Check file metadata (path, size, modification timestamp) to hit cache instantly. When AI summarization is enabled, checking the cache first ensures that hits completely bypass local model inference by returning the fully cached and summarized session.
   - Database-based sources (Cursor): Compute string MD5 hashes on SQLite values in memory to hit cache without JSON parsing.
   - Pruning: Automatically deletes orphaned cache entries for sessions that are no longer present on disk during scans.
 - **`Startup Profiler`**: Measures and formats log reports of exact scanning times and percentages for all registered active source adapters. Together with the persistent caching layer, this reduces the average startup log scanning/load time from ~2.5s down to ~0.25s (a ~90% optimization).
@@ -133,6 +133,13 @@ All desktop source implementations inherit from the abstract base class [Desktop
 ---
 
 ## ⚙️ Settings Management, OS Portability & Auto-Updates
+
+Persisted via `java.util.prefs.Preferences` (or OS-native secure credential store for sensitive items):
+- **Credentials & Keys**: Stored securely in OS-native credential store (Keychain, Credential Manager, Secret Service) via `SecureStorage` / `java-keyring` with automatic migration from legacy plaintext preferences.
+- **States**: `Monitor` (scan even if not installed), `Ignore` (skip folder), `Default` (prompt on orphaned logs).
+- **Settings UI**: Two-pane dialog in `:app-desktop` for settings toggles and recursive path purges.
+- **Search Filters**: Restores the last selected "Filter by Source" and "Filter by Status" states on application launch.
+- **Auto-Updates**: Configures automatic startup update checks (enabled/disabled) and stores user-skipped version tags, providing manual check hooks and native platform installer deployment.
 
 - **Preferences Persistence**: Persisted via `java.util.prefs.Preferences` including sidebar width, window bounds, maximized state, active screen, search filters, and similarity thresholds. Window coordinates are validated against the active display configuration (`GraphicsEnvironment`) on startup to prevent off-screen layouts.
 - **Exhaustive Settings List**: Displays all supported adapters. The sources list is sorted alphabetically by their display name, but bisected into two groups: installed adapters are displayed at the top, followed by uninstalled/not-detected adapters at the bottom.

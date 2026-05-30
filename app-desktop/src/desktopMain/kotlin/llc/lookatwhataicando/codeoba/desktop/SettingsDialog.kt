@@ -1951,17 +1951,6 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                                 SettingsManager.setPreferredParserMode(ParserMode.SUMMARIZING)
                                                 LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
 
-                                                val modelFile = File(System.getProperty("user.home"), ".codeoba/models/weights.bin")
-                                                if (!modelFile.exists()) {
-                                                    downloadProgress = 0f
-                                                    for (i in 1..100) {
-                                                        kotlinx.coroutines.delay(10)
-                                                        downloadProgress = i / 100f
-                                                    }
-                                                    modelFile.parentFile.mkdirs()
-                                                    modelFile.writeText("MOCK_MODEL_WEIGHTS_DATA_L3AWAICD12")
-                                                    downloadProgress = null
-                                                }
                                                 onSettingsChanged()
                                             } catch (e: Exception) {
                                                 log("Error configuring device keys: ${e.message}")
