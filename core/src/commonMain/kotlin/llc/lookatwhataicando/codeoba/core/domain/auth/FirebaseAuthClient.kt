@@ -98,12 +98,11 @@ object FirebaseAuthClient {
             } else {
                 "https://$CLOUD_FUNCTION_REGION-$firebaseProjectId.cloudfunctions.net/registerEcosystemDevice"
             }
-            val cleanPem = publicKeyPem.replace("\n", "\\n").replace("\r", "")
             val bodyStr = buildJsonObject {
                 put("data", buildJsonObject {
                     put("deviceId", deviceId)
                     put("deviceName", deviceName)
-                    put("publicKey", cleanPem)
+                    put("publicKey", publicKeyPem)
                     put("nonce", nonce)
                     put("signature", signature)
                 })
