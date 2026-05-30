@@ -10,9 +10,9 @@ This guide explains what the Codeoba Ecosystem is, how it works, and how you wil
 
 ## 🚀 What is the Codeoba Ecosystem?
 
-By default, Codeoba runs **100% locally and offline on your computer**. You can search, index log directories, and run AI-powered conversation summaries completely for free. 
+By default, Codeoba runs **100% locally and offline on your computer**. You can execute local lexical and semantic searches and index log directories completely for free. 
 
-The **Ecosystem Subscription ($5/mo)** bridges your development environment to your personal companion devices. It creates a secure, real-time sync channel that lets you:
+The **Ecosystem Subscription ($5/mo)** unlocks AI-powered conversation summaries and bridges your development environment to your personal companion devices. It creates a secure, real-time sync channel that lets you:
 
 * **🔍 Multi-Device Search**: Search and view conversation logs from all of your workstations and remote servers in a single merged index on any device.
 * **📱 Remote Control (Phone & Watch)**: Check the status of long-running terminal tasks, read live output, pause/resume agents, or cancel a runaway process right from your phone or smartwatch while away from your desk.
@@ -25,7 +25,7 @@ The **Ecosystem Subscription ($5/mo)** bridges your development environment to y
 
 Your privacy is our priority. You choose exactly what data leaves your development machine via the **Sync Mode** setting in the Account panel:
 
-1. **Local Only (Free)**: No data ever leaves your device. All lexical/semantic search indexing and summaries happen locally on your hardware.
+1. **Local Only (Free/Offline)**: No data ever leaves your device. All local lexical and semantic search indexing (and AI summaries, if subscribed) happens locally on your hardware.
 2. **Metadata Only (Default)**: Synced devices only see high-level task metrics (e.g. task names, status, and execution times). Raw logs and code snippets remain on your machine.
 3. **Summaries Only**: Syncs high-level AI-generated summaries of your conversation turns, letting you review what the agent accomplished without uploading raw terminal outputs or file paths.
 4. **Full Sync**: Syncs raw conversation transcripts and terminal outputs. **This mode is required to enable remote approvals of command prompts.** Content is encrypted at rest to ensure unauthorized parties cannot access your logs.

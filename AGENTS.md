@@ -186,7 +186,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Launches native installers via `ProcessBuilder` (e.g. passive MSI `/passive` on Windows for seamless background installation, PKG launcher `open` on macOS, or `xdg-open` on Linux) and exits the JVM with `System.exit(0)` to release write locks.
 
 26. **Multi-Device Ecosystem Sync & Subscription Redesign**:
-    - Free local lexical and semantic searches and free AI summaries are enabled by default for all users.
+    - Free local lexical and semantic searches are enabled by default for all users, while AI-powered summarization is a premium subscription feature.
     - Paid subscription entitlements are enforced strictly on the backend to gate access to the Device Sync Hub and remote command relay APIs.
     - Implements secure, browser-delegated OAuth flow utilizing a temporary JDK-native HTTP loopback server (listening on a random port for `/callback` parameters) and a unified Web Console SPA (running on Firebase Hosting) to prevent in-app credential handling.
     - Billing webhooks query subscriptions using the user's immutable Firebase `uid` mapped in checkout custom metadata rather than mutable emails to support profile email updates.
