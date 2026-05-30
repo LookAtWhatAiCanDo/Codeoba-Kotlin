@@ -11,8 +11,10 @@ import io.ktor.http.contentType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import llc.lookatwhataicando.codeoba.core.util.AppConfig
 
 object FirebaseAuthClient {
@@ -66,7 +68,11 @@ object FirebaseAuthClient {
             } else {
                 "https://$CLOUD_FUNCTION_REGION-$firebaseProjectId.cloudfunctions.net/getRegistrationChallenge"
             }
-            val bodyStr = """{"data":{"deviceId":"$deviceId"}}"""
+            val bodyStr = buildJsonObject {
+                put("data", buildJsonObject {
+                    put("deviceId", deviceId)
+                })
+            }.toString()
             
             val response: HttpResponse = client.post(url) {
                 header("Authorization", "Bearer $idToken")
@@ -93,7 +99,15 @@ object FirebaseAuthClient {
                 "https://$CLOUD_FUNCTION_REGION-$firebaseProjectId.cloudfunctions.net/registerEcosystemDevice"
             }
             val cleanPem = publicKeyPem.replace("\n", "\\n").replace("\r", "")
-            val bodyStr = """{"data":{"deviceId":"$deviceId","deviceName":"$deviceName","publicKey":"$cleanPem","nonce":"$nonce","signature":"$signature"}}"""
+            val bodyStr = buildJsonObject {
+                put("data", buildJsonObject {
+                    put("deviceId", deviceId)
+                    put("deviceName", deviceName)
+                    put("publicKey", cleanPem)
+                    put("nonce", nonce)
+                    put("signature", signature)
+                })
+            }.toString()
             
             val response: HttpResponse = client.post(url) {
                 header("Authorization", "Bearer $idToken")
@@ -119,4 +133,3 @@ data class AuthResponse(
     val uid: String,
     val email: String
 )
-
