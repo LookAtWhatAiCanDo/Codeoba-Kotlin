@@ -24,7 +24,7 @@ object LocalAuthServer {
         "https://codeoba-dev.firebaseapp.com"
     )
 
-    fun start(onSuccess: (idToken: String, refreshToken: String, email: String, uid: String) -> Unit): Int {
+    fun start(onSuccess: (idToken: String, refreshToken: String, email: String, uid: String) -> Unit): Int = synchronized(this) {
         // Stop any running instance first
         stop()
 
@@ -34,7 +34,21 @@ object LocalAuthServer {
         expectedState = state
         log("LocalAuthServer: Started on port $port with state $state")
 
+        // Schedule an absolute safety timeout of 5 minutes to close this listener
+        Thread {
+            try {
+                Thread.sleep(5 * 60 * 1000L)
+                synchronized(LocalAuthServer) {
+                    if (server === activeServer) {
+                        log("LocalAuthServer: Stopping due to 5-minute inactivity timeout")
+                        stop()
+                    }
+                }
+            } catch (_: Exception) {}
+        }.apply { isDaemon = true }.start()
+
         activeServer.createContext("/callback") { exchange ->
+            var wasSuccessful = false
             try {
                 val origin = exchange.requestHeaders.getFirst("Origin")
                 val isAllowed = origin != null && (
@@ -136,6 +150,7 @@ object LocalAuthServer {
                 val isPost = exchange.requestMethod.equals("POST", ignoreCase = true)
                 val responseBody = if (idToken != null && refreshToken != null) {
                     onSuccess(idToken, refreshToken, email, uid)
+                    wasSuccessful = true
                     if (isPost) {
                         """
                         {
@@ -201,12 +216,16 @@ object LocalAuthServer {
                     exchange.close()
                 } catch (_: Exception) {}
             } finally {
-                if (!exchange.requestMethod.equals("OPTIONS", ignoreCase = true)) {
+                if (wasSuccessful) {
                     // Terminate server asynchronously shortly after
                     Thread {
                         try {
                             Thread.sleep(1000)
-                            stop()
+                            synchronized(LocalAuthServer) {
+                                if (server === activeServer) {
+                                    stop()
+                                }
+                            }
                         } catch (_: Exception) {}
                     }.apply { isDaemon = true }.start()
                 }
@@ -218,7 +237,7 @@ object LocalAuthServer {
         return port
     }
 
-    fun stop() {
+    fun stop() = synchronized(this) {
         expectedState = null
         server?.let {
             try {
