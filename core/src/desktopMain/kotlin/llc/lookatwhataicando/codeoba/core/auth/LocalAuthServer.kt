@@ -135,7 +135,7 @@ object LocalAuthServer {
 
                 val contentType = if (isPost) "application/json" else "text/html"
                 exchange.responseHeaders.set("Content-Type", "$contentType; charset=UTF-8")
-                exchange.sendResponseHeaders(200, responseBody.toByteArray(Charsets.UTF_8).size.toLong())
+                exchange.sendResponseHeaders(if (isPost && (idToken == null || refreshToken == null)) 400 else 200, responseBody.toByteArray(Charsets.UTF_8).size.toLong())
                 exchange.responseBody.write(responseBody.toByteArray(Charsets.UTF_8))
                 exchange.close()
             } catch (e: Exception) {
