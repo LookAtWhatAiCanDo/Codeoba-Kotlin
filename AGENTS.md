@@ -196,6 +196,10 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Integrates a best-effort local regex secrets scanner to redact sensitive credentials on the client side before synchronizing data.
     - Allows configuring Sync Modes (Local, Metadata, Summaries, Full Sync), target machine Remote Control Policies, and workspace Path Exclusions inside the Settings panel.
 
+26. **Firebase API Key Configuration**:
+    - The Firebase Web API key used for token refresh operations is resolved dynamically via the JVM system property `codeoba.firebase.api_key` or environment variable `CODEOBA_FIREBASE_API_KEY`.
+    - If running in production (non-emulator) mode and the API key matches the default placeholder or is blank, a fail-fast validation check throws an `IllegalArgumentException` with clear configuration instructions.
+
 ---
 
 ## 🛠️ Common Gradle Development Commands

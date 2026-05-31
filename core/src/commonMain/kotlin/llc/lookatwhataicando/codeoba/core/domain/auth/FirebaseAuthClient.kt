@@ -18,8 +18,25 @@ import kotlinx.serialization.json.put
 import llc.lookatwhataicando.codeoba.core.util.AppConfig
 
 object FirebaseAuthClient {
-    // Standard Firebase API Key Placeholder — configure in build or runtime settings
-    private const val FIREBASE_API_KEY = "AIzaSyFakeKeyCodeobaPlaceholder_ForProductionReplace"
+    // Firebase Web API key is required for securetoken.googleapis.com calls.
+    // Allow overriding via JVM system property or environment variable to keep environment config out of source.
+    private const val DEFAULT_FIREBASE_API_KEY = "AIzaSyFakeKeyCodeobaPlaceholder_ForProductionReplace"
+
+    private fun getFirebaseApiKey(): String {
+        val key = try {
+            System.getProperty("codeoba.firebase.api_key") ?: System.getenv("CODEOBA_FIREBASE_API_KEY")
+        } catch (_: Throwable) {
+            null
+        } ?: DEFAULT_FIREBASE_API_KEY
+
+        if (!useEmulator) {
+            require(key != DEFAULT_FIREBASE_API_KEY && key.isNotBlank()) {
+                "Firebase API key is not configured. Set -Dcodeoba.firebase.api_key=... (or provide via build config)."
+            }
+        }
+        return key
+    }
+
     private val firebaseProjectId: String
         get() = AppConfig.getFirebaseProjectId()
     private const val CLOUD_FUNCTION_REGION = "us-central1"
@@ -34,10 +51,11 @@ object FirebaseAuthClient {
 
     suspend fun refreshIdToken(refreshToken: String): AuthResponse {
         return withContext(Dispatchers.IO) {
+            val apiKey = getFirebaseApiKey()
             val url = if (useEmulator) {
-                "http://127.0.0.1:9099/securetoken.googleapis.com/v1/token?key=$FIREBASE_API_KEY"
+                "http://127.0.0.1:9099/securetoken.googleapis.com/v1/token?key=$apiKey"
             } else {
-                "https://securetoken.googleapis.com/v1/token?key=$FIREBASE_API_KEY"
+                "https://securetoken.googleapis.com/v1/token?key=$apiKey"
             }
             val bodyStr = "grant_type=refresh_token&refresh_token=${java.net.URLEncoder.encode(refreshToken, "UTF-8")}"
             

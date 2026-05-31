@@ -60,6 +60,12 @@ graph TD
 - **Test**: `./gradlew :core:desktopTest`
 - **Launch Application**: `./gradlew :app-desktop:run`
 
+### Environment & Configuration Properties
+
+The application resolves dynamic parameters at startup from JVM system properties or environment variables:
+- `codeoba.firebase.api_key` (JVM property) or `CODEOBA_FIREBASE_API_KEY` (env variable): Firebase Web API Key required for token refresh operations in non-emulator (production) mode. If missing in production, token refreshes fail fast.
+- `codeoba.base_url` (JVM property): The active environment base URL. Defaults to `codeoba.com`. If configured to `localhost` or `127.0.0.1`, the app targets local Firebase emulators.
+
 ---
 
 ## 🔒 Privacy & Local-First Philosophy
