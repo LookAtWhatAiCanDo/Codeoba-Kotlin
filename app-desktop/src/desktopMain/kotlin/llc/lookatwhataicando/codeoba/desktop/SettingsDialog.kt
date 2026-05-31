@@ -1900,8 +1900,12 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                                         if (refreshToken != null) {
                                                             try {
                                                                 val refreshedAuth = FirebaseAuthClient.refreshIdToken(refreshToken)
-                                                                SettingsManager.setFirebaseAuthIdToken(refreshedAuth.idToken)
-                                                                SettingsManager.setFirebaseAuthRefreshToken(refreshedAuth.refreshToken)
+                                                                if (refreshedAuth.idToken.isNotBlank()) {
+                                                                    SettingsManager.setFirebaseAuthIdToken(refreshedAuth.idToken)
+                                                                }
+                                                                if (refreshedAuth.refreshToken.isNotBlank()) {
+                                                                    SettingsManager.setFirebaseAuthRefreshToken(refreshedAuth.refreshToken)
+                                                                }
                                                                 val portalUrl = FirebaseAuthClient.getCustomerPortalUrl(refreshedAuth.idToken)
                                                                 java.awt.Desktop.getDesktop().browse(java.net.URI(portalUrl))
                                                             } catch (refreshEx: Exception) {
@@ -2022,7 +2026,8 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                     }
 
                                     val baseUrl = "${AppConfig.getWebConsoleUrl()}/connect"
-                                    val url = "$baseUrl?port=$port"
+                                    val stateToken = LocalAuthServer.expectedState ?: ""
+                                    val url = "$baseUrl?port=$port&state=${java.net.URLEncoder.encode(stateToken, "UTF-8")}"
                                     
                                     try {
                                         java.awt.Desktop.getDesktop().browse(java.net.URI(url))

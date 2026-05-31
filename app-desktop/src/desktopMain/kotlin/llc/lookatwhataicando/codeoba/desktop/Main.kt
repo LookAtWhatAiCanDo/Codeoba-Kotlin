@@ -166,6 +166,10 @@ fun main(args: Array<String>) {
     // Run startup initialization
     log("Main: Initializing Codeoba client components...")
 
+    // Initialize device ID early to prevent PII-derived legacy ID creation on fresh installs
+    val deviceId = SettingsManager.getDeviceId()
+    log("Main: Initializing device ID to $deviceId")
+
     val initialMode = SettingsManager.getEffectiveParserMode()
     LogParserFactory.setParserMode(initialMode)
     log("Main: Initializing parser mode to $initialMode")
@@ -538,8 +542,12 @@ fun mainEntry() = application {
                 try {
                     // 1. Refresh ID Token using the refresh token
                     val refreshedAuth = llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthClient.refreshIdToken(refreshToken)
-                    SettingsManager.setFirebaseAuthIdToken(refreshedAuth.idToken)
-                    SettingsManager.setFirebaseAuthRefreshToken(refreshedAuth.refreshToken)
+                    if (refreshedAuth.idToken.isNotBlank()) {
+                        SettingsManager.setFirebaseAuthIdToken(refreshedAuth.idToken)
+                    }
+                    if (refreshedAuth.refreshToken.isNotBlank()) {
+                        SettingsManager.setFirebaseAuthRefreshToken(refreshedAuth.refreshToken)
+                    }
                     
                     // 2. Perform background device registration/sync in the Hub
                     val deviceId = SettingsManager.getDeviceId()

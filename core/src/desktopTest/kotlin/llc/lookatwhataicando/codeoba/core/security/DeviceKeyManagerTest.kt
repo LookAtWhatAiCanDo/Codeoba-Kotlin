@@ -9,28 +9,43 @@ class DeviceKeyManagerTest {
 
     @Test
     fun testKeyGenerationAndRetrieval() {
-        // 1. Reset state
-        SecureStorage.delete("device_private_key")
-        SecureStorage.delete("device_public_key")
+        if (System.getProperty("codeoba.run.keyring.integration.tests") != "true") return
 
-        // 2. Load KeyPair — should generate a new one
-        val generatedKeyPair = DeviceKeyManager.getOrGenerateKeyPair()
-        assertNotNull(generatedKeyPair)
+        // 1. Backup any existing real production keys
+        val backupPrivate = SecureStorage.get("device_private_key")
+        val backupPublic = SecureStorage.get("device_public_key")
 
-        // Verify they now reside in SecureStorage
-        assertNotNull(SecureStorage.get("device_private_key"))
-        assertNotNull(SecureStorage.get("device_public_key"))
+        try {
+            // 2. Reset state for test
+            SecureStorage.delete("device_private_key")
+            SecureStorage.delete("device_public_key")
 
-        // 3. Load KeyPair again — should return the same generated one
-        val loadedKeyPair = DeviceKeyManager.getOrGenerateKeyPair()
-        assertNotNull(loadedKeyPair)
-        assertEquals(
-            generatedKeyPair.public.encoded.toList(),
-            loadedKeyPair.public.encoded.toList()
-        )
+            // 3. Load KeyPair — should generate a new one
+            val generatedKeyPair = DeviceKeyManager.getOrGenerateKeyPair()
+            assertNotNull(generatedKeyPair)
 
-        // Clean up
-        SecureStorage.delete("device_private_key")
-        SecureStorage.delete("device_public_key")
+            // Verify they now reside in SecureStorage
+            assertNotNull(SecureStorage.get("device_private_key"))
+            assertNotNull(SecureStorage.get("device_public_key"))
+
+            // 4. Load KeyPair again — should return the same generated one
+            val loadedKeyPair = DeviceKeyManager.getOrGenerateKeyPair()
+            assertNotNull(loadedKeyPair)
+            assertEquals(
+                generatedKeyPair.public.encoded.toList(),
+                loadedKeyPair.public.encoded.toList()
+            )
+        } finally {
+            // 5. Clean up test keys and restore backup
+            SecureStorage.delete("device_private_key")
+            SecureStorage.delete("device_public_key")
+
+            if (backupPrivate != null) {
+                SecureStorage.put("device_private_key", backupPrivate)
+            }
+            if (backupPublic != null) {
+                SecureStorage.put("device_public_key", backupPublic)
+            }
+        }
     }
 }

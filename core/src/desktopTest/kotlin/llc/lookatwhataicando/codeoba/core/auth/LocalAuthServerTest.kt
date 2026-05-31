@@ -38,7 +38,8 @@ class LocalAuthServerTest {
             val client = HttpClient(CIO)
             try {
                 // Request callback with base64/JWT-like tokens that contain equals signs
-                val response = client.get("http://127.0.0.1:$port/callback?idToken=eyJhbGciOi=MyToken=&refreshToken=ref=token=&email=test@example.com&uid=user_123")
+                val state = LocalAuthServer.expectedState
+                val response = client.get("http://127.0.0.1:$port/callback?idToken=eyJhbGciOi=MyToken=&refreshToken=ref=token=&email=test@example.com&uid=user_123&state=$state")
                 val html = response.bodyAsText()
 
                 assertTrue(html.contains("Successfully Authenticated!"), "HTML should indicate success")
@@ -75,7 +76,8 @@ class LocalAuthServerTest {
                     "idToken": "token=123",
                     "refreshToken": "refresh=456",
                     "email": "user@gmail.com",
-                    "uid": "uid_789"
+                    "uid": "uid_789",
+                    "state": "${LocalAuthServer.expectedState}"
                 }
                 """.trimIndent()
 
@@ -115,7 +117,7 @@ class LocalAuthServerTest {
 
             val client = HttpClient(CIO)
             try {
-                val formBody = "idToken=formToken=1&refreshToken=formRefresh=2&email=form@gmail.com&uid=form_uid"
+                val formBody = "idToken=formToken=1&refreshToken=formRefresh=2&email=form@gmail.com&uid=form_uid&state=${LocalAuthServer.expectedState}"
 
                 val response = client.post("http://127.0.0.1:$port/callback") {
                     contentType(ContentType.Application.FormUrlEncoded)
@@ -171,6 +173,24 @@ class LocalAuthServerTest {
 
                 assertEquals(403, response.status.value)
                 assertEquals("Unauthorized origin.", response.bodyAsText())
+            } finally {
+                client.close()
+                LocalAuthServer.stop()
+            }
+        }
+    }
+
+    @Test
+    fun testCallbackInvalidState() {
+        runBlocking {
+            val port = LocalAuthServer.start { _, _, _, _ -> }
+
+            val client = HttpClient(CIO)
+            try {
+                val response = client.get("http://127.0.0.1:$port/callback?idToken=123&refreshToken=456&state=invalid_state")
+
+                assertEquals(403, response.status.value)
+                assertTrue(response.bodyAsText().contains("Invalid or missing state parameter"))
             } finally {
                 client.close()
                 LocalAuthServer.stop()

@@ -11,6 +11,8 @@ import llc.lookatwhataicando.codeoba.core.util.AppConfig
 
 object LocalAuthServer {
     private var server: HttpServer? = null
+    var expectedState: String? = null
+        private set
 
     private val allowedOrigins = setOf(
         "http://localhost:5000",
@@ -28,7 +30,9 @@ object LocalAuthServer {
 
         val activeServer = HttpServer.create(InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 0)
         val port = activeServer.address.port
-        log("LocalAuthServer: Started on port $port")
+        val state = java.util.UUID.randomUUID().toString()
+        expectedState = state
+        log("LocalAuthServer: Started on port $port with state $state")
 
         activeServer.createContext("/callback") { exchange ->
             try {
@@ -99,6 +103,29 @@ object LocalAuthServer {
                             }
                         }
                     }
+                }
+
+                val state = params["state"]
+                if (state == null || state != expectedState) {
+                    log("LocalAuthServer: Rejected request due to invalid or missing state parameter: $state")
+                    val isPost = exchange.requestMethod.equals("POST", ignoreCase = true)
+                    val errorResponse = "Invalid or missing state parameter."
+                    val responseText = if (isPost) {
+                        """
+                        {
+                            "status": "error",
+                            "message": "Invalid or missing state parameter"
+                        }
+                        """.trimIndent()
+                    } else {
+                        errorResponse
+                    }
+                    val contentType = if (isPost) "application/json" else "text/plain"
+                    exchange.responseHeaders.set("Content-Type", "$contentType; charset=UTF-8")
+                    exchange.sendResponseHeaders(403, responseText.toByteArray(Charsets.UTF_8).size.toLong())
+                    exchange.responseBody.write(responseText.toByteArray(Charsets.UTF_8))
+                    exchange.close()
+                    return@createContext
                 }
 
                 val idToken = params["idToken"]
@@ -174,13 +201,15 @@ object LocalAuthServer {
                     exchange.close()
                 } catch (_: Exception) {}
             } finally {
-                // Terminate server asynchronously shortly after
-                Thread {
-                    try {
-                        Thread.sleep(1000)
-                        stop()
-                    } catch (_: Exception) {}
-                }.apply { isDaemon = true }.start()
+                if (!exchange.requestMethod.equals("OPTIONS", ignoreCase = true)) {
+                    // Terminate server asynchronously shortly after
+                    Thread {
+                        try {
+                            Thread.sleep(1000)
+                            stop()
+                        } catch (_: Exception) {}
+                    }.apply { isDaemon = true }.start()
+                }
             }
         }
 
@@ -190,6 +219,7 @@ object LocalAuthServer {
     }
 
     fun stop() {
+        expectedState = null
         server?.let {
             try {
                 it.stop(0)

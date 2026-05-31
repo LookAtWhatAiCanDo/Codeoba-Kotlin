@@ -52,10 +52,24 @@ object FirebaseAuthClient {
             }
             
             val obj = json.parseToJsonElement(responseText).jsonObject
+            val idToken = obj["id_token"]?.jsonPrimitive?.content
+            val userId = obj["user_id"]?.jsonPrimitive?.content
+            
+            if (idToken.isNullOrBlank() || userId.isNullOrBlank()) {
+                throw Exception("Invalid token refresh response from server")
+            }
+            
+            val returnedRefreshToken = obj["refresh_token"]?.jsonPrimitive?.content
+            val finalRefreshToken = if (returnedRefreshToken.isNullOrBlank()) {
+                refreshToken
+            } else {
+                returnedRefreshToken
+            }
+            
             AuthResponse(
-                idToken = obj["id_token"]?.jsonPrimitive?.content ?: "",
-                refreshToken = obj["refresh_token"]?.jsonPrimitive?.content ?: "",
-                uid = obj["user_id"]?.jsonPrimitive?.content ?: "",
+                idToken = idToken,
+                refreshToken = finalRefreshToken,
+                uid = userId,
                 email = "" // Email should be persisted by client, not returned on refresh
             )
         }
