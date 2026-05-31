@@ -21,7 +21,7 @@ object FirebaseAuthClient {
     // Standard Firebase API Key Placeholder — configure in build or runtime settings
     private const val FIREBASE_API_KEY = "AIzaSyFakeKeyCodeobaPlaceholder_ForProductionReplace"
     private val firebaseProjectId: String
-        get() = if (useEmulator) "codeoba-dev" else "codeoba-prod"
+        get() = AppConfig.getFirebaseProjectId()
     private const val CLOUD_FUNCTION_REGION = "us-central1"
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -122,6 +122,38 @@ object FirebaseAuthClient {
             val root = json.parseToJsonElement(responseText).jsonObject
             val result = root["result"]?.jsonObject ?: throw Exception("Invalid server response format")
             result["success"]?.jsonPrimitive?.content == "true"
+        }
+    }
+
+    suspend fun getCustomerPortalUrl(idToken: String): String {
+        return withContext(Dispatchers.IO) {
+            val url = if (useEmulator) {
+                "http://127.0.0.1:5001/$firebaseProjectId/$CLOUD_FUNCTION_REGION/getCustomerPortalUrl"
+            } else {
+                "https://$CLOUD_FUNCTION_REGION-$firebaseProjectId.cloudfunctions.net/getCustomerPortalUrl"
+            }
+            val bodyStr = buildJsonObject {
+                put("data", buildJsonObject {})
+            }.toString()
+            
+            val response: HttpResponse = client.post(url) {
+                header("Authorization", "Bearer $idToken")
+                contentType(ContentType.Application.Json)
+                setBody(bodyStr)
+            }
+            
+            val responseText = response.bodyAsText()
+            if (response.status.value != 200) {
+                val errorMsg = try {
+                    val root = json.parseToJsonElement(responseText).jsonObject
+                    root["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+                } catch (_: Exception) { null }
+                throw Exception(errorMsg ?: "Failed to get customer portal URL. Status: ${response.status.value}")
+            }
+            
+            val root = json.parseToJsonElement(responseText).jsonObject
+            val result = root["result"]?.jsonObject ?: throw Exception("Invalid customer portal response format")
+            result["url"]?.jsonPrimitive?.content ?: throw Exception("URL missing in response")
         }
     }
 }

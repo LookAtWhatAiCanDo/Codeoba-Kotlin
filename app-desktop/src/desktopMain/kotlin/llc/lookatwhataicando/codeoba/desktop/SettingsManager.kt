@@ -159,6 +159,7 @@ object SettingsManager {
     fun getFirebaseUserUid(): String? = prefs.get("firebase_user_uid", null)
     fun setFirebaseUserUid(value: String?) = putOrRemove("firebase_user_uid", value)
 
+    fun getFirebaseAuthIdToken(): String? = SecureStorage.get("firebase_auth_id_token")
     fun setFirebaseAuthIdToken(value: String?) = SecureStorage.put("firebase_auth_id_token", value)
 
     fun getFirebaseAuthRefreshToken(): String? = SecureStorage.get("firebase_auth_refresh_token")

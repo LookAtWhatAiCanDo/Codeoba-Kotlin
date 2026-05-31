@@ -1543,6 +1543,7 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf<Float?>(null) }
+    var isLoadingPortal by remember { mutableStateOf(false) }
 
     val savedEmail = SettingsManager.getFirebaseUserEmail()
     val savedUid = SettingsManager.getFirebaseUserUid()
@@ -1877,20 +1878,82 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
 
                         Button(
                             onClick = {
-                                try {
-                                    val targetUrl = if (AppConfig.useEmulator()) {
-                                        "http://localhost:5000/dashboard?tab=subs"
-                                    } else {
-                                        "https://codeoba.firebaseapp.com/dashboard?tab=subs"
+                                if (!isSubscribed) {
+                                    try {
+                                        val targetUrl = "${AppConfig.getWebConsoleUrl()}/dashboard?tab=subs"
+                                        java.awt.Desktop.getDesktop().browse(java.net.URI(targetUrl))
+                                    } catch (_: Exception) {}
+                                } else {
+                                    isLoadingPortal = true
+                                    scope.launch {
+                                        try {
+                                            val idToken = SettingsManager.getFirebaseAuthIdToken()
+                                            if (idToken != null) {
+                                                try {
+                                                    val portalUrl = FirebaseAuthClient.getCustomerPortalUrl(idToken)
+                                                    java.awt.Desktop.getDesktop().browse(java.net.URI(portalUrl))
+                                                } catch (e: Exception) {
+                                                    val isAuthError = e.message?.contains("auth", ignoreCase = true) == true ||
+                                                                    e.message?.contains("token", ignoreCase = true) == true ||
+                                                                    e.message?.contains("expired", ignoreCase = true) == true
+                                                    
+                                                    if (isAuthError) {
+                                                        val refreshToken = SettingsManager.getFirebaseAuthRefreshToken()
+                                                        if (refreshToken != null) {
+                                                            try {
+                                                                val refreshedAuth = FirebaseAuthClient.refreshIdToken(refreshToken)
+                                                                SettingsManager.setFirebaseAuthIdToken(refreshedAuth.idToken)
+                                                                SettingsManager.setFirebaseAuthRefreshToken(refreshedAuth.refreshToken)
+                                                                val portalUrl = FirebaseAuthClient.getCustomerPortalUrl(refreshedAuth.idToken)
+                                                                java.awt.Desktop.getDesktop().browse(java.net.URI(portalUrl))
+                                                            } catch (refreshEx: Exception) {
+                                                                log("Failed to refresh token after auth error: ${refreshEx.message}")
+                                                                throw e
+                                                            }
+                                                        } else {
+                                                            throw e
+                                                        }
+                                                    } else {
+                                                        throw e
+                                                    }
+                                                }
+                                            } else {
+                                                // Fallback if no token is available
+                                                val targetUrl = "${AppConfig.getWebConsoleUrl()}/dashboard?tab=subs"
+                                                java.awt.Desktop.getDesktop().browse(java.net.URI(targetUrl))
+                                            }
+                                        } catch (e: Exception) {
+                                            log("Failed to load customer portal directly: ${e.message}", e)
+                                            try {
+                                                val targetUrl = "${AppConfig.getWebConsoleUrl()}/dashboard?tab=subs"
+                                                java.awt.Desktop.getDesktop().browse(java.net.URI(targetUrl))
+                                            } catch (_: Exception) {}
+                                        } finally {
+                                            isLoadingPortal = false
+                                        }
                                     }
-                                    java.awt.Desktop.getDesktop().browse(java.net.URI(targetUrl))
-                                } catch (_: Exception) {}
+                                }
                             },
+                            enabled = !isLoadingPortal,
                             modifier = Modifier.weight(1f),
                             colors = polarButtonColors,
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text(polarButtonText, style = MaterialTheme.typography.labelLarge)
+                            if (isLoadingPortal) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = ObsidianBg,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Text("Loading Portal...", style = MaterialTheme.typography.labelLarge)
+                                }
+                            } else {
+                                Text(polarButtonText, style = MaterialTheme.typography.labelLarge)
+                            }
                         }
                     }
                 }
@@ -1960,11 +2023,7 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                         }
                                     }
 
-                                    val baseUrl = if (AppConfig.useEmulator()) {
-                                        "http://localhost:5000/connect"
-                                    } else {
-                                        "https://codeoba.firebaseapp.com/connect"
-                                    }
+                                    val baseUrl = "${AppConfig.getWebConsoleUrl()}/connect"
                                     val url = "$baseUrl?port=$port"
                                     
                                     try {

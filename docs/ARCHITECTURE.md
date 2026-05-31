@@ -135,7 +135,7 @@ All desktop source implementations inherit from the abstract base class [Desktop
 ## ⚙️ Settings Management, OS Portability & Auto-Updates
 
 Persisted via `java.util.prefs.Preferences` (or OS-native secure credential store for sensitive items):
-- **Credentials & Keys**: Stored securely in OS-native credential store (Keychain, Credential Manager, Secret Service) via `SecureStorage` / `java-keyring` with automatic migration from legacy plaintext preferences.
+- **Credentials & Keys**: Stored securely in OS-native credential store (Keychain, Credential Manager, Secret Service) via `SecureStorage` / `java-keyring` with automatic migration from legacy plaintext preferences. Can be bypassed via the `-Dcodeoba.no.keyring=true` JVM property.
 - **States**: `Monitor` (scan even if not installed), `Ignore` (skip folder), `Default` (prompt on orphaned logs).
 - **Settings UI**: Two-pane dialog in `:app-desktop` for settings toggles and recursive path purges.
 - **Search Filters**: Restores the last selected "Filter by Source" and "Filter by Status" states on application launch.

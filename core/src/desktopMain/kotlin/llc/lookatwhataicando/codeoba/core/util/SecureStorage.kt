@@ -7,7 +7,12 @@ object SecureStorage {
     private const val SERVICE_NAME = "Codeoba"
 
     private val keyring: Keyring? = try {
-        Keyring.create()
+        if (System.getProperty("codeoba.no.keyring") == "true") {
+            System.err.println("SecureStorage: Native Keyring disabled via system property. Falling back to Java Preferences.")
+            null
+        } else {
+            Keyring.create()
+        }
     } catch (e: Throwable) {
         System.err.println("SecureStorage: Native Keyring initialization failed. Falling back to Java Preferences. Error: ${e.message}")
         null
