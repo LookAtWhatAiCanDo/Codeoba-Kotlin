@@ -43,14 +43,16 @@ class SummarizingLogParser(private val parserConfigJson: String?) : LogParser {
 }
 
 object LogParserFactory {
+    @Volatile
     private var parserMode: ParserMode = ParserMode.STANDARD
+
+    @Volatile
     private var parserConfig: String? = """
     {
       "version": "1.0.0",
       "systemPrompt": "You are the Codeoba assistant. Keep your responses concise and precise."
     }
     """.trimIndent()
-
     fun setParserMode(mode: ParserMode, configJson: String? = null) {
         parserMode = mode
         if (configJson != null) {
