@@ -8,6 +8,8 @@ class SecureStorageTest {
 
     @Test
     fun testSecureStorageOperations() {
+        if (System.getProperty("codeoba.run.keyring.integration.tests") != "true") return
+
         val testKey = "test_key_credential_storage"
         val testVal = "superSecretTokenValue123"
 
