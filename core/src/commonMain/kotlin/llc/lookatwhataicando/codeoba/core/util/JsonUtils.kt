@@ -1,7 +1,8 @@
 package llc.lookatwhataicando.codeoba.core.util
 
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 object JsonUtils {
     private val json = Json { ignoreUnknownKeys = true }
