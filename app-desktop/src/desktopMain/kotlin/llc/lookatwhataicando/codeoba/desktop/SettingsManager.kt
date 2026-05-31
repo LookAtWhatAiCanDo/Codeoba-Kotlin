@@ -4,6 +4,7 @@ import llc.lookatwhataicando.codeoba.core.domain.parser.ParserMode
 import llc.lookatwhataicando.codeoba.core.domain.search.ArchivalFilter
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import llc.lookatwhataicando.codeoba.core.util.SecureStorage
+import llc.lookatwhataicando.codeoba.core.util.JsonUtils
 import java.util.prefs.Preferences
 
 object SettingsManager {
@@ -256,12 +257,13 @@ object SettingsManager {
 
     fun getExcludedPaths(): List<String> {
         val value = prefs.get("excluded_paths", "")
-        if (value.isEmpty()) return emptyList()
-        return value.split(",")
+        return JsonUtils.deserializeList(value)
     }
 
     fun setExcludedPaths(paths: List<String>) {
-        prefs.put("excluded_paths", paths.filter { it.isNotBlank() }.joinToString(","))
+        val nonBlank = paths.filter { it.isNotBlank() }
+        val jsonStr = JsonUtils.serializeList(nonBlank)
+        prefs.put("excluded_paths", jsonStr)
     }
 
     private fun putOrRemove(key: String, value: String?) {

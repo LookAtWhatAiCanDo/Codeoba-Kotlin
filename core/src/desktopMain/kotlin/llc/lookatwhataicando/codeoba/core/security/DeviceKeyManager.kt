@@ -1,9 +1,7 @@
 package llc.lookatwhataicando.codeoba.core.security
 
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
-import java.io.File
-import java.nio.file.Files
-import java.nio.file.attribute.PosixFilePermission
+import llc.lookatwhataicando.codeoba.core.util.SecureStorage
 import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.KeyPairGenerator
@@ -12,39 +10,28 @@ import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
 object DeviceKeyManager {
-    private val keysDir = File(System.getProperty("user.home"), ".codeoba/keys")
-    private val privateKeyFile = File(keysDir, "device_private.der")
-    private val publicKeyFile = File(keysDir, "device_public.der")
-
-    init {
-        keysDir.mkdirs()
-    }
 
     fun getOrGenerateKeyPair(): KeyPair {
-        return if (privateKeyFile.exists() && publicKeyFile.exists()) {
+        // 1. Try loading from SecureStorage first (OS-native secure keyring)
+        val securePriv = SecureStorage.get("device_private_key")
+        val securePub = SecureStorage.get("device_public_key")
+        if (securePriv != null && securePub != null) {
             try {
-                loadKeyPair()
+                val privBytes = Base64.getDecoder().decode(securePriv)
+                val pubBytes = Base64.getDecoder().decode(securePub)
+                
+                val kf = KeyFactory.getInstance("RSA")
+                val privateKey = kf.generatePrivate(PKCS8EncodedKeySpec(privBytes))
+                val publicKey = kf.generatePublic(X509EncodedKeySpec(pubBytes))
+                
+                return KeyPair(publicKey, privateKey)
             } catch (e: Exception) {
-                log("DeviceKeyManager: Failed to load existing keys, regenerating. Error: ${e.message}")
-                generateAndSaveKeyPair()
+                log("DeviceKeyManager: Failed to load keys from SecureStorage: ${e.message}")
             }
-        } else {
-            generateAndSaveKeyPair()
         }
-    }
 
-    private fun loadKeyPair(): KeyPair {
-        val kf = KeyFactory.getInstance("RSA")
-        
-        val privBytes = privateKeyFile.readBytes()
-        val privSpec = PKCS8EncodedKeySpec(privBytes)
-        val privateKey = kf.generatePrivate(privSpec)
-
-        val pubBytes = publicKeyFile.readBytes()
-        val pubSpec = X509EncodedKeySpec(pubBytes)
-        val publicKey = kf.generatePublic(pubSpec)
-
-        return KeyPair(publicKey, privateKey)
+        // 2. Generate a new key pair
+        return generateAndSaveKeyPair()
     }
 
     private fun generateAndSaveKeyPair(): KeyPair {
@@ -52,24 +39,12 @@ object DeviceKeyManager {
         kpg.initialize(2048)
         val keyPair = kpg.genKeyPair()
 
-        privateKeyFile.writeBytes(keyPair.private.encoded)
-        publicKeyFile.writeBytes(keyPair.public.encoded)
-
-        // Set Unix permissions to 0600 (owner read-write only)
-        try {
-            val path = privateKeyFile.toPath()
-            val perms = setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)
-            Files.setPosixFilePermissions(path, perms)
-            Files.setPosixFilePermissions(publicKeyFile.toPath(), perms)
-        } catch (e: UnsupportedOperationException) {
-            // Non-posix OS (Windows), standard file hiding/attributes can be applied, or standard permissions.
-            privateKeyFile.setReadable(true, true)
-            privateKeyFile.setWritable(true, true)
-            publicKeyFile.setReadable(true, true)
-            publicKeyFile.setWritable(true, true)
-        } catch (e: Exception) {
-            log("DeviceKeyManager: Error setting file permissions: ${e.message}")
-        }
+        val privBase64 = Base64.getEncoder().encodeToString(keyPair.private.encoded)
+        val pubBase64 = Base64.getEncoder().encodeToString(keyPair.public.encoded)
+        
+        // Write to SecureStorage
+        SecureStorage.put("device_private_key", privBase64)
+        SecureStorage.put("device_public_key", pubBase64)
 
         return keyPair
     }

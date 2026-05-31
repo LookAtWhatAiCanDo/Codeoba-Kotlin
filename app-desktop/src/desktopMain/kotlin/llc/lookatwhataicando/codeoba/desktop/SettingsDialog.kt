@@ -503,12 +503,10 @@ fun SettingsDialog(
                                                         .clip(RoundedCornerShape(8.dp))
                                                         .background(if (isStandardSelected) SlateSurface else Color.Transparent)
                                                         .clickable {
-                                                            if (isSubscribed) {
-                                                                currentPreferredMode = ParserMode.STANDARD
-                                                                SettingsManager.setPreferredParserMode(ParserMode.STANDARD)
-                                                                LogParserFactory.setParserMode(ParserMode.STANDARD)
-                                                                onSettingsChanged()
-                                                            }
+                                                            currentPreferredMode = ParserMode.STANDARD
+                                                            SettingsManager.setPreferredParserMode(ParserMode.STANDARD)
+                                                            LogParserFactory.setParserMode(ParserMode.STANDARD)
+                                                            onSettingsChanged()
                                                         }
                                                         .pointerHoverIcon(PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)))
                                                         .padding(horizontal = 12.dp, vertical = 8.dp),

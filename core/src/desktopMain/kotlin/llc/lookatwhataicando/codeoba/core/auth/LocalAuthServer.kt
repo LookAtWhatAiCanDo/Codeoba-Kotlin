@@ -7,9 +7,20 @@ import java.net.URLDecoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import llc.lookatwhataicando.codeoba.core.util.AppConfig
 
 object LocalAuthServer {
     private var server: HttpServer? = null
+
+    private val allowedOrigins = setOf(
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+        "https://codeoba-dev.web.app",
+        "https://codeoba-prod.web.app",
+        "https://codeoba.com",
+        "https://codeoba.firebaseapp.com",
+        "https://codeoba-dev.firebaseapp.com"
+    )
 
     fun start(onSuccess: (idToken: String, refreshToken: String, email: String, uid: String) -> Unit): Int {
         // Stop any running instance first
@@ -21,9 +32,25 @@ object LocalAuthServer {
 
         activeServer.createContext("/callback") { exchange ->
             try {
+                val origin = exchange.requestHeaders.getFirst("Origin")
+                val isAllowed = origin != null && (
+                    allowedOrigins.contains(origin.trimEnd('/')) ||
+                    origin.trimEnd('/') == AppConfig.getWebConsoleUrl().trimEnd('/')
+                )
+
+                if (origin != null && !isAllowed) {
+                    log("LocalAuthServer: Rejected request from unauthorized origin: $origin")
+                    val errorResponse = "Unauthorized origin."
+                    exchange.sendResponseHeaders(403, errorResponse.toByteArray().size.toLong())
+                    exchange.responseBody.write(errorResponse.toByteArray())
+                    exchange.close()
+                    return@createContext
+                }
+
                 // Set CORS headers
-                val origin = exchange.requestHeaders.getFirst("Origin") ?: "*"
-                exchange.responseHeaders.set("Access-Control-Allow-Origin", origin)
+                if (origin != null) {
+                    exchange.responseHeaders.set("Access-Control-Allow-Origin", origin)
+                }
                 exchange.responseHeaders.set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
                 exchange.responseHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
@@ -153,7 +180,7 @@ object LocalAuthServer {
                         Thread.sleep(1000)
                         stop()
                     } catch (_: Exception) {}
-                }.start()
+                }.apply { isDaemon = true }.start()
             }
         }
 

@@ -1,5 +1,9 @@
 package llc.lookatwhataicando.codeoba.core.domain.parser
 
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import java.io.File
 
@@ -119,20 +123,28 @@ object LocalModelRunner {
         val semanticSpeed = (100.0 + (turnCount * 5.2)).coerceAtMost(250.0)
         val watcherLatency = (10.0 + (turnCount * 0.8)).coerceAtMost(50.0)
 
-        return """
-        {
-          "keyActions": [
-            ${actions.joinToString(",") { "\"$it\"" }}
-          ],
-          "errors": [
-            ${errors.joinToString(",") { "\"$it\"" }}
-          ],
-          "performanceCharts": [
-            {"label": "Lexical Search Speed", "value": $lexicalSpeed},
-            {"label": "Semantic Search Speed", "value": $semanticSpeed},
-            {"label": "Directory Watcher Latency", "value": $watcherLatency}
-          ]
+        val jsonObject = buildJsonObject {
+            put("keyActions", buildJsonArray {
+                actions.forEach { add(it) }
+            })
+            put("errors", buildJsonArray {
+                errors.forEach { add(it) }
+            })
+            put("performanceCharts", buildJsonArray {
+                add(buildJsonObject {
+                    put("label", "Lexical Search Speed")
+                    put("value", lexicalSpeed)
+                })
+                add(buildJsonObject {
+                    put("label", "Semantic Search Speed")
+                    put("value", semanticSpeed)
+                })
+                add(buildJsonObject {
+                    put("label", "Directory Watcher Latency")
+                    put("value", watcherLatency)
+                })
+            })
         }
-        """.trimIndent()
+        return jsonObject.toString()
     }
 }

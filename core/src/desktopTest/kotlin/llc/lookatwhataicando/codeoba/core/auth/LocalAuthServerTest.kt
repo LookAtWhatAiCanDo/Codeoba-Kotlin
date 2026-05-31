@@ -157,4 +157,24 @@ class LocalAuthServerTest {
             }
         }
     }
+
+    @Test
+    fun testCallbackUnauthorizedOrigin() {
+        runBlocking {
+            val port = LocalAuthServer.start { _, _, _, _ -> }
+
+            val client = HttpClient(CIO)
+            try {
+                val response = client.get("http://127.0.0.1:$port/callback") {
+                    header("Origin", "https://malicious-origin.com")
+                }
+
+                assertEquals(403, response.status.value)
+                assertEquals("Unauthorized origin.", response.bodyAsText())
+            } finally {
+                client.close()
+                LocalAuthServer.stop()
+            }
+        }
+    }
 }

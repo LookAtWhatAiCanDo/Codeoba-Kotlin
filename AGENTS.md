@@ -192,7 +192,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Implements secure, browser-delegated OAuth flow utilizing a temporary JDK-native HTTP loopback server (listening on a random port for `/callback` parameters) and a unified Web Console SPA (running on Firebase Hosting) to prevent in-app credential handling.
     - Stores all sensitive authentication credentials (ID and refresh tokens, licensing JWT, decryption key) in the OS-native keyring (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux) using a secure utility with automatic self-healing migration and a Java Preferences fallback. Keychain/Keyring prompts can be bypassed completely during development or troubleshooting by setting the JVM system property `codeoba.no.keyring=true`.
     - Billing webhooks query subscriptions using the user's immutable Firebase `uid` mapped in checkout custom metadata rather than mutable emails to support profile email updates.
-    - Implements challenge-response authentication utilizing 90-second single-use nonces and device public/private key pairs.
+    - Implements challenge-response authentication utilizing 90-second single-use nonces and device public/private key pairs (stored securely in the OS-native keyring via `SecureStorage` with a fallback to Preferences).
     - Integrates a best-effort local regex secrets scanner to redact sensitive credentials on the client side before synchronizing data.
     - Allows configuring Sync Modes (Local, Metadata, Summaries, Full Sync), target machine Remote Control Policies, and workspace Path Exclusions inside the Settings panel.
 
