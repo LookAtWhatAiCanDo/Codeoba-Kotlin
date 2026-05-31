@@ -76,6 +76,7 @@ jobs:
         with:
           name: Codeoba-${{ matrix.platform }}-package
           path: ${{ matrix.artifact-path }}
+          retention-days: 7
 
       - name: Upload PKG Package Artifact (macOS only)
         if: matrix.platform == 'macos'
@@ -83,6 +84,7 @@ jobs:
         with:
           name: Codeoba-macos-pkg
           path: ${{ matrix.artifact-path-pkg }}
+          retention-days: 7
 
   release:
     name: Create GitHub Release
