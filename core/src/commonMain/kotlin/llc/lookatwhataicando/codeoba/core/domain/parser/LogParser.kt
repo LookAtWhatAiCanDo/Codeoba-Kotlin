@@ -26,7 +26,7 @@ class SummarizingLogParser(private val parserConfigJson: String?) : LogParser {
             parseSummaryJson(summaryText)
         } catch (e: Exception) {
             SessionSummary(
-                keyActions = listOf("Unable to run AI summarization"),
+                keyActions = listOf("AI summarization failed"),
                 errors = listOf("Inference exception: ${e.message}"),
                 performanceCharts = emptyList()
             )

@@ -58,7 +58,7 @@ class LogParserSelectionTest {
             assertNotNull(resultSession)
             val summary = resultSession.summary
             assertNotNull(summary)
-            assertTrue(summary.keyActions.contains("Unable to run AI summarization"), "Should contain fallback action message")
+            assertTrue(summary.keyActions.contains("AI summarization failed"), "Should contain fallback action message")
             assertTrue(summary.errors.first().contains("Inference exception:"), "Should capture the inference failure error message")
         }
     }
