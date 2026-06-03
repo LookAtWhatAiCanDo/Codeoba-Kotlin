@@ -2011,7 +2011,8 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                                 val nonce = FirebaseAuthClient.getRegistrationChallenge(idToken, deviceId)
                                                 val signature = DeviceKeyManager.signPayload(nonce)
 
-                                                FirebaseAuthClient.registerEcosystemDevice(idToken, deviceId, deviceName, publicKeyPem, nonce, signature)
+                                                val registered = FirebaseAuthClient.registerEcosystemDevice(idToken, deviceId, deviceName, publicKeyPem, nonce, signature)
+                                                require(registered) { "Device registration failed." }
                                                 SettingsManager.setEcosystemActive(true)
                                                 SettingsManager.setPreferredParserMode(ParserMode.SUMMARIZING)
                                                 LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
@@ -2031,6 +2032,15 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                     
                                     try {
                                         java.awt.Desktop.getDesktop().browse(java.net.URI(url))
+                                        // Match LocalAuthServer's 5-minute safety timeout so the UI can recover.
+                                        scope.launch {
+                                            kotlinx.coroutines.delay(5 * 60 * 1000L)
+                                            if (isLoading && SettingsManager.getFirebaseUserEmail() == null) {
+                                                errorMessage = "Authentication timed out. Please try again."
+                                                isLoading = false
+                                                LocalAuthServer.stop()
+                                            }
+                                        }
                                     } catch (e: Exception) {
                                         errorMessage = "Failed to launch system browser. Please open the URL manually:\n$url"
                                         isLoading = false

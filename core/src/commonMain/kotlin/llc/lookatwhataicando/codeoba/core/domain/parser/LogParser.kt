@@ -16,14 +16,21 @@ class StandardLogParser : LogParser {
         return delegateParse()
     }
 }
-
 class SummarizingLogParser(private val parserConfigJson: String?) : LogParser {
     override suspend fun parse(file: File, delegateParse: suspend () -> Session?): Session? {
         val baseSession = delegateParse() ?: return null
         
-        // Local model stub simulation using parser config configuration parameters
-        val summaryText = LocalModelRunner.runLocalInference(baseSession, parserConfigJson)
-        val summary = parseSummaryJson(summaryText)
+        val summary = try {
+            // Local model stub simulation using parser config configuration parameters
+            val summaryText = LocalModelRunner.runLocalInference(baseSession, parserConfigJson)
+            parseSummaryJson(summaryText)
+        } catch (e: Exception) {
+            SessionSummary(
+                keyActions = listOf("Unable to run AI summarization"),
+                errors = listOf("Inference exception: ${e.message}"),
+                performanceCharts = emptyList()
+            )
+        }
         
         return baseSession.copy(summary = summary)
     }

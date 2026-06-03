@@ -66,7 +66,7 @@ object FirebaseAuthClient {
             
             val responseText = response.bodyAsText()
             if (response.status.value != 200) {
-                throw Exception("Failed to refresh token")
+                throw Exception("Failed to refresh token. Status: ${response.status.value}. Body: $responseText")
             }
             
             val obj = json.parseToJsonElement(responseText).jsonObject

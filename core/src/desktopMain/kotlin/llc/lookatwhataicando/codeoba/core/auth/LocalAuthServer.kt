@@ -32,7 +32,7 @@ object LocalAuthServer {
         val port = activeServer.address.port
         val state = java.util.UUID.randomUUID().toString()
         expectedState = state
-        log("LocalAuthServer: Started on port $port with state $state")
+        log("LocalAuthServer: Started on port $port")
 
         // Schedule an absolute safety timeout of 5 minutes to close this listener
         Thread {

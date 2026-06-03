@@ -551,7 +551,8 @@ fun mainEntry() = application {
                     
                     // 2. Perform background device registration/sync in the Hub
                     val deviceId = SettingsManager.getDeviceId()
-                    val deviceName = System.getProperty("user.name") + "@" + (if (PlatformUtils.isMac()) "macOS" else if (PlatformUtils.isWindows()) "Windows" else "Linux")
+                    val host = try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" }
+                    val deviceName = "${if (PlatformUtils.isMac()) "macOS" else if (PlatformUtils.isWindows()) "Windows" else "Linux"} ($host)"
                     val publicKey = llc.lookatwhataicando.codeoba.core.security.DeviceKeyManager.getPublicKeyPem()
                     
                     val nonce = llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthClient.getRegistrationChallenge(
