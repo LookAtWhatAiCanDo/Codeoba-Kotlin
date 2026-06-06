@@ -175,9 +175,10 @@ object SettingsManager {
                     !prefs.get("firebase_user_email", null).isNullOrEmpty()
             if (hasLegacyAccount) {
                 val os = System.getProperty("os.name") ?: "Unknown"
-                val userHome = System.getProperty("user.home") ?: "Unknown"
-                val userName = System.getProperty("user.name") ?: "Unknown"
-                val rawId = "$os:$userHome:$userName"
+                val uid = prefs.get("firebase_user_uid", null)
+                val email = prefs.get("firebase_user_email", null)
+                val stableAccountId = uid ?: email ?: "Unknown"
+                val rawId = "$os:$stableAccountId"
                 deviceId = java.util.UUID.nameUUIDFromBytes(rawId.toByteArray()).toString()
             } else {
                 deviceId = java.util.UUID.randomUUID().toString()

@@ -551,14 +551,14 @@ fun mainEntry() = application {
                     
                     // 2. Perform background device registration/sync in the Hub
                     val deviceId = SettingsManager.getDeviceId()
-                    val host = try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" }
+                    val host = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" } }
                     val deviceName = "${if (PlatformUtils.isMac()) "macOS" else if (PlatformUtils.isWindows()) "Windows" else "Linux"} ($host)"
-                    val publicKey = llc.lookatwhataicando.codeoba.core.security.DeviceKeyManager.getPublicKeyPem()
+                    val publicKey = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { llc.lookatwhataicando.codeoba.core.security.DeviceKeyManager.getPublicKeyPem() }
                     
                     val nonce = llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthClient.getRegistrationChallenge(
                         refreshedAuth.idToken, deviceId
                     )
-                    val signature = llc.lookatwhataicando.codeoba.core.security.DeviceKeyManager.signPayload(nonce)
+                    val signature = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { llc.lookatwhataicando.codeoba.core.security.DeviceKeyManager.signPayload(nonce) }
                     
                     val success = llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthClient.registerEcosystemDevice(
                         refreshedAuth.idToken, deviceId, deviceName, publicKey, nonce, signature

@@ -148,7 +148,7 @@ object LocalAuthServer {
                 val uid = params["uid"] ?: ""
 
                 val isPost = exchange.requestMethod.equals("POST", ignoreCase = true)
-                val responseBody = if (idToken != null && refreshToken != null) {
+                val responseBody = if (!idToken.isNullOrBlank() && !refreshToken.isNullOrBlank() && uid.isNotBlank()) {
                     onSuccess(idToken, refreshToken, email, uid)
                     wasSuccessful = true
                     if (isPost) {

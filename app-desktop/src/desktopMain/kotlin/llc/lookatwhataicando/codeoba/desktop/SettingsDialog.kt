@@ -2005,11 +2005,11 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                                 SettingsManager.setFirebaseAuthRefreshToken(refreshToken)
 
                                                 val deviceId = SettingsManager.getDeviceId()
-                                                val host = try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" }
+                                                val host = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" } }
                                                 val deviceName = "${when { PlatformUtils.isMac() -> "macOS"; PlatformUtils.isWindows() -> "Windows"; else -> "Linux" }} ($host)"
-                                                val publicKeyPem = DeviceKeyManager.getPublicKeyPem()
+                                                val publicKeyPem = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { DeviceKeyManager.getPublicKeyPem() }
                                                 val nonce = FirebaseAuthClient.getRegistrationChallenge(idToken, deviceId)
-                                                val signature = DeviceKeyManager.signPayload(nonce)
+                                                val signature = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { DeviceKeyManager.signPayload(nonce) }
 
                                                 val registered = FirebaseAuthClient.registerEcosystemDevice(idToken, deviceId, deviceName, publicKeyPem, nonce, signature)
                                                 require(registered) { "Device registration failed." }

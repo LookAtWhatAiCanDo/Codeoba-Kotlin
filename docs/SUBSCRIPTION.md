@@ -101,8 +101,7 @@ To prevent simple device-ID spoofing and copying of cached session directories:
   - *Windows*: Stored via CNG (non-exportable, TPM-backed where available), falling back to DPAPI.
   - *Linux*: Stored in the Secret Service/libsecret API keyring.
   - *Headless/Unsupported Fallback*: On headless remote servers where keyrings are unavailable, the client degrades gracefully to a software-protected key file with restricted permissions (`0600`).
-* **Challenge-Response Auth**: Subsequent socket connections and stream requests require proof of key possession. The backend issues a cryptographically random, single-use nonce that expires in 90 seconds. The client must sign a canonical challenge payload containing:
-  `{ nonce, uid, deviceId, purpose: "stream_lease", issuedAt, expiresAt }`
+* **Challenge-Response Auth**: Subsequent socket connections and stream requests require proof of key possession. The backend issues a cryptographically random, single-use nonce that expires in 90 seconds. The client must sign the provided nonce (or a canonical payload containing the nonce and identifying fields, depending on the backend implementation).
 
 ### 3. Stream Expiry Gate (Mid-Stream Revocation)
 Remote command relays use a persistent listener stream. To prevent users from maintaining access after their subscription expires or is canceled:

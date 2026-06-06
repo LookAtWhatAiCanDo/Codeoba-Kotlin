@@ -20,7 +20,7 @@ import llc.lookatwhataicando.codeoba.core.util.AppConfig
 object FirebaseAuthClient {
     // Firebase Web API key is required for securetoken.googleapis.com calls.
     // Allow overriding via JVM system property or environment variable to keep environment config out of source.
-    private const val DEFAULT_FIREBASE_API_KEY = "AIzaSyFakeKeyCodeobaPlaceholder_ForProductionReplace"
+    private const val DEFAULT_FIREBASE_API_KEY = "EMULATOR_ONLY"
 
     private fun getFirebaseApiKey(): String {
         val key = try {
