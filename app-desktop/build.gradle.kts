@@ -38,11 +38,16 @@ compose {
                 packageName = "Codeoba"
                 packageVersion = project.findProperty("appVersion")?.toString() ?: "1.0.0"
                 vendor = "LookAtWhatAiCanDo"
+                includeAllModules = true
                 macOS {
                     iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
                 }
                 windows {
                     iconFile.set(project.file("src/desktopMain/resources/icon.ico"))
+                    shortcut = true
+                    menu = true
+                    menuGroup = "LookAtWhatAiCanDo"
+                    installationPath = "LookAtWhatAiCanDo/Codeoba"
                 }
                 linux {
                     iconFile.set(project.file("src/desktopMain/resources/icon.png"))
@@ -50,4 +55,16 @@ compose {
             }
         }
     }
+}
+
+tasks.withType<JavaExec>().configureEach {
+    // Forward only Codeoba-specific system properties (e.g. -Dcodeoba.base_url=...)
+    val forwarded = System.getProperties().entries
+        .mapNotNull { (k, v) ->
+            val key = k.toString()
+            if (key.startsWith("codeoba.")) key to v else null
+        }
+        .toMap()
+
+    systemProperties(forwarded)
 }

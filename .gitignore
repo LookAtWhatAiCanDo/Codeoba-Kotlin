@@ -7,3 +7,5 @@ build/
 local.properties
 
 *.code-workspace
+
+.DS_Store
