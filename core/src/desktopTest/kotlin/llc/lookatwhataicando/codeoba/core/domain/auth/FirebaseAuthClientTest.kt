@@ -1,5 +1,10 @@
 package llc.lookatwhataicando.codeoba.core.domain.auth
 
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -47,6 +52,7 @@ class FirebaseAuthClientTest {
     fun testConfiguredApiKeyPassedToUrl() {
         val originalBaseUrl = System.getProperty("codeoba.base_url")
         val originalApiKey = System.getProperty("codeoba.firebase.api_key")
+        val originalClient = FirebaseAuthClient.client
 
         try {
             // Force production mode (non-emulator)
@@ -55,17 +61,30 @@ class FirebaseAuthClientTest {
             // Set a custom API key
             System.setProperty("codeoba.firebase.api_key", "my-test-api-key")
 
-            // Calling refreshIdToken should bypass the check (it might fail due to network/dummy token, 
-            // but it should NOT fail with API Key not configured check)
-            val exception = assertFailsWith<Exception> {
-                runBlocking {
-                    FirebaseAuthClient.refreshIdToken("dummy_token")
-                }
+            var capturedUrl = ""
+            val mockEngine = MockEngine { request ->
+                capturedUrl = request.url.toString()
+                respond(
+                    content = """{"id_token": "mock-id", "user_id": "mock-user", "refresh_token": "mock-refresh"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf("Content-Type", "application/json")
+                )
             }
-            // Ensure the failure is not the API Key validation check
-            assertTrue(!exception.message!!.contains("Firebase API key is not configured"), "Expected network or authentication failure, got: ${exception.message}")
+            FirebaseAuthClient.client = HttpClient(mockEngine)
+
+            val result = runBlocking {
+                FirebaseAuthClient.refreshIdToken("dummy_token")
+            }
+
+            // Verify the URL contained our test API key
+            assertTrue(capturedUrl.contains("key=my-test-api-key"), "Expected URL to contain API key, got: $capturedUrl")
+            // Verify the result is parsed correctly
+            kotlin.test.assertEquals("mock-id", result.idToken)
+            kotlin.test.assertEquals("mock-user", result.uid)
+            kotlin.test.assertEquals("mock-refresh", result.refreshToken)
         } finally {
             // Restore original state
+            FirebaseAuthClient.client = originalClient
             if (originalBaseUrl != null) {
                 System.setProperty("codeoba.base_url", originalBaseUrl)
             } else {

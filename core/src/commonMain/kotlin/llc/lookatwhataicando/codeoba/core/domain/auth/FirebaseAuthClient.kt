@@ -42,7 +42,7 @@ object FirebaseAuthClient {
     private const val CLOUD_FUNCTION_REGION = "us-central1"
 
     private val json = Json { ignoreUnknownKeys = true }
-    private val client = HttpClient()
+    internal var client = HttpClient()
     
     private val useEmulator: Boolean
         get() = AppConfig.useEmulator()

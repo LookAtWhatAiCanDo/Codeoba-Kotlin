@@ -1540,7 +1540,6 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
     val scope = rememberCoroutineScope()
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
-    var downloadProgress by remember { mutableStateOf<Float?>(null) }
     var isLoadingPortal by remember { mutableStateOf(false) }
 
     val savedEmail = SettingsManager.getFirebaseUserEmail()
@@ -1831,22 +1830,6 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                         }
                     }
 
-                    if (downloadProgress != null) {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            LinearProgressIndicator(
-                                progress = downloadProgress!!,
-                                color = AccentCyan,
-                                trackColor = SlateSurface,
-                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
-                            )
-                            Text(
-                                text = "Configuring dynamic parser modules... ${(downloadProgress!! * 100).toInt()}%",
-                                color = AccentCyan,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -2020,6 +2003,13 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                                 onSettingsChanged()
                                             } catch (e: Exception) {
                                                 log("Error configuring device keys: ${e.message}")
+                                                // Roll back partial sign-in state so the user can retry cleanly.
+                                                SettingsManager.setFirebaseUserEmail(null)
+                                                SettingsManager.setFirebaseUserUid(null)
+                                                SettingsManager.setFirebaseAuthIdToken(null)
+                                                SettingsManager.setFirebaseAuthRefreshToken(null)
+                                                SettingsManager.setEcosystemActive(false)
+                                                onSettingsChanged()
                                                 errorMessage = e.message ?: "Error configuring device credentials."
                                                 isLoading = false
                                             }
