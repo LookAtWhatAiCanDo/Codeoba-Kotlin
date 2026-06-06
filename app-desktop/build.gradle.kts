@@ -37,6 +37,7 @@ compose {
                 )
                 packageName = "Codeoba"
                 packageVersion = project.findProperty("appVersion")?.toString() ?: "1.0.0"
+                vendor = "LookAtWhatAiCanDo"
                 macOS {
                     iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
                 }
