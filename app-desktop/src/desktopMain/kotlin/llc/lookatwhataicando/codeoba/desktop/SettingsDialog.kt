@@ -142,7 +142,6 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.VerticalScrollbar
 import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
 import java.awt.Cursor
-import java.io.File
 
 enum class SettingsCategory(val displayName: String) {
     General("General"),

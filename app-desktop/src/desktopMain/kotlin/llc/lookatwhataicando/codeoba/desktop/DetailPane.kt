@@ -217,6 +217,7 @@ import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
 import llc.lookatwhataicando.codeoba.core.domain.model.GroupTask
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import llc.lookatwhataicando.codeoba.core.domain.model.Turn
+import llc.lookatwhataicando.codeoba.core.domain.parser.ParserMode
 import llc.lookatwhataicando.codeoba.core.domain.parser.SessionSummary
 import llc.lookatwhataicando.codeoba.core.domain.search.SearchResult
 import llc.lookatwhataicando.codeoba.core.domain.search.buildFindRegex
@@ -1710,7 +1711,8 @@ fun DetailPane(
                                 dragDropState = dragDropState
                             )
                         }
-                        val summary = session.summary
+                        val showAiSummary = SettingsManager.getEffectiveParserMode() == ParserMode.SUMMARIZING
+                        val summary = if (showAiSummary) session.summary else null
                         if (summary != null) {
                             item(key = "ai_summary") {
                                 AiSummaryCard(summary = summary)

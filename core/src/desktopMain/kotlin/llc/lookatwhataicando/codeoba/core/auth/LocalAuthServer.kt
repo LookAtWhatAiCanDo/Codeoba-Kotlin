@@ -28,7 +28,7 @@ object LocalAuthServer {
         // Stop any running instance first
         stop()
 
-        val activeServer = HttpServer.create(InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 0)
+        val activeServer = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         val port = activeServer.address.port
         val state = java.util.UUID.randomUUID().toString()
         expectedState = state
