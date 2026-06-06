@@ -50,14 +50,15 @@ object LocalAuthServer {
         activeServer.createContext("/callback") { exchange ->
             var wasSuccessful = false
             try {
+                val isPost = exchange.requestMethod.equals("POST", ignoreCase = true)
                 val origin = exchange.requestHeaders.getFirst("Origin")
                 val isAllowed = origin != null && (
                     allowedOrigins.contains(origin.trimEnd('/')) ||
                     origin.trimEnd('/') == AppConfig.getWebConsoleUrl().trimEnd('/')
                 )
 
-                if (origin != null && !isAllowed) {
-                    log("LocalAuthServer: Rejected request from unauthorized origin: $origin")
+                if ((origin != null && !isAllowed) || (isPost && origin == null)) {
+                    log("LocalAuthServer: Rejected request from unauthorized or missing origin: $origin")
                     val errorResponse = "Unauthorized origin."
                     exchange.sendResponseHeaders(403, errorResponse.toByteArray().size.toLong())
                     exchange.responseBody.write(errorResponse.toByteArray())
@@ -122,7 +123,6 @@ object LocalAuthServer {
                 val state = params["state"]
                 if (state == null || state != expectedState) {
                     log("LocalAuthServer: Rejected request due to invalid or missing state parameter: $state")
-                    val isPost = exchange.requestMethod.equals("POST", ignoreCase = true)
                     val errorResponse = "Invalid or missing state parameter."
                     val responseText = if (isPost) {
                         """
@@ -142,12 +142,10 @@ object LocalAuthServer {
                     return@createContext
                 }
 
-                val idToken = params["idToken"]
-                val refreshToken = params["refreshToken"]
-                val email = params["email"] ?: ""
-                val uid = params["uid"] ?: ""
-
-                val isPost = exchange.requestMethod.equals("POST", ignoreCase = true)
+                val idToken = if (isPost) params["idToken"] else null
+                val refreshToken = if (isPost) params["refreshToken"] else null
+                val email = if (isPost) (params["email"] ?: "") else ""
+                val uid = if (isPost) (params["uid"] ?: "") else ""
                 val responseBody = if (!idToken.isNullOrBlank() && !refreshToken.isNullOrBlank() && uid.isNotBlank()) {
                     onSuccess(idToken, refreshToken, email, uid)
                     wasSuccessful = true
@@ -204,7 +202,8 @@ object LocalAuthServer {
 
                 val contentType = if (isPost) "application/json" else "text/html"
                 exchange.responseHeaders.set("Content-Type", "$contentType; charset=UTF-8")
-                exchange.sendResponseHeaders(if (isPost && (idToken == null || refreshToken == null)) 400 else 200, responseBody.toByteArray(Charsets.UTF_8).size.toLong())
+                val hasRequiredFields = !idToken.isNullOrBlank() && !refreshToken.isNullOrBlank() && uid.isNotBlank()
+                exchange.sendResponseHeaders(if (hasRequiredFields) 200 else 400, responseBody.toByteArray(Charsets.UTF_8).size.toLong())
                 exchange.responseBody.write(responseBody.toByteArray(Charsets.UTF_8))
                 exchange.close()
             } catch (e: Exception) {

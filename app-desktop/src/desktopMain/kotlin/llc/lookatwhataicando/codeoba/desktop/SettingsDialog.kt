@@ -1842,6 +1842,9 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                 SettingsManager.setFirebaseAuthRefreshToken(null)
                                 SettingsManager.setEcosystemActive(false)
                                 LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
+                                errorMessage = null
+                                isLoading = false
+                                LocalAuthServer.stop()
                                 onSettingsChanged()
                             },
                             modifier = Modifier.weight(1f),
@@ -1999,7 +2002,8 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                                 SettingsManager.setEcosystemActive(true)
                                                 SettingsManager.setPreferredParserMode(ParserMode.SUMMARIZING)
                                                 LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
-
+                                                errorMessage = null
+                                                isLoading = false
                                                 onSettingsChanged()
                                             } catch (e: Exception) {
                                                 log("Error configuring device keys: ${e.message}")

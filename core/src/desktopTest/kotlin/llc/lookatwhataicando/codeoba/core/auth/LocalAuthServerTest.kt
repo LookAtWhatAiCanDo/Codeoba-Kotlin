@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
 class LocalAuthServerTest {
 
     @Test
-    fun testCallbackQueryParsingWithEqualsSigns() {
+    fun testCallbackFormParsingWithEqualsSigns() {
         runBlocking {
             var receivedIdToken: String? = null
             var receivedRefreshToken: String? = null
@@ -37,12 +37,17 @@ class LocalAuthServerTest {
 
             val client = HttpClient(CIO)
             try {
-                // Request callback with base64/JWT-like tokens that contain equals signs
+                // Request callback with base64/JWT-like tokens that contain equals signs in a POST form request
                 val state = LocalAuthServer.expectedState
-                val response = client.get("http://127.0.0.1:$port/callback?idToken=eyJhbGciOi=MyToken=&refreshToken=ref=token=&email=test@example.com&uid=user_123&state=$state")
-                val html = response.bodyAsText()
+                val formBody = "idToken=eyJhbGciOi=MyToken=&refreshToken=ref=token=&email=test@example.com&uid=user_123&state=$state"
+                val response = client.post("http://127.0.0.1:$port/callback") {
+                    header("Origin", "https://codeoba.com")
+                    contentType(ContentType.Application.FormUrlEncoded)
+                    setBody(formBody)
+                }
+                val jsonResponse = response.bodyAsText()
 
-                assertTrue(html.contains("Successfully Authenticated!"), "HTML should indicate success")
+                assertTrue(jsonResponse.contains("Successfully authenticated"), "Response should indicate success")
                 assertEquals("eyJhbGciOi=MyToken=", receivedIdToken)
                 assertEquals("ref=token=", receivedRefreshToken)
                 assertEquals("test@example.com", receivedEmail)
@@ -82,6 +87,7 @@ class LocalAuthServerTest {
                 """.trimIndent()
 
                 val response = client.post("http://127.0.0.1:$port/callback") {
+                    header("Origin", "https://codeoba.com")
                     contentType(ContentType.Application.Json)
                     setBody(jsonBody)
                 }
@@ -120,6 +126,7 @@ class LocalAuthServerTest {
                 val formBody = "idToken=formToken=1&refreshToken=formRefresh=2&email=form@gmail.com&uid=form_uid&state=${LocalAuthServer.expectedState}"
 
                 val response = client.post("http://127.0.0.1:$port/callback") {
+                    header("Origin", "https://codeoba.com")
                     contentType(ContentType.Application.FormUrlEncoded)
                     setBody(formBody)
                 }
@@ -181,13 +188,34 @@ class LocalAuthServerTest {
     }
 
     @Test
+    fun testCallbackMissingOriginOnPost() {
+        runBlocking {
+            val port = LocalAuthServer.start { _, _, _, _ -> }
+
+            val client = HttpClient(CIO)
+            try {
+                val response = client.post("http://127.0.0.1:$port/callback") {
+                    contentType(ContentType.Application.Json)
+                    setBody("{}")
+                }
+
+                assertEquals(403, response.status.value)
+                assertEquals("Unauthorized origin.", response.bodyAsText())
+            } finally {
+                client.close()
+                LocalAuthServer.stop()
+            }
+        }
+    }
+
+    @Test
     fun testCallbackInvalidState() {
         runBlocking {
             val port = LocalAuthServer.start { _, _, _, _ -> }
 
             val client = HttpClient(CIO)
             try {
-                val response = client.get("http://127.0.0.1:$port/callback?idToken=123&refreshToken=456&state=invalid_state")
+                val response = client.get("http://127.0.0.1:$port/callback?state=invalid_state")
 
                 assertEquals(403, response.status.value)
                 assertTrue(response.bodyAsText().contains("Invalid or missing state parameter"))

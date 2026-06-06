@@ -23,7 +23,7 @@ class FirebaseAuthClientTest {
             System.setProperty("codeoba.base_url", "codeoba.com")
             
             // Clear API key system property to trigger validation check on fallback
-            System.clearProperty("codeoba.firebase.api_key")
+            System.setProperty("codeoba.firebase.api_key", "")
             
             // Assert that calling refreshIdToken throws IllegalArgumentException
             val exception = assertFailsWith<IllegalArgumentException> {

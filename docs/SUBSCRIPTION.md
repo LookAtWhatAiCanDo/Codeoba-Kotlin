@@ -59,7 +59,7 @@ sequenceDiagram
 
 ### 3. Browser-Based OAuth Connection Handshake Flow
 
-To support secure authentication (including third-party identity providers like Google and GitHub) without embedding credentials or heavy SDKs in the desktop client, Codeoba utilizes a local loopback server redirect:
+To support secure authentication (including third-party identity providers like Google and GitHub) without embedding credentials or heavy SDKs in the desktop client, Codeoba utilizes a local loopback server POST callback transfer:
 
 ```mermaid
 sequenceDiagram
@@ -70,15 +70,14 @@ sequenceDiagram
     participant Hub as Sync Hub Backend
     
     App->>App: Start local HttpServer on random port P
-    App->>Browser: Open system browser to Web Page with port P
-    Browser->>Web: Load connect page (?port=P)
+    App->>Browser: Open system browser to Web Page with port P & state S
+    Browser->>Web: Load connect page (?port=P&state=S)
     Web->>Web: User logs in (Google, GitHub, or Email/Password)
     Auth->>Web: Return ID Token & Refresh Token
-    Web->>Browser: Redirect to http://localhost:P/callback?idToken=...
-    Browser->>App: Callback request sent with credentials
+    Web->>App: Send secure POST request with credentials (idToken, refreshToken, email, uid, state)
     App->>App: Save credentials & Stop HttpServer
     App->>Hub: Complete Handshake (registerEcosystemDevice)
-    App->>Browser: Render success HTML ("Success! You can close this tab.")
+    Web->>Browser: Display success message ("Successfully Authenticated! You can close this browser tab...")
 ```
 
 * **Immutable UID Checkout Binding**: Checking out a subscription binds Polar custom metadata to the user's immutable Firebase `uid` (`custom_metadata: { uid: auth.uid }`) rather than email addresses to prevent entitlement mismatches during email updates.
