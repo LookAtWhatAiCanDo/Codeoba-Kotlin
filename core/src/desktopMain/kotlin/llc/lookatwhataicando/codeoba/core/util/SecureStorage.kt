@@ -8,13 +8,13 @@ object SecureStorage {
 
     private val keyring: Keyring? = try {
         if (System.getProperty("codeoba.no.keyring") == "true") {
-            System.err.println("SecureStorage: Native Keyring disabled via system property. Falling back to Java Preferences.")
+            Logger.log("SecureStorage: Native Keyring disabled via system property. Falling back to Java Preferences.")
             null
         } else {
             Keyring.create()
         }
     } catch (e: Throwable) {
-        System.err.println("SecureStorage: Native Keyring initialization failed. Falling back to Java Preferences. Error: ${e.message}")
+        Logger.log("SecureStorage: Native Keyring initialization failed. Falling back to Java Preferences. Error: ${e.message}")
         null
     }
 
@@ -50,7 +50,7 @@ object SecureStorage {
                 fallbackPrefs.remove(key)
                 return
             } catch (e: Throwable) {
-                System.err.println("SecureStorage: Failed to write to native keyring for key $key, falling back to Preferences. Error: ${e.message}")
+                Logger.log("SecureStorage: Failed to write to native keyring for key $key, falling back to Preferences. Error: ${e.message}")
             }
         }
         fallbackPrefs.put(key, value)

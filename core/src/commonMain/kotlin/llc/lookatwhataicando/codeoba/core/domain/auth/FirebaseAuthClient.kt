@@ -24,10 +24,14 @@ object FirebaseAuthClient {
 
     private fun getFirebaseApiKey(): String {
         val key = try {
-            System.getProperty("codeoba.firebase.api_key") ?: System.getenv("CODEOBA_FIREBASE_API_KEY")
+            val prop = System.getProperty("codeoba.firebase.api_key")?.trim()
+            val env = System.getenv("CODEOBA_FIREBASE_API_KEY")?.trim()
+            prop.takeUnless { it.isNullOrBlank() }
+                ?: env.takeUnless { it.isNullOrBlank() }
+                ?: DEFAULT_FIREBASE_API_KEY
         } catch (_: Throwable) {
-            null
-        } ?: DEFAULT_FIREBASE_API_KEY
+            DEFAULT_FIREBASE_API_KEY
+        }
 
         if (!useEmulator) {
             require(key != DEFAULT_FIREBASE_API_KEY && key.isNotBlank()) {
@@ -66,7 +70,7 @@ object FirebaseAuthClient {
             
             val responseText = response.bodyAsText()
             if (response.status.value != 200) {
-                throw Exception("Failed to refresh token. Status: ${response.status.value}. Body: $responseText")
+                throw FirebaseAuthException(response.status.value, "Failed to refresh token. Status: ${response.status.value}. Body: $responseText")
             }
             
             val obj = json.parseToJsonElement(responseText).jsonObject
@@ -114,7 +118,7 @@ object FirebaseAuthClient {
             
             val responseText = response.bodyAsText()
             if (response.status.value != 200) {
-                throw Exception("Failed to get registration challenge. Status: ${response.status.value}")
+                throw FirebaseAuthException(response.status.value, "Failed to get registration challenge. Status: ${response.status.value}")
             }
             
             val root = json.parseToJsonElement(responseText).jsonObject
@@ -148,7 +152,7 @@ object FirebaseAuthClient {
             
             val responseText = response.bodyAsText()
             if (response.status.value != 200) {
-                throw Exception("Failed to register device in Sync Hub. Status: ${response.status.value}")
+                throw FirebaseAuthException(response.status.value, "Failed to register device in Sync Hub. Status: ${response.status.value}")
             }
             
             val root = json.parseToJsonElement(responseText).jsonObject
@@ -180,7 +184,7 @@ object FirebaseAuthClient {
                     val root = json.parseToJsonElement(responseText).jsonObject
                     root["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
                 } catch (_: Exception) { null }
-                throw Exception(errorMsg ?: "Failed to get customer portal URL. Status: ${response.status.value}")
+                throw FirebaseAuthException(response.status.value, errorMsg ?: "Failed to get customer portal URL. Status: ${response.status.value}")
             }
             
             val root = json.parseToJsonElement(responseText).jsonObject
@@ -196,3 +200,5 @@ data class AuthResponse(
     val uid: String,
     val email: String
 )
+
+class FirebaseAuthException(val status: Int, message: String) : Exception(message)

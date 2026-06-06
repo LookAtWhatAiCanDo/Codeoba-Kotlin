@@ -81,6 +81,7 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.launch
+import llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthException
 import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
@@ -568,13 +569,14 @@ fun mainEntry() = application {
                     } else {
                         log("Main Background Loop: Sync Hub returned failure status for device registration.")
                     }
-                } catch (e: Exception) {
-                    val status = Regex("Status: (\\d+)").find(e.message.orEmpty())?.groupValues?.getOrNull(1)?.toIntOrNull()
-                    if (status == 402 || status == 403) {
-                        log("Main Background Loop: Subscription expired or permission denied (Status $status). Deactivating ecosystem features.")
+                } catch (e: FirebaseAuthException) {
+                    if (e.status == 402 || e.status == 403) {
+                        log("Main Background Loop: Subscription expired or permission denied (Status ${e.status}). Deactivating ecosystem features.")
                         SettingsManager.setEcosystemActive(false)
                         LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
                     }
+                    log("Main Background Loop: Ecosystem sync refresh failed: ${e.message}")
+                } catch (e: Exception) {
                     log("Main Background Loop: Ecosystem sync refresh failed: ${e.message}")
                 }
             }
