@@ -31,7 +31,7 @@ object FirebaseAuthClient {
 
         if (!useEmulator) {
             require(key != DEFAULT_FIREBASE_API_KEY && key.isNotBlank()) {
-                "Firebase API key is not configured. Set -Dcodeoba.firebase.api_key=... (or provide via build config)."
+                "Firebase API key is not configured. Set -Dcodeoba.firebase.api_key=... or CODEOBA_FIREBASE_API_KEY=..."
             }
         }
         return key

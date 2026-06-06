@@ -9,6 +9,12 @@ import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
+/**
+ * Manages device identity keys.
+ * 
+ * TODO: Implement non-exportable/TPM/Secure Enclave-backed keys (CNG on Windows, Secure Enclave on macOS).
+ * TODO: Implement a fallback to software-protected key file with restricted permissions (0600) on headless servers where keyring is unavailable.
+ */
 object DeviceKeyManager {
 
     fun getOrGenerateKeyPair(): KeyPair {

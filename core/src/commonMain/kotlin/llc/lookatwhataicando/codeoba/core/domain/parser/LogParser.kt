@@ -38,7 +38,8 @@ class SummarizingLogParser(private val parserConfigJson: String?) : LogParser {
     private fun parseSummaryJson(jsonStr: String): SessionSummary {
         return try {
             val trimmed = jsonStr.trim()
-            kotlinx.serialization.json.Json.decodeFromString(SessionSummary.serializer(), trimmed)
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            json.decodeFromString(SessionSummary.serializer(), trimmed)
         } catch (e: Exception) {
             SessionSummary(
                 keyActions = listOf("Unable to parse AI summary outputs"),

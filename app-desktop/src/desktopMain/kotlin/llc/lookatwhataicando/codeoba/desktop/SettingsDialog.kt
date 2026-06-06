@@ -1561,7 +1561,7 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        if (savedEmail != null) {
+        if (!savedUid.isNullOrBlank()) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1580,7 +1580,7 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("Email Address", color = TextSecondary, style = MaterialTheme.typography.bodySmall)
-                        Text(savedEmail, color = TextPrimary, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                        Text(savedEmail?.ifBlank { "Unknown" } ?: "Unknown", color = TextPrimary, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),

@@ -7,12 +7,38 @@ object AppConfig {
      * If not specified, defaults to "codeoba.com".
      */
     fun getBaseUrl(): String {
-        val raw = System.getProperty("codeoba.base_url")
-        if (raw.isNullOrBlank()) {
-            return "codeoba.com"
+        val raw = System.getProperty("codeoba.base_url")?.trim().orEmpty()
+        if (raw.isBlank()) return "codeoba.com"
+
+        val normalized = raw.trimEnd('/')
+        return try {
+            val uri = if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+                java.net.URI(normalized)
+            } else {
+                // Add a scheme purely for parsing; we only return host[:port]
+                java.net.URI("https://$normalized")
+            }
+            val host = uri.host ?: normalized.replace(Regex("^https?://"), "")
+            val portPart = if (uri.port != -1) ":${uri.port}" else ""
+            (host + portPart).trimEnd('/')
+        } catch (_: Exception) {
+            normalized.replace(Regex("^https?://"), "").trimEnd('/')
         }
-        // Strip protocols and trailing slashes to normalize
-        return raw.replace(Regex("^https?://"), "").trimEnd('/')
+    }
+
+    /**
+     * Determines if a given host points to a local environment (localhost or 127.0.0.1, with or without a port).
+     */
+    fun isLocalHost(host: String): Boolean {
+        return isRawLocalHost(host) || host.startsWith("localhost:") ||
+            host.startsWith("127.0.0.1:")
+    }
+
+    /**
+     * Determines if a given host is exactly "localhost" or "127.0.0.1" without an explicit port.
+     */
+    fun isRawLocalHost(host: String): Boolean {
+        return host == "localhost" || host == "127.0.0.1"
     }
 
     /**
@@ -20,8 +46,7 @@ object AppConfig {
      * This is true if the base URL points to localhost or 127.0.0.1.
      */
     fun useEmulator(): Boolean {
-        val host = getBaseUrl()
-        return host.contains("localhost") || host.contains("127.0.0.1")
+        return isLocalHost(getBaseUrl())
     }
 
     /**
@@ -30,7 +55,8 @@ object AppConfig {
     fun getWebConsoleUrl(): String {
         val host = getBaseUrl()
         return if (useEmulator()) {
-            "http://localhost:5000" // Emulator hosting port
+            val emulatorHost = if (isRawLocalHost(host)) "$host:5000" else host
+            "http://$emulatorHost"
         } else {
             "https://$host"
         }
@@ -41,7 +67,8 @@ object AppConfig {
      */
     fun getFirebaseProjectId(): String {
         val host = getBaseUrl()
-        return if (host.contains("localhost") || host.contains("127.0.0.1") || host.contains("codeoba-dev")) {
+        val isDev = useEmulator() || Regex("(^|\\.)codeoba-dev(\\.|$)").containsMatchIn(host)
+        return if (isDev) {
             "codeoba-dev"
         } else {
             "codeoba-prod"
