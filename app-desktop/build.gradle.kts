@@ -1,7 +1,20 @@
 plugins {
     kotlin("multiplatform")
+    kotlin("plugin.serialization")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+val appVersion = project.findProperty("appVersion")?.toString() ?: "1.0.0"
+
+val generateVersionResource by tasks.registering {
+    val outputDir = layout.buildDirectory.dir("generated/resources/version")
+    outputs.dir(outputDir)
+    doLast {
+        val file = outputDir.get().file("version.txt").asFile
+        file.parentFile.mkdirs()
+        file.writeText(appVersion)
+    }
 }
 
 kotlin {
@@ -11,8 +24,10 @@ kotlin {
 
     sourceSets {
         val desktopMain by getting {
+            resources.srcDir(generateVersionResource)
             dependencies {
                 implementation(project(":core"))
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation(compose.desktop.currentOs)
                 implementation(compose.runtime)
                 implementation(compose.foundation)

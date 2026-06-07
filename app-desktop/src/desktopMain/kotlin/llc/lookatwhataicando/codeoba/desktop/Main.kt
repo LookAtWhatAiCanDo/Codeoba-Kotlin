@@ -199,12 +199,36 @@ class DynamicSemanticEmbedder(fallback: SemanticEmbedder) : SemanticEmbedder {
     }
 }
 
+fun isSafeLocalFileLink(url: String): Boolean {
+    val lower = url.trim().lowercase()
+    if (lower.startsWith("http://") || lower.startsWith("https://")) return false
+    val colonIdx = lower.indexOf(':')
+    if (colonIdx != -1) {
+        val scheme = lower.substring(0, colonIdx)
+        if (scheme.startsWith("file")) return true
+        if (scheme.length == 1 && scheme[0] in 'a'..'z') {
+            val after = lower.substring(colonIdx + 1)
+            if (after.startsWith("/") || after.startsWith("\\")) {
+                return true
+            }
+        }
+        return false
+    }
+    return true
+}
+
 internal fun openUrl(url: String) {
+    val trimmed = url.trim()
+    val lower = trimmed.lowercase()
+    if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
+        log("openUrl: Blocked unsafe URL: $url")
+        return
+    }
     try {
         if (Desktop.isDesktopSupported()) {
             val desktop = Desktop.getDesktop()
             if (desktop.isSupported(Desktop.Action.BROWSE)) {
-                desktop.browse(URI(url))
+                desktop.browse(URI(trimmed))
             }
         }
     } catch (e: Exception) {
@@ -222,6 +246,19 @@ fun main(args: Array<String>) {
     } else if (args.contains("--cache")) {
         cacheOverride = true
         log("Main: Caching enabled via command-line option --cache.")
+    }
+
+    if (args.contains("--update-ignore-throttling")) {
+        UpdateManager.ignoreUpdateThrottling = true
+        log("Main: Update throttling disabled via command-line option --update-ignore-throttling.")
+    }
+    if (args.contains("--update-force")) {
+        UpdateManager.forceUpdateAvailable = true
+        log("Main: Forced update check availability via command-line option --update-force.")
+    }
+    if (args.contains("--update-mock-notes")) {
+        UpdateManager.mockUpdateNotes = true
+        log("Main: Mock hostile changelog notes enabled via command-line option --update-mock-notes.")
     }
 
     System.setProperty("apple.awt.application.name", "Codeoba")
@@ -513,6 +550,8 @@ fun mainEntry() = application {
     var isSidebarCollapsed by remember { mutableStateOf(SettingsManager.getSidebarCollapsed() ?: false) }
     var sidebarWidth by remember { mutableStateOf((SettingsManager.getSidebarWidth() ?: 360f).dp) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    var latestReleaseForUpdate by remember { mutableStateOf<GitHubRelease?>(null) }
     var activeFileToView by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(sidebarWidth, isSidebarCollapsed) {
@@ -534,6 +573,39 @@ fun mainEntry() = application {
             }
         } catch (e: Exception) {
             log("Failed to register preferences handler: ${e.message}")
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (SettingsManager.getAutoUpdateEnabled()) {
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val lastCheck = SettingsManager.getLastUpdateCheck()
+                val now = System.currentTimeMillis()
+                val intervalMs = SettingsManager.getMinUpdateCheckIntervalSeconds() * 1000L
+                val elapsed = now - lastCheck
+                
+                if (elapsed in 0 until intervalMs && !UpdateManager.ignoreUpdateThrottling) {
+                    log("Main Startup Update: Throttled (last check: ${Date(lastCheck)}, interval: ${intervalMs / 1000}s)")
+                    return@launch
+                }
+
+                log("Main Startup Update: Running update check...")
+                val release = UpdateManager.checkLatestRelease()
+                if (release != null) {
+                    SettingsManager.setLastUpdateCheck(System.currentTimeMillis())
+                    SettingsManager.setMinUpdateCheckIntervalSeconds(release.minAutoUpdateCheckIntervalSeconds)
+                    if (UpdateManager.isUpdateAvailable(release)) {
+                        val skipped = SettingsManager.getSkippedVersion()
+                        if (release.tagName != skipped) {
+                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                kotlinx.coroutines.delay(release.uiDelayMillis)
+                                latestReleaseForUpdate = release
+                                showUpdateDialog = true
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -996,7 +1068,7 @@ fun mainEntry() = application {
                             onUrlClick = { url ->
                                 if (url.startsWith("http://") || url.startsWith("https://")) {
                                     openUrl(url)
-                                } else {
+                                } else if (isSafeLocalFileLink(url)) {
                                     try {
                                         var decodedPath = java.net.URLDecoder.decode(url, "UTF-8")
                                         decodedPath = decodedPath.substringBefore('#').substringBefore('?')
@@ -1019,6 +1091,8 @@ fun mainEntry() = application {
                                         log("Failed to parse file URL $url: ${e.message}")
                                         activeFileToView = url
                                     }
+                                } else {
+                                    log("onUrlClick: Blocked unsafe local file link: $url")
                                 }
                             },
                             modifier = Modifier.weight(1f)
@@ -1053,7 +1127,17 @@ fun mainEntry() = application {
                         },
                         onSettingsChanged = {
                             refreshTrigger++
+                        },
+                        onUpdateAvailable = { release ->
+                            latestReleaseForUpdate = release
+                            showUpdateDialog = true
                         }
+                    )
+                }
+                if (showUpdateDialog && latestReleaseForUpdate != null) {
+                    UpdateDialog(
+                        latestRelease = latestReleaseForUpdate!!,
+                        onClose = { showUpdateDialog = false }
                     )
                 }
                 if (activeFileToView != null) {
@@ -1063,7 +1147,7 @@ fun mainEntry() = application {
                         onUrlClick = { url ->
                             if (url.startsWith("http://") || url.startsWith("https://")) {
                                 openUrl(url)
-                            } else {
+                            } else if (isSafeLocalFileLink(url)) {
                                 try {
                                     var decodedPath = java.net.URLDecoder.decode(url, "UTF-8")
                                     decodedPath = decodedPath.substringBefore('#').substringBefore('?')
@@ -1086,6 +1170,8 @@ fun mainEntry() = application {
                                     log("Failed to parse file URL $url: ${e.message}")
                                     activeFileToView = url
                                 }
+                            } else {
+                                log("onUrlClick: Blocked unsafe local file link: $url")
                             }
                         }
                     )

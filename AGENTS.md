@@ -19,7 +19,7 @@ To ensure the project context remains accurate:
 ## 🏗️ Codebase Directory Map
 
 - **[core](./core)**: Kotlin Multiplatform (KMP) search engine, parsers, and watchers.
-  - `commonMain`: Unified data models (`Session`, `Turn`), indexer interfaces, lexical/semantic search engine algorithms.
+  - `commonMain`: Unified data models (`Session`, `Turn`), indexer interfaces, lexical/semantic search engine algorithms, and shared `SemVer.kt` version parsing.
   - `desktopMain`: JVM-specific log directory watchers (Java NIO) and SQLite JDBC adapters (with read-only WAL support).
   - `desktopTest`: Parser, watch-filter, and semantic similarity unit tests.
 - **[app-desktop](./app-desktop)**: Desktop UI front-end built with Jetpack Compose Multiplatform.
@@ -31,6 +31,8 @@ To ensure the project context remains accurate:
   - `MarkdownParser.kt`: Tokenizes and syntax-highlights raw conversation transcripts.
   - `SettingsDialog.kt`: App-level settings pane (general preferences, source monitoring controls).
   - `StatsComponents.kt`: Statistics overview and metrics charts.
+  - `UpdateManager.kt`: Asynchronous release checking, redirect-following download streams, and native installer execution.
+  - `UpdateDialog.kt`: Dark-themed update overlay prompting version jumps, markdown release notes, and progress.
 - **[docs](./docs)**: System architecture and developer walkthroughs.
 
 ---
@@ -164,6 +166,13 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - The search similarity threshold is dynamically adjustable via an interactive slider in a dedicated "Semantic" tab in the settings dialog and persisted via `SettingsManager.getSimilarityThreshold()`.
     - Leverages a local `EmbeddingCache` (implemented via `EmbeddingCacheManager`) to store text embedding vectors in `~/.codeoba/cache/embeddings_cache.json`, preventing redundant ONNX calls.
     - Indexes sessions in parallel using Kotlin coroutines and a `Semaphore` (concurrency limit of 4) in `SemanticSearchEngine.updateIndex` to utilize multicore CPUs efficiently and prevent UI thread blockage.
+
+25. **Auto-Update Mechanism**:
+    - Exposes the app version at runtime by generating a `version.txt` resource via a custom Gradle build task during compilation.
+    - Compares versions numerically using a shared `SemVer` class (major, minor, patch parsing) to ensure that `1.10.0` is recognized as newer than `1.9.0`.
+    - Queries the Firebase-proxied update endpoint (`http://localhost:5000/api/update` in dev/emulator mode, or production Cloud Function URL) on startup using a custom User-Agent (`Codeoba/{version} ({OS}; {arch}; GUID-{guid})`) to avoid GitHub API rate-limiting while logging anonymous telemetry.
+    - Downloads matching installer packages (`.msi`, `.pkg`, or `.deb`) to the directory `~/.codeoba/updates/` with real-time progress indicators.
+    - Launches native installers via `ProcessBuilder` (e.g. passive MSI `/passive` on Windows for seamless background installation, PKG launcher `open` on macOS, or `xdg-open` on Linux) and exits the JVM with `System.exit(0)` to release write locks.
 
 ---
 

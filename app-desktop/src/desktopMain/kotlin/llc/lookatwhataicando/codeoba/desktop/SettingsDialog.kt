@@ -37,12 +37,15 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import java.awt.Cursor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceRegistry
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.rememberCoroutineScope
 
 
 enum class SettingsCategory(val displayName: String) {
@@ -55,7 +58,8 @@ enum class SettingsCategory(val displayName: String) {
 fun SettingsDialog(
     sourceRegistry: SourceRegistry,
     onClose: () -> Unit,
-    onSettingsChanged: () -> Unit
+    onSettingsChanged: () -> Unit,
+    onUpdateAvailable: (GitHubRelease) -> Unit
 ) {
     var selectedCategory by remember { mutableStateOf(SettingsCategory.General) }
     var deletingSource by remember { mutableStateOf<SourceAdapter?>(null) }
@@ -161,6 +165,7 @@ fun SettingsDialog(
                         when (selectedCategory) {
                             SettingsCategory.General -> {
                                 var cacheEnabled by remember { mutableStateOf(SettingsManager.getCacheEnabled()) }
+                                var autoUpdateEnabled by remember { mutableStateOf(SettingsManager.getAutoUpdateEnabled()) }
 
                                 Text(
                                     text = "General Settings",
@@ -217,6 +222,140 @@ fun SettingsDialog(
                                                 ),
                                                 modifier = Modifier.pointerHoverIcon(PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)))
                                             )
+                                        }
+                                    }
+
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                                        colors = CardDefaults.cardColors(containerColor = CardSurface),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.weight(1f),
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "Auto-Updates",
+                                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                        color = TextPrimary
+                                                    )
+                                                    Text(
+                                                        text = "Automatically check for new versions on startup.",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = TextSecondary
+                                                    )
+                                                }
+
+                                                Switch(
+                                                    checked = autoUpdateEnabled,
+                                                    onCheckedChange = { isChecked ->
+                                                        autoUpdateEnabled = isChecked
+                                                        SettingsManager.setAutoUpdateEnabled(isChecked)
+                                                        onSettingsChanged()
+                                                    },
+                                                    colors = SwitchDefaults.colors(
+                                                        checkedThumbColor = ObsidianBg,
+                                                        checkedTrackColor = AccentCyan,
+                                                        uncheckedThumbColor = TextSecondary,
+                                                        uncheckedTrackColor = SlateSurface,
+                                                        uncheckedBorderColor = BorderColor
+                                                    ),
+                                                    modifier = Modifier.pointerHoverIcon(PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)))
+                                                )
+                                            }
+
+                                            HorizontalDivider(color = BorderColor.copy(alpha = 0.3f))
+
+                                            var checkingUpdates by remember { mutableStateOf(false) }
+                                            var updateCheckResult by remember { mutableStateOf<String?>(null) }
+                                            val coroutineScope = rememberCoroutineScope()
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "Current Version: v${UpdateManager.currentVersion}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = TextSecondary
+                                                )
+
+                                                Button(
+                                                    onClick = {
+                                                        if (!checkingUpdates) {
+                                                            checkingUpdates = true
+                                                            updateCheckResult = null
+                                                            coroutineScope.launch(Dispatchers.IO) {
+                                                                val release = UpdateManager.checkLatestRelease()
+                                                                coroutineScope.launch(Dispatchers.Main) {
+                                                                    checkingUpdates = false
+                                                                    if (release != null) {
+                                                                        SettingsManager.setLastUpdateCheck(System.currentTimeMillis())
+                                                                        SettingsManager.setMinUpdateCheckIntervalSeconds(release.minAutoUpdateCheckIntervalSeconds)
+                                                                        if (UpdateManager.isUpdateAvailable(release)) {
+                                                                            onUpdateAvailable(release)
+                                                                            onClose()
+                                                                        } else {
+                                                                            updateCheckResult = "Codeoba is up to date!"
+                                                                        }
+                                                                    } else {
+                                                                        val detail = UpdateManager.lastCheckError
+                                                                        updateCheckResult = if (detail != null) {
+                                                                            "Unable to contact update server: $detail"
+                                                                        } else {
+                                                                            "Unable to contact update server."
+                                                                        }
+                                                                    }
+                                                                }
+                                                             }
+                                                        }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = SlateSurface,
+                                                        contentColor = AccentCyan
+                                                    ),
+                                                    border = BorderStroke(1.dp, BorderColor),
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    modifier = Modifier
+                                                        .height(32.dp)
+                                                        .pointerHoverIcon(PointerIcon(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR))),
+                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                                                ) {
+                                                    if (checkingUpdates) {
+                                                        CircularProgressIndicator(
+                                                            color = AccentCyan,
+                                                            modifier = Modifier.size(14.dp),
+                                                            strokeWidth = 1.5.dp
+                                                        )
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text("Checking...", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                    } else {
+                                                        Text("Check for Updates", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                    }
+                                                }
+                                            }
+
+                                            if (updateCheckResult != null) {
+                                                Text(
+                                                    text = updateCheckResult!!,
+                                                    style = MaterialTheme.typography.bodySmall.copy(
+                                                        color = if (updateCheckResult!!.contains("up to date")) AccentCyan else Color(0xFFEF5350)
+                                                    ),
+                                                    modifier = Modifier.padding(top = 4.dp)
+                                                )
+                                            }
                                         }
                                     }
 
