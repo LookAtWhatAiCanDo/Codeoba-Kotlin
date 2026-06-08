@@ -72,7 +72,7 @@ object UpdateManager {
         val rawBase = System.getProperty("codeoba.base_url") ?: System.getenv("CODEOBA_BASE_URL")
         if (!rawBase.isNullOrBlank()) {
             var trimmed = rawBase.trim()
-            if (!trimmed.lowercase().startsWith("http://") && !trimmed.lowercase().startsWith("https://")) {
+            if (!isWebUrl(trimmed)) {
                 if (trimmed.contains("localhost") || trimmed.contains("127.0.0.1")) {
                     trimmed = "http://$trimmed"
                 } else {
@@ -174,7 +174,7 @@ object UpdateManager {
             }
  
             val text = connection.inputStream.bufferedReader().use { it.readText() }
-            log("UpdateManager: Received response body: $text")
+            log("UpdateManager: Received response body (truncated to 2000 chars): ${text.take(2000)}")
             val release = json.decodeFromString<GitHubRelease>(text)
             log("UpdateManager: Update check successful. Latest Release Tag: ${release.tagName}, uiDelayMillis: ${release.uiDelayMillis}, minAutoUpdateCheckIntervalSeconds: ${release.minAutoUpdateCheckIntervalSeconds}")
             return release
@@ -240,9 +240,13 @@ object UpdateManager {
         var redirectCount = 0
         while (status == HttpURLConnection.HTTP_MOVED_TEMP || status == HttpURLConnection.HTTP_MOVED_PERM || status == HttpURLConnection.HTTP_SEE_OTHER) {
             if (redirectCount > 5) throw Exception("Too many redirects")
-            val newUrl = conn.getHeaderField("Location")
-            log("UpdateManager: Redirecting ($status) to: $newUrl")
-            conn = URI(newUrl).toURL().openConnection() as HttpURLConnection
+            val location = conn.getHeaderField("Location") ?: throw Exception("Redirect missing Location header")
+            val redirectedUri = conn.url.toURI().resolve(location)
+            if (redirectedUri.scheme != "http" && redirectedUri.scheme != "https") {
+                throw Exception("Unsafe redirect scheme: ${redirectedUri.scheme}")
+            }
+            log("UpdateManager: Redirecting ($status) to: $redirectedUri")
+            conn = redirectedUri.toURL().openConnection() as HttpURLConnection
             conn.connectTimeout = 15000
             conn.readTimeout = 60000
             conn.requestMethod = "GET"

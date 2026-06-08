@@ -57,13 +57,15 @@ fun UpdateDialog(
         downloadJob = scope.launch(Dispatchers.IO) {
             try {
                 val downloadedFile = UpdateManager.downloadUpdate(asset) { progress, downloaded, total ->
-                    downloadProgress = progress
-                    val downloadedMB = downloaded / (1024.0 * 1024.0)
-                    downloadedSizeStr = if (total > 0) {
-                        val totalMB = total / (1024.0 * 1024.0)
-                        String.format("%.1f MB / %.1f MB (%.0f%%)", downloadedMB, totalMB, progress * 100f)
-                    } else {
-                        String.format("%.1f MB", downloadedMB)
+                    scope.launch(Dispatchers.Main) {
+                        downloadProgress = progress
+                        val downloadedMB = downloaded / (1024.0 * 1024.0)
+                        downloadedSizeStr = if (total > 0) {
+                            val totalMB = total / (1024.0 * 1024.0)
+                            String.format("%.1f MB / %.1f MB (%.0f%%)", downloadedMB, totalMB, progress * 100f)
+                        } else {
+                            String.format("%.1f MB", downloadedMB)
+                        }
                     }
                 }
 

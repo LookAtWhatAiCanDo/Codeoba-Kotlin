@@ -175,11 +175,9 @@ import llc.lookatwhataicando.codeoba.core.source.DesktopClaudeSource
 import llc.lookatwhataicando.codeoba.core.source.DesktopCodexSource
 import llc.lookatwhataicando.codeoba.core.source.DesktopCursorSource
 import java.awt.Cursor
-import java.awt.Desktop
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
-import java.net.URI
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -196,43 +194,6 @@ class DynamicSemanticEmbedder(fallback: SemanticEmbedder) : SemanticEmbedder {
     var delegate: SemanticEmbedder = fallback
     override suspend fun getEmbeddings(text: String): FloatArray {
         return delegate.getEmbeddings(text)
-    }
-}
-
-fun isSafeLocalFileLink(url: String): Boolean {
-    val lower = url.trim().lowercase()
-    if (lower.startsWith("http://") || lower.startsWith("https://")) return false
-    val colonIdx = lower.indexOf(':')
-    if (colonIdx != -1) {
-        val scheme = lower.substring(0, colonIdx)
-        if (scheme.startsWith("file")) return true
-        if (scheme.length == 1 && scheme[0] in 'a'..'z') {
-            val after = lower.substring(colonIdx + 1)
-            if (after.startsWith("/") || after.startsWith("\\")) {
-                return true
-            }
-        }
-        return false
-    }
-    return true
-}
-
-internal fun openUrl(url: String) {
-    val trimmed = url.trim()
-    val lower = trimmed.lowercase()
-    if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
-        log("openUrl: Blocked unsafe URL: $url")
-        return
-    }
-    try {
-        if (Desktop.isDesktopSupported()) {
-            val desktop = Desktop.getDesktop()
-            if (desktop.isSupported(Desktop.Action.BROWSE)) {
-                desktop.browse(URI(trimmed))
-            }
-        }
-    } catch (e: Exception) {
-        log("Failed to open URL $url: ${e.message}")
     }
 }
 
@@ -1066,27 +1027,12 @@ fun mainEntry() = application {
                                 onGroupDelete = { groupName -> GroupManager.deleteGroup(groupName).also { if (activeGroupFilter == groupName) activeGroupFilter = null; groupsState = GroupManager.getGroups() } },
                                 onToggleGroupPin = { name, pinned -> GroupManager.setGroupPinned(name, pinned); groupsState = GroupManager.getGroups() },
                             onUrlClick = { url ->
-                                if (url.startsWith("http://") || url.startsWith("https://")) {
-                                    openUrl(url)
-                                } else if (isSafeLocalFileLink(url)) {
+                                val trimmed = url.trim()
+                                if (isWebUrl(trimmed)) {
+                                    openUrl(trimmed)
+                                } else if (isSafeLocalFileLink(trimmed)) {
                                     try {
-                                        var decodedPath = java.net.URLDecoder.decode(url, "UTF-8")
-                                        decodedPath = decodedPath.substringBefore('#').substringBefore('?')
-                                        if (decodedPath.startsWith("file:///")) {
-                                            decodedPath = "/" + decodedPath.removePrefix("file:///").removePrefix("file:/")
-                                        } else if (decodedPath.startsWith("file://")) {
-                                            decodedPath = decodedPath.removePrefix("file://")
-                                        } else if (decodedPath.startsWith("file:/")) {
-                                            decodedPath = "/" + decodedPath.removePrefix("file:/")
-                                        }
-                                        while (decodedPath.contains("//")) {
-                                            decodedPath = decodedPath.replace("//", "/")
-                                        }
-                                        val isWindows = PlatformUtils.isWindows()
-                                        if (isWindows && decodedPath.startsWith("/") && decodedPath.length > 2 && decodedPath[2] == ':') {
-                                            decodedPath = decodedPath.substring(1)
-                                        }
-                                        activeFileToView = decodedPath
+                                        activeFileToView = parseLocalFilePath(trimmed)
                                     } catch (e: Exception) {
                                         log("Failed to parse file URL $url: ${e.message}")
                                         activeFileToView = url
@@ -1145,27 +1091,12 @@ fun mainEntry() = application {
                         filePath = activeFileToView!!,
                         onClose = { activeFileToView = null },
                         onUrlClick = { url ->
-                            if (url.startsWith("http://") || url.startsWith("https://")) {
-                                openUrl(url)
-                            } else if (isSafeLocalFileLink(url)) {
+                            val trimmed = url.trim()
+                            if (isWebUrl(trimmed)) {
+                                openUrl(trimmed)
+                            } else if (isSafeLocalFileLink(trimmed)) {
                                 try {
-                                    var decodedPath = java.net.URLDecoder.decode(url, "UTF-8")
-                                    decodedPath = decodedPath.substringBefore('#').substringBefore('?')
-                                    if (decodedPath.startsWith("file:///")) {
-                                        decodedPath = "/" + decodedPath.removePrefix("file:///").removePrefix("file:/")
-                                    } else if (decodedPath.startsWith("file://")) {
-                                        decodedPath = decodedPath.removePrefix("file://")
-                                    } else if (decodedPath.startsWith("file:/")) {
-                                        decodedPath = "/" + decodedPath.removePrefix("file:/")
-                                    }
-                                    while (decodedPath.contains("//")) {
-                                        decodedPath = decodedPath.replace("//", "/")
-                                    }
-                                    val isWindows = PlatformUtils.isWindows()
-                                    if (isWindows && decodedPath.startsWith("/") && decodedPath.length > 2 && decodedPath[2] == ':') {
-                                        decodedPath = decodedPath.substring(1)
-                                    }
-                                    activeFileToView = decodedPath
+                                    activeFileToView = parseLocalFilePath(trimmed)
                                 } catch (e: Exception) {
                                     log("Failed to parse file URL $url: ${e.message}")
                                     activeFileToView = url

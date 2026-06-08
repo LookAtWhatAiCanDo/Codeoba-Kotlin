@@ -9,6 +9,7 @@ val appVersion = project.findProperty("appVersion")?.toString() ?: "1.0.0"
 
 val generateVersionResource by tasks.registering {
     val outputDir = layout.buildDirectory.dir("generated/resources/version")
+    inputs.property("appVersion", appVersion)
     outputs.dir(outputDir)
     doLast {
         val file = outputDir.get().file("version.txt").asFile
@@ -24,7 +25,7 @@ kotlin {
 
     sourceSets {
         val desktopMain by getting {
-            resources.srcDir(generateVersionResource)
+            resources.srcDir(generateVersionResource.map { it.outputs.files.singleFile })
             dependencies {
                 implementation(project(":core"))
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
