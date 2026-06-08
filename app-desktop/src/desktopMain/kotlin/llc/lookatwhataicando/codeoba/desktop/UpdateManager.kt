@@ -11,6 +11,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
+import java.net.URL
 
 @Serializable
 data class GitHubRelease(
@@ -19,7 +20,7 @@ data class GitHubRelease(
     val body: String = "",
     val assets: List<GitHubAsset> = emptyList(),
     val uiDelayMillis: Long = 1000L,
-    val minAutoUpdateCheckIntervalSeconds: Long = 86400L
+    val minAutoUpdateCheckIntervalSeconds: Long = UpdateManager.DEFAULT_MIN_UPDATE_CHECK_INTERVAL_SECONDS
 )
 
 @Serializable
@@ -30,11 +31,10 @@ data class GitHubAsset(
 
 object UpdateManager {
     const val GITHUB_REPO = "LookAtWhatAiCanDo/Codeoba"
+    const val DEFAULT_MIN_UPDATE_CHECK_INTERVAL_SECONDS = 97200L // 27 hours
     private val json = Json { ignoreUnknownKeys = true }
 
-    @Volatile var ignoreUpdateThrottling = getUpdateUrl().let { url ->
-        url.contains("localhost") || url.contains("127.0.0.1")
-    }
+    @Volatile var ignoreUpdateThrottling = isLocalUrl(getUpdateUrl())
     @Volatile var forceUpdateAvailable = false
     @Volatile var mockUpdateNotes = false
     @Volatile var lastCheckError: String? = null
@@ -72,12 +72,16 @@ object UpdateManager {
         val rawBase = System.getProperty("codeoba.base_url") ?: System.getenv("CODEOBA_BASE_URL")
         if (!rawBase.isNullOrBlank()) {
             var trimmed = rawBase.trim()
+            val isLocal = isLocalUrl(trimmed)
             if (!isWebUrl(trimmed)) {
-                if (trimmed.contains("localhost") || trimmed.contains("127.0.0.1")) {
-                    trimmed = "http://$trimmed"
+                trimmed = if (isLocal) {
+                    "http://$trimmed"
                 } else {
-                    trimmed = "https://$trimmed"
+                    "https://$trimmed"
                 }
+            } else if (trimmed.lowercase().startsWith("http://") && !isLocal) {
+                // Prevent accidental insecure update endpoints in production.
+                trimmed = "https://${trimmed.removePrefix("http://")}"
             }
             return if (trimmed.endsWith("/api/update")) {
                 trimmed
@@ -87,7 +91,7 @@ object UpdateManager {
             }
         }
 
-        return "https://codeoba-prod.web.app/api/update"
+        return "https://codeoba.com/api/update"
     }
 
     fun checkLatestRelease(): GitHubRelease? {
@@ -217,6 +221,16 @@ object UpdateManager {
         return release.assets.find { it.name.endsWith(suffix) }
     }
 
+    private fun createDownloadConnection(url: URL): HttpURLConnection {
+        return (url.openConnection() as HttpURLConnection).apply {
+            connectTimeout = 15000
+            readTimeout = 60000
+            requestMethod = "GET"
+            instanceFollowRedirects = false
+            setRequestProperty("User-Agent", "Codeoba-Updater")
+        }
+    }
+
     fun downloadUpdate(
         asset: GitHubAsset,
         onProgress: (progress: Float, downloadedBytes: Long, totalBytes: Long) -> Unit
@@ -229,28 +243,21 @@ object UpdateManager {
 
         log("UpdateManager: Starting download for asset: ${asset.name} from URL: ${asset.browserDownloadUrl}")
         val url = URI(asset.browserDownloadUrl).toURL()
-        val connection = url.openConnection() as HttpURLConnection
-        connection.connectTimeout = 15000
-        connection.readTimeout = 60000
-        connection.requestMethod = "GET"
-        connection.setRequestProperty("User-Agent", "Codeoba-Updater")
+        val connection = createDownloadConnection(url)
 
         var conn = connection
         var status = conn.responseCode
         var redirectCount = 0
         while (status == HttpURLConnection.HTTP_MOVED_TEMP || status == HttpURLConnection.HTTP_MOVED_PERM || status == HttpURLConnection.HTTP_SEE_OTHER) {
-            if (redirectCount > 5) throw Exception("Too many redirects")
+            if (redirectCount >= 5) throw Exception("Too many redirects")
             val location = conn.getHeaderField("Location") ?: throw Exception("Redirect missing Location header")
             val redirectedUri = conn.url.toURI().resolve(location)
             if (redirectedUri.scheme != "http" && redirectedUri.scheme != "https") {
                 throw Exception("Unsafe redirect scheme: ${redirectedUri.scheme}")
             }
             log("UpdateManager: Redirecting ($status) to: $redirectedUri")
-            conn = redirectedUri.toURL().openConnection() as HttpURLConnection
-            conn.connectTimeout = 15000
-            conn.readTimeout = 60000
-            conn.requestMethod = "GET"
-            conn.setRequestProperty("User-Agent", "Codeoba-Updater")
+            conn.disconnect()
+            conn = createDownloadConnection(redirectedUri.toURL())
             status = conn.responseCode
             redirectCount++
         }

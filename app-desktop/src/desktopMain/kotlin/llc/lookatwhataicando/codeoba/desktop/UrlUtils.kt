@@ -10,6 +10,11 @@ fun isWebUrl(url: String): Boolean {
     return lower.startsWith("http://") || lower.startsWith("https://")
 }
 
+fun isLocalUrl(url: String): Boolean {
+    val lower = url.trim().lowercase()
+    return lower.contains("localhost") || lower.contains("127.0.0.1")
+}
+
 fun isSafeLocalFileLink(url: String): Boolean {
     if (isWebUrl(url)) return false
     val lower = url.trim().lowercase()
@@ -29,26 +34,39 @@ fun isSafeLocalFileLink(url: String): Boolean {
 }
 
 fun parseLocalFilePath(url: String): String {
-    var decoded = java.net.URLDecoder.decode(url, "UTF-8")
-    decoded = decoded.substringBefore('#').substringBefore('?')
-    
-    val lower = decoded.lowercase()
-    decoded = when {
-        lower.startsWith("file:///") -> "/" + decoded.drop(8)
-        lower.startsWith("file://") -> decoded.drop(7)
-        lower.startsWith("file:/") -> "/" + decoded.drop(6)
-        else -> decoded
+    val cleanedUrl = url.substringBefore('#').substringBefore('?').trim()
+    val lower = cleanedUrl.lowercase()
+    if (!lower.startsWith("file:")) {
+        return java.net.URLDecoder.decode(cleanedUrl, "UTF-8")
     }
-    
-    while (decoded.contains("//")) {
-        decoded = decoded.replace("//", "/")
+
+    return try {
+        val uri = URI(cleanedUrl)
+        val authority = uri.authority
+        val path = uri.path ?: ""
+        val combined = if (!authority.isNullOrBlank()) "//$authority$path" else path
+        if (PlatformUtils.isWindows() && combined.startsWith("/") && combined.length > 2 && combined[2] == ':') {
+            combined.drop(1)
+        } else {
+            combined
+        }
+    } catch (_: Exception) {
+        var decoded = java.net.URLDecoder.decode(cleanedUrl, "UTF-8")
+        val decLower = decoded.lowercase()
+        decoded = when {
+            decLower.startsWith("file:///") -> "/" + decoded.drop(8)
+            decLower.startsWith("file://") -> decoded.drop(7)
+            decLower.startsWith("file:/") -> "/" + decoded.drop(6)
+            else -> decoded
+        }
+        while (decoded.contains("//")) {
+            decoded = decoded.replace("//", "/")
+        }
+        if (PlatformUtils.isWindows() && decoded.startsWith("/") && decoded.length > 2 && decoded[2] == ':') {
+            decoded = decoded.substring(1)
+        }
+        decoded
     }
-    
-    if (PlatformUtils.isWindows() && decoded.startsWith("/") && decoded.length > 2 && decoded[2] == ':') {
-        decoded = decoded.substring(1)
-    }
-    
-    return decoded
 }
 
 internal fun openUrl(url: String) {

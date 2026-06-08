@@ -56,7 +56,11 @@ fun UpdateDialog(
 
         downloadJob = scope.launch(Dispatchers.IO) {
             try {
+                var lastUiUpdateMs = 0L
                 val downloadedFile = UpdateManager.downloadUpdate(asset) { progress, downloaded, total ->
+                    val now = System.currentTimeMillis()
+                    if (progress < 1f && now - lastUiUpdateMs < 100) return@downloadUpdate
+                    lastUiUpdateMs = now
                     scope.launch(Dispatchers.Main) {
                         downloadProgress = progress
                         val downloadedMB = downloaded / (1024.0 * 1024.0)

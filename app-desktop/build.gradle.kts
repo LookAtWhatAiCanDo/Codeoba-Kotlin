@@ -18,6 +18,10 @@ val generateVersionResource by tasks.registering {
     }
 }
 
+tasks.withType<org.gradle.language.jvm.tasks.ProcessResources>().configureEach {
+    dependsOn(generateVersionResource)
+}
+
 kotlin {
     jvm("desktop") {
         withJava()

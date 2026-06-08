@@ -239,7 +239,7 @@ object SettingsManager {
     }
 
     fun getMinUpdateCheckIntervalSeconds(): Long {
-        return prefs.getLong("min_update_check_interval_seconds", 97200L) // Default 27 hours
+        return prefs.getLong("min_update_check_interval_seconds", UpdateManager.DEFAULT_MIN_UPDATE_CHECK_INTERVAL_SECONDS)
     }
 
     fun setMinUpdateCheckIntervalSeconds(value: Long) {

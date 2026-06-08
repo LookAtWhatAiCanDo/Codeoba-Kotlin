@@ -35,12 +35,15 @@ The proxied update architecture provides the following:
        - Fields: `lastSeen` (server timestamp), `appVersion`, `osName`, `cpuArch`.
     2. **Request History Log:** `/updates/{guid}/requests/{requestTime}` (or `/updates-dev/{guid}/requests/{requestTime}`)
        - Fields: `timestamp` (server timestamp), `appVersion`, `osName`, `cpuArch`, `ttl` (current time + 90 days).
-  - **Response Payload:** Return a structured JSON response:
-    - `releaseTag`: latest release tag from GitHub
-    - `releaseUrl`: latest release download/details page URL
-    - `releaseNotes`: Markdown changelog body
-    - `uiDelayMillis`: delay before showing the dialog (default: `1000`)
-    - `minAutoUpdateCheckIntervalSeconds`: checking interval (default: `86400`)
+  - **Response Payload:** Return a structured JSON response (matching GitHub's release shape plus custom throttle/UI fields):
+    - `tag_name`: latest release tag from GitHub (e.g. `"v1.10.0"`)
+    - `html_url`: latest release page URL
+    - `body`: Markdown changelog/release notes
+    - `assets`: array of release asset objects:
+      - `name`: name of the asset (e.g., `"codeoba-1.10.0.pkg"`)
+      - `browser_download_url`: direct download URL for the asset
+    - `uiDelayMillis`: delay before showing the dialog in milliseconds (default: `1000`)
+    - `minAutoUpdateCheckIntervalSeconds`: checking interval (default: `97200`)
 
 ---
 
@@ -58,10 +61,10 @@ The proxied update architecture provides the following:
   - `@Volatile var mockUpdateNotes = false`
 - Update `checkLatestRelease()`:
   - If `mockUpdateNotes` is active, immediately return a synthetic `GitHubRelease` object containing hostile XSS injection payloads (to verify client sanitization).
-  - Otherwise, send a GET request to the Firebase proxy endpoint (`http://localhost:5000/api/update` in dev/emulator mode, or production Cloud Function URL).
+  - Otherwise, send a POST request to the Firebase proxy endpoint (`http://localhost:5000/api/update` in dev/emulator mode, or production Cloud Function URL).
   - Include the custom formatted User-Agent:
     `Codeoba/{version} ({OS}; {arch}; GUID-{guid})`
-  - Parse the structured JSON response into a `GitHubRelease` model.
+  - Decode the JSON response into a `GitHubRelease` model.
 - Update `isUpdateAvailable()`:
   - Return `true` if `forceUpdateAvailable` is active. Otherwise, parse and compare versions using `SemVer`.
 
@@ -73,12 +76,12 @@ The proxied update architecture provides the following:
 - Update `onUrlClick` blocks (in main view and file preview):
   - Delegate safe web links to `openUrl` and validated local references to `FileViewerDialog`. Block all other remote protocols.
 - Update startup `LaunchedEffect(Unit)`:
-  - Check the 24-hour interval (`minAutoUpdateCheckIntervalSeconds` returned by the server or a fallback 24 hours).
+  - Check the 27-hour interval (`minAutoUpdateCheckIntervalSeconds` returned by the server or a fallback 27 hours).
   - Bypass throttling if `ignoreUpdateThrottling` is active.
   - Record the timestamp of successful update checks to `SettingsManager`.
 
 #### [MODIFY] [SettingsDialog.kt](../app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/SettingsDialog.kt)
-- Ensure the manual check button bypasses the 24-hour rate limit and updates the last successful check timestamp in `SettingsManager`.
+- Ensure the manual check button bypasses the 27-hour rate limit and updates the last successful check timestamp in `SettingsManager`.
 
 ---
 
