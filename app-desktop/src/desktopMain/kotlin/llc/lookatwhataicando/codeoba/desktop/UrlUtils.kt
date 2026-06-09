@@ -11,26 +11,47 @@ fun isWebUrl(url: String): Boolean {
 }
 
 fun isLocalUrl(url: String): Boolean {
-    val lower = url.trim().lowercase()
-    return lower.contains("localhost") || lower.contains("127.0.0.1")
+    val trimmed = url.trim()
+    val host = try {
+        val uri = if (isWebUrl(trimmed)) URI(trimmed) else URI("http://$trimmed")
+        uri.host?.lowercase()
+    } catch (_: Exception) {
+        null
+    }
+    return host == "localhost" || host == "127.0.0.1"
 }
 
 fun isSafeLocalFileLink(url: String): Boolean {
     if (isWebUrl(url)) return false
-    val lower = url.trim().lowercase()
+
+    val trimmed = url.trim()
+    val lower = trimmed.lowercase()
+
+    // Block obvious remote/UNC paths (Windows network shares, protocol-relative URLs)
+    if (lower.startsWith("\\\\") || lower.startsWith("//")) return false
+
     val colonIdx = lower.indexOf(':')
-    if (colonIdx != -1) {
-        val scheme = lower.substring(0, colonIdx)
-        if (scheme == "file") return true
-        if (scheme.length == 1 && scheme[0] in 'a'..'z') {
-            val after = lower.substring(colonIdx + 1)
-            if (after.startsWith("/") || after.startsWith("\\")) {
-                return true
-            }
+    if (colonIdx == -1) return true
+
+    val scheme = lower.substring(0, colonIdx)
+
+    // Allow only *local* file:// URIs (no authority/host component)
+    if (scheme == "file") {
+        return try {
+            val uri = URI(trimmed)
+            uri.scheme.equals("file", ignoreCase = true) && uri.authority.isNullOrBlank()
+        } catch (_: Exception) {
+            lower.startsWith("file:///") || (lower.startsWith("file:/") && !lower.startsWith("file://"))
         }
-        return false
     }
-    return true
+
+    // Allow Windows drive paths like C:\... or C:/...
+    if (scheme.length == 1 && scheme[0] in 'a'..'z') {
+        val after = lower.substring(colonIdx + 1)
+        return after.startsWith("/") || after.startsWith("\\")
+    }
+
+    return false
 }
 
 fun parseLocalFilePath(url: String): String {

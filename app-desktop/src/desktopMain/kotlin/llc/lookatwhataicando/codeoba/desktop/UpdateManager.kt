@@ -79,9 +79,9 @@ object UpdateManager {
                 } else {
                     "https://$trimmed"
                 }
-            } else if (trimmed.lowercase().startsWith("http://") && !isLocal) {
+            } else if (trimmed.startsWith("http://", ignoreCase = true) && !isLocal) {
                 // Prevent accidental insecure update endpoints in production.
-                trimmed = "https://${trimmed.removePrefix("http://")}"
+                trimmed = "https://${trimmed.substring(7)}"
             }
             return if (trimmed.endsWith("/api/update")) {
                 trimmed

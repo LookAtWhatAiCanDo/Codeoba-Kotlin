@@ -57,18 +57,20 @@ fun UpdateDialog(
         downloadJob = scope.launch(Dispatchers.IO) {
             try {
                 var lastUiUpdateMs = 0L
-                val downloadedFile = UpdateManager.downloadUpdate(asset) { progress, downloaded, total ->
-                    val now = System.currentTimeMillis()
-                    if (progress < 1f && now - lastUiUpdateMs < 100) return@downloadUpdate
-                    lastUiUpdateMs = now
-                    scope.launch(Dispatchers.Main) {
-                        downloadProgress = progress
-                        val downloadedMB = downloaded / (1024.0 * 1024.0)
-                        downloadedSizeStr = if (total > 0) {
-                            val totalMB = total / (1024.0 * 1024.0)
-                            String.format("%.1f MB / %.1f MB (%.0f%%)", downloadedMB, totalMB, progress * 100f)
-                        } else {
-                            String.format("%.1f MB", downloadedMB)
+                val downloadedFile = kotlinx.coroutines.runInterruptible {
+                    UpdateManager.downloadUpdate(asset) { progress, downloaded, total ->
+                        val now = System.currentTimeMillis()
+                        if (progress < 1f && now - lastUiUpdateMs < 100) return@downloadUpdate
+                        lastUiUpdateMs = now
+                        scope.launch(Dispatchers.Main) {
+                            downloadProgress = progress
+                            val downloadedMB = downloaded / (1024.0 * 1024.0)
+                            downloadedSizeStr = if (total > 0) {
+                                val totalMB = total / (1024.0 * 1024.0)
+                                String.format("%.1f MB / %.1f MB (%.0f%%)", downloadedMB, totalMB, progress * 100f)
+                            } else {
+                                String.format("%.1f MB", downloadedMB)
+                            }
                         }
                     }
                 }
