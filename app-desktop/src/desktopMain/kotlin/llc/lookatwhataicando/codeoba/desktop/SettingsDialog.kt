@@ -68,7 +68,10 @@ fun SettingsDialog(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.75f))
-            .clickable(enabled = false) {}, // Consume clicks
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null
+            ) { /* consume clicks */ },
         contentAlignment = Alignment.Center
     ) {
         Card(
@@ -303,7 +306,7 @@ fun SettingsDialog(
                                                                     checkingUpdates = false
                                                                     if (release != null) {
                                                                         SettingsManager.setLastUpdateCheck(System.currentTimeMillis())
-                                                                        SettingsManager.setMinUpdateCheckIntervalSeconds(release.minAutoUpdateCheckIntervalSeconds)
+                                                                        SettingsManager.setMinUpdateCheckIntervalSeconds(release.minAutoUpdateCheckIntervalSeconds.coerceIn(0L, Long.MAX_VALUE / 1000L))
                                                                         if (UpdateManager.isUpdateAvailable(release)) {
                                                                             onUpdateAvailable(release)
                                                                             onClose()
@@ -550,7 +553,10 @@ fun SettingsDialog(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(Color.Black.copy(alpha = 0.8f))
-                            .clickable(enabled = false) {},
+                            .clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null
+                            ) { /* consume clicks */ },
                         contentAlignment = Alignment.Center
                     ) {
                         Card(

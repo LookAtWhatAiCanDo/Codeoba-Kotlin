@@ -5,7 +5,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val defaultVersion = "0.1.0"
+val defaultVersion = "1.0.0"
 val appVersion = project.findProperty("appVersion")?.toString() ?: defaultVersion
 
 val generateVersionResource by tasks.registering {
@@ -57,13 +57,11 @@ compose {
                     org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb
                 )
                 packageName = "Codeoba"
-                packageVersion = appVersion
+                packageVersion = appVersion.substringBefore('-').substringBefore('+')
                 vendor = "LookAtWhatAiCanDo"
                 includeAllModules = true
                 macOS {
                     iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
-                    // macOS package builders (DMG/PKG) require a major version > 0 (e.g. 1.0.0 instead of 0.1.0)
-                    packageVersion = if (appVersion.startsWith("0.")) "1.0.0" else appVersion
                 }
                 windows {
                     iconFile.set(project.file("src/desktopMain/resources/icon.ico"))

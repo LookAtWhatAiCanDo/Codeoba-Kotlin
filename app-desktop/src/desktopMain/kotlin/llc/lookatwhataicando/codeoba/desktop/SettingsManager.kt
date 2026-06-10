@@ -243,7 +243,7 @@ object SettingsManager {
     }
 
     fun setMinUpdateCheckIntervalSeconds(value: Long) {
-        prefs.putLong("min_update_check_interval_seconds", value)
+        prefs.putLong("min_update_check_interval_seconds", value.coerceAtLeast(0L))
     }
 }
 

@@ -542,7 +542,7 @@ fun mainEntry() = application {
             scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 val lastCheck = SettingsManager.getLastUpdateCheck()
                 val now = System.currentTimeMillis()
-                val intervalMs = SettingsManager.getMinUpdateCheckIntervalSeconds() * 1000L
+                val intervalMs = SettingsManager.getMinUpdateCheckIntervalSeconds().coerceAtLeast(0L).coerceAtMost(Long.MAX_VALUE / 1000L) * 1000L
                 val elapsed = now - lastCheck
                 
                 if (elapsed in 0 until intervalMs && !UpdateManager.ignoreUpdateThrottling) {
@@ -554,12 +554,12 @@ fun mainEntry() = application {
                 val release = UpdateManager.checkLatestRelease()
                 if (release != null) {
                     SettingsManager.setLastUpdateCheck(System.currentTimeMillis())
-                    SettingsManager.setMinUpdateCheckIntervalSeconds(release.minAutoUpdateCheckIntervalSeconds)
+                    SettingsManager.setMinUpdateCheckIntervalSeconds(release.minAutoUpdateCheckIntervalSeconds.coerceIn(0L, Long.MAX_VALUE / 1000L))
                     if (UpdateManager.isUpdateAvailable(release)) {
                         val skipped = SettingsManager.getSkippedVersion()
                         if (release.tagName != skipped) {
                             scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                kotlinx.coroutines.delay(release.uiDelayMillis)
+                                kotlinx.coroutines.delay(release.uiDelayMillis.coerceAtLeast(0L))
                                 latestReleaseForUpdate = release
                                 showUpdateDialog = true
                             }

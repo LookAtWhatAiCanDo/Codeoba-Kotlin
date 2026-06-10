@@ -24,7 +24,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.awt.Cursor
-import java.io.File
 
 @Composable
 fun UpdateDialog(
