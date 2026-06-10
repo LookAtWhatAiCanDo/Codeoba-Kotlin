@@ -57,7 +57,7 @@ compose {
                     org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb
                 )
                 packageName = "Codeoba"
-                packageVersion = appVersion.trim().substringBefore('-').substringBefore('+').lowercase().removePrefix("v")
+                packageVersion = appVersion.trim().substringBefore('-').substringBefore('+').lowercase().removePrefix("v").ifBlank { defaultVersion }
                 vendor = "LookAtWhatAiCanDo"
                 includeAllModules = true
                 macOS {

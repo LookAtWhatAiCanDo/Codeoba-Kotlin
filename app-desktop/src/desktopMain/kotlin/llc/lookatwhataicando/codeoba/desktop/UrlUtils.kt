@@ -59,11 +59,43 @@ fun isSafeLocalFileLink(url: String): Boolean {
     return false
 }
 
+private fun getHomeDirectory(): String? {
+    val javaHome = System.getProperty("user.home")
+    if (!javaHome.isNullOrBlank()) return javaHome
+
+    val envHome = System.getenv("HOME")
+    if (!envHome.isNullOrBlank()) return envHome
+
+    val envUserProfile = System.getenv("USERPROFILE")
+    if (!envUserProfile.isNullOrBlank()) return envUserProfile
+
+    val homeDrive = System.getenv("HOMEDRIVE")
+    val homePath = System.getenv("HOMEPATH")
+    if (!homeDrive.isNullOrBlank() && !homePath.isNullOrBlank()) {
+        return homeDrive + homePath
+    }
+
+    return null
+}
+
 fun parseLocalFilePath(url: String): String {
     val cleanedUrl = url.substringBefore('#').substringBefore('?').trim()
     val lower = cleanedUrl.lowercase()
     if (!lower.startsWith("file:")) {
-        return java.net.URLDecoder.decode(cleanedUrl.replace("+", "%2B"), "UTF-8")
+        val decoded = java.net.URLDecoder.decode(cleanedUrl.replace("+", "%2B"), "UTF-8")
+        val home = getHomeDirectory()
+        return if (!home.isNullOrBlank()) {
+            when {
+                decoded == "~" -> home
+                decoded.startsWith("~/") || decoded.startsWith("~\\") -> {
+                    val subPath = decoded.drop(2).replace('\\', java.io.File.separatorChar).replace('/', java.io.File.separatorChar)
+                    java.io.File(home, subPath).absolutePath
+                }
+                else -> decoded
+            }
+        } else {
+            decoded
+        }
     }
 
     return try {
