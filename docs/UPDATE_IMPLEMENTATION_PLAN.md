@@ -18,11 +18,11 @@ The proxied update architecture provides the following:
 
 ### 1. Codeoba Backend (`Codeoba-Backend`)
 
-#### [MODIFY] [firebase.json](../Codeoba-Backend/firebase.json)
+#### [MODIFY] [firebase.json](https://github.com/LookAtWhatAiCanDo/Codeoba-Backend/blob/main/firebase.json)
 - Add a URL rewrite under `hosting`:
   - Map `/api/update` to the `checkLatestRelease` Cloud Function to provide a clean endpoint.
 
-#### [MODIFY] [index.ts](../Codeoba-Backend/functions/src/index.ts)
+#### [MODIFY] [index.ts](https://github.com/LookAtWhatAiCanDo/Codeoba-Backend/blob/main/functions/src/index.ts)
 - Implement a Gen 2 HTTPS onRequest function `checkLatestRelease`:
   - **In-Memory Cache:** Cache the GitHub Releases API response (`https://api.github.com/repos/LookAtWhatAiCanDo/Codeoba/releases/latest`) for 15 minutes.
   - **User-Agent Parsing:** Parse the client's custom User-Agent to extract:

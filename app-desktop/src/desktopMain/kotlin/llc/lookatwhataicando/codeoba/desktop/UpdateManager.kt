@@ -245,11 +245,18 @@ object UpdateManager {
         val updatesDir = getUpdatesDir()
         cleanUpdatesDir() // Start fresh
 
-        val destFile = File(updatesDir, asset.name)
-        val tempFile = File(updatesDir, "${asset.name}.tmp")
+        val safeName = File(asset.name).name
+        val destFile = File(updatesDir, safeName)
+        val tempFile = File(updatesDir, "$safeName.tmp")
 
         log("UpdateManager: Starting download for asset: ${asset.name} from URL: ${asset.browserDownloadUrl}")
-        val url = URI(asset.browserDownloadUrl).toURL()
+        val assetUri = URI(asset.browserDownloadUrl)
+        val scheme = assetUri.scheme?.lowercase()
+        val allowHttp = isLocalUrl(getUpdateUrl())
+        if (scheme != "https" && !(allowHttp && scheme == "http")) {
+            throw Exception("Unsafe download scheme: $scheme")
+        }
+        val url = assetUri.toURL()
         val connection = createDownloadConnection(url)
 
         var conn = connection
@@ -265,8 +272,9 @@ object UpdateManager {
             if (redirectCount >= 5) throw Exception("Too many redirects")
             val location = conn.getHeaderField("Location") ?: throw Exception("Redirect missing Location header")
             val redirectedUri = conn.url.toURI().resolve(location)
-            if (redirectedUri.scheme != "http" && redirectedUri.scheme != "https") {
-                throw Exception("Unsafe redirect scheme: ${redirectedUri.scheme}")
+            val redirectScheme = redirectedUri.scheme?.lowercase()
+            if (redirectScheme != "https" && !(allowHttp && redirectScheme == "http")) {
+                throw Exception("Unsafe redirect scheme: $redirectScheme")
             }
             log("UpdateManager: Redirecting ($status) to: $redirectedUri")
             conn.disconnect()

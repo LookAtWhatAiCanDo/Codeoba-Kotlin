@@ -57,13 +57,13 @@ compose {
                     org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb
                 )
                 packageName = "Codeoba"
-                val rawVersion = project.findProperty("appVersion")?.toString() ?: defaultVersion
-                // macOS package builders require a major version > 0 (e.g. 1.0.0 instead of 0.1.0)
-                packageVersion = if (rawVersion.startsWith("0.")) "1.0.0" else rawVersion
+                packageVersion = appVersion
                 vendor = "LookAtWhatAiCanDo"
                 includeAllModules = true
                 macOS {
                     iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
+                    // macOS package builders (DMG/PKG) require a major version > 0 (e.g. 1.0.0 instead of 0.1.0)
+                    packageVersion = if (appVersion.startsWith("0.")) "1.0.0" else appVersion
                 }
                 windows {
                     iconFile.set(project.file("src/desktopMain/resources/icon.ico"))

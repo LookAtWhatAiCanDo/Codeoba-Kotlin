@@ -63,7 +63,7 @@ fun parseLocalFilePath(url: String): String {
     val cleanedUrl = url.substringBefore('#').substringBefore('?').trim()
     val lower = cleanedUrl.lowercase()
     if (!lower.startsWith("file:")) {
-        return java.net.URLDecoder.decode(cleanedUrl, "UTF-8")
+        return java.net.URLDecoder.decode(cleanedUrl.replace("+", "%2B"), "UTF-8")
     }
 
     return try {
@@ -77,7 +77,7 @@ fun parseLocalFilePath(url: String): String {
             combined
         }
     } catch (_: Exception) {
-        var decoded = java.net.URLDecoder.decode(cleanedUrl, "UTF-8")
+        var decoded = java.net.URLDecoder.decode(cleanedUrl.replace("+", "%2B"), "UTF-8")
         val decLower = decoded.lowercase()
         decoded = when {
             decLower.startsWith("file:///") -> "/" + decoded.drop(8)
