@@ -87,11 +87,10 @@ fun UpdateDialog(
                     }
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) return@launch
                 scope.launch(Dispatchers.Main) {
-                    if (downloadJob?.isCancelled != true) {
-                        downloadError = e.localizedMessage ?: e.message ?: "Failed to download update"
-                        isDownloading = false
-                    }
+                    downloadError = e.localizedMessage ?: e.message ?: "Failed to download update"
+                    isDownloading = false
                 }
             }
         }

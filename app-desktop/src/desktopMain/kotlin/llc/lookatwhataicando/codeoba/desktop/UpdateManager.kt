@@ -161,7 +161,8 @@ object UpdateManager {
             connection.setRequestProperty("User-Agent", userAgent)
             connection.setRequestProperty("Accept", "application/json")
             
-            log("UpdateManager: Request Headers: User-Agent=$userAgent, Accept=application/json")
+            val guidForLog = if (guid.length > 8) guid.take(8) + "..." else guid
+            log("UpdateManager: Request Headers: User-Agent=Codeoba/$version ($os; $arch; GUID-$guidForLog), Accept=application/json")
             log("UpdateManager: Writing empty request body (Content-Length: 0)")
             connection.outputStream.close()
  
@@ -248,7 +249,13 @@ object UpdateManager {
         var conn = connection
         var status = conn.responseCode
         var redirectCount = 0
-        while (status == HttpURLConnection.HTTP_MOVED_TEMP || status == HttpURLConnection.HTTP_MOVED_PERM || status == HttpURLConnection.HTTP_SEE_OTHER) {
+        while (
+            status == HttpURLConnection.HTTP_MOVED_TEMP ||
+            status == HttpURLConnection.HTTP_MOVED_PERM ||
+            status == HttpURLConnection.HTTP_SEE_OTHER ||
+            status == 307 ||
+            status == 308
+        ) {
             if (redirectCount >= 5) throw Exception("Too many redirects")
             val location = conn.getHeaderField("Location") ?: throw Exception("Redirect missing Location header")
             val redirectedUri = conn.url.toURI().resolve(location)
