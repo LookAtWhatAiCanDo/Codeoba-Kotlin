@@ -289,7 +289,8 @@ object UpdateManager {
                 if ((redirectScheme != "https" || !isRedirectAllowedHost) && !(allowHttp && isRedirectHttpLocalhost)) {
                     throw Exception("Unsafe redirect scheme/host: $redirectScheme://$redirectHost")
                 }
-                log("UpdateManager: Redirecting ($status) to: $redirectedUri")
+                val redactedRedirectUri = URI(redirectedUri.scheme, redirectedUri.authority, redirectedUri.path, null, null)
+                log("UpdateManager: Redirecting ($status) to: $redactedRedirectUri")
                 conn.disconnect()
                 conn = createDownloadConnection(redirectedUri.toURL())
                 status = conn.responseCode

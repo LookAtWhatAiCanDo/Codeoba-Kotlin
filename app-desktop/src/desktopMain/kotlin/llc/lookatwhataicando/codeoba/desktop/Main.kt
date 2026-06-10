@@ -1083,7 +1083,10 @@ fun mainEntry() = application {
                 if (showUpdateDialog && latestReleaseForUpdate != null) {
                     UpdateDialog(
                         latestRelease = latestReleaseForUpdate!!,
-                        onClose = { showUpdateDialog = false }
+                        onClose = {
+                            showUpdateDialog = false
+                            latestReleaseForUpdate = null
+                        }
                     )
                 }
                 if (activeFileToView != null) {
