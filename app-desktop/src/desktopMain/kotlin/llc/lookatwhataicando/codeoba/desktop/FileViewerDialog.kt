@@ -10,6 +10,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.HorizontalScrollbar
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Clear
@@ -299,21 +303,35 @@ fun FileViewerDialog(
                         val isMarkdown = fileName.endsWith(".md", ignoreCase = true)
 
                         if (isMarkdown) {
-                            Box(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                                SelectionContainer {
-                                    MarkdownView(
-                                        text = content,
-                                        turnIndex = 0,
-                                        isUser = false,
-                                        partIndex = 0,
-                                        query = "",
-                                        findRegex = null,
-                                        activeMatch = null,
-                                        color = TextPrimary.copy(alpha = 0.9f),
-                                        highlightColor = Color.Transparent,
-                                        onUrlClick = onUrlClick
-                                    )
+                            val scrollState = rememberScrollState()
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .dragToScroll(scrollState)
+                                        .verticalScroll(scrollState)
+                                        .padding(end = 12.dp)
+                                ) {
+                                    SelectionContainer {
+                                        MarkdownView(
+                                            text = content,
+                                            turnIndex = 0,
+                                            isUser = false,
+                                            partIndex = 0,
+                                            query = "",
+                                            findRegex = null,
+                                            activeMatch = null,
+                                            color = TextPrimary.copy(alpha = 0.9f),
+                                            highlightColor = Color.Transparent,
+                                            onUrlClick = onUrlClick
+                                        )
+                                    }
                                 }
+                                VerticalScrollbar(
+                                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(6.dp),
+                                    adapter = rememberScrollbarAdapter(scrollState),
+                                    style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                )
                             }
                         } else {
                             val lines = remember(content) { content.split("\n") }
@@ -322,34 +340,51 @@ fun FileViewerDialog(
                                 (1..lineCount).joinToString("\n") { it.toString() }
                             }
 
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(rememberScrollState())
-                                    .horizontalScroll(rememberScrollState())
-                            ) {
-                                SelectionContainer {
-                                    Row(modifier = Modifier.fillMaxHeight()) {
-                                        Text(
-                                            text = lineNumbersText,
-                                            color = TextSecondary.copy(alpha = 0.4f),
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 12.5.sp,
-                                            lineHeight = 18.sp,
-                                            modifier = Modifier.padding(end = 16.dp),
-                                            fontWeight = FontWeight.Normal
-                                        )
+                            val verticalScrollState = rememberScrollState()
+                            val horizontalScrollState = rememberScrollState()
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .dragToScroll(verticalScrollState, Orientation.Vertical)
+                                        .dragToScroll(horizontalScrollState, Orientation.Horizontal)
+                                        .verticalScroll(verticalScrollState)
+                                        .horizontalScroll(horizontalScrollState)
+                                        .padding(end = 12.dp, bottom = 12.dp)
+                                ) {
+                                    SelectionContainer {
+                                        Row(modifier = Modifier.fillMaxHeight()) {
+                                            Text(
+                                                text = lineNumbersText,
+                                                color = TextSecondary.copy(alpha = 0.4f),
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 12.5.sp,
+                                                lineHeight = 18.sp,
+                                                modifier = Modifier.padding(end = 16.dp),
+                                                fontWeight = FontWeight.Normal
+                                            )
 
-                                        Text(
-                                            text = content,
-                                            color = TextPrimary.copy(alpha = 0.85f),
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 12.5.sp,
-                                            lineHeight = 18.sp,
-                                            fontWeight = FontWeight.Normal
-                                        )
+                                            Text(
+                                                text = content,
+                                                color = TextPrimary.copy(alpha = 0.85f),
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 12.5.sp,
+                                                lineHeight = 18.sp,
+                                                fontWeight = FontWeight.Normal
+                                            )
+                                        }
                                     }
                                 }
+                                VerticalScrollbar(
+                                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(bottom = 12.dp).width(6.dp),
+                                    adapter = rememberScrollbarAdapter(verticalScrollState),
+                                    style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                )
+                                HorizontalScrollbar(
+                                    modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(end = 12.dp).height(6.dp),
+                                    adapter = rememberScrollbarAdapter(horizontalScrollState),
+                                    style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                )
                             }
                         }
                     }

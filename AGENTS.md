@@ -62,6 +62,12 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
    - Proactively compensate for this by applying `Modifier.offset(y = 1.dp)` (or custom vertical padding/offsets) to the `Text` composable inside centering containers (such as `Box(contentAlignment = Alignment.Center)`).
    - **Important**: When small texts are nested inside an `OutlinedTextField` (e.g., in a `trailingIcon`), they inherit the parent's `LocalTextStyle` which can have a large `lineHeight` that pushes the text upwards. Break this inheritance by passing `style = TextStyle.Default` (from `androidx.compose.ui.text.TextStyle`) and setting `lineHeight` equal to `fontSize` (e.g. `lineHeight = 11.sp` for `fontSize = 11.sp`).
 
+5. **Scrollbar Controls & Touch/Drag Scrolling**:
+   - Every scrollable container (e.g. `LazyColumn`, `Column` with `verticalScroll`, `Row` with `horizontalScroll`) must support touch-screen and mouse-drag scrolling and display a visual scrollbar.
+   - Use the custom extension `.dragToScroll(scrollState)` or `.dragToScroll(lazyListState)` defined in `./app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Components.kt` on the scrollable container.
+   - Wrap the scrollable container in a `Box` and add a sibling `VerticalScrollbar` (or `HorizontalScrollbar`) aligned to the edge (e.g. `Alignment.CenterEnd`).
+   - Use `themedScrollbarStyle()` to style the scrollbar to match the dynamic color theme's cyan accents (`AccentCyan`). Apply a small padding (e.g., `end = 12.dp`) to the scrollable container so its content doesn't overlap the scrollbar.
+
 ---
 
 ## ⚙️ Core Architecture Patterns

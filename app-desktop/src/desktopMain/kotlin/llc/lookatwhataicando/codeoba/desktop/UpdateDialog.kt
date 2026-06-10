@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -222,22 +224,32 @@ fun UpdateDialog(
                         }
                     } else {
                         // Release changelog (rendered using MarkdownView)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                            MarkdownView(
-                                text = latestRelease.body.ifBlank { "*No changelog description provided for this release.*" },
-                                turnIndex = 0,
-                                isUser = false,
-                                partIndex = 0,
-                                query = "",
-                                findRegex = null,
-                                activeMatch = null,
-                                color = TextPrimary.copy(alpha = 0.9f),
-                                highlightColor = Color.Transparent,
-                                onUrlClick = { openUrl(it) }
+                        val scrollState = rememberScrollState()
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .dragToScroll(scrollState)
+                                    .verticalScroll(scrollState)
+                                    .padding(end = 12.dp)
+                            ) {
+                                MarkdownView(
+                                    text = latestRelease.body.ifBlank { "*No changelog description provided for this release.*" },
+                                    turnIndex = 0,
+                                    isUser = false,
+                                    partIndex = 0,
+                                    query = "",
+                                    findRegex = null,
+                                    activeMatch = null,
+                                    color = TextPrimary.copy(alpha = 0.9f),
+                                    highlightColor = Color.Transparent,
+                                    onUrlClick = { openUrl(it) }
+                                )
+                            }
+                            VerticalScrollbar(
+                                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(6.dp),
+                                adapter = rememberScrollbarAdapter(scrollState),
+                                style = themedScrollbarStyle().copy(thickness = 6.dp)
                             )
                         }
                     }

@@ -46,6 +46,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.VerticalScrollbar
 
 
 enum class SettingsCategory(val displayName: String) {
@@ -177,10 +180,16 @@ fun SettingsDialog(
                                     modifier = Modifier.padding(bottom = 16.dp)
                                 )
 
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                                ) {
+                                val scrollState = rememberScrollState()
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .dragToScroll(scrollState)
+                                            .verticalScroll(scrollState)
+                                            .padding(end = 12.dp)
+                                    ) {
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -410,6 +419,12 @@ fun SettingsDialog(
                                         }
                                     }
                                 }
+                                VerticalScrollbar(
+                                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(6.dp),
+                                    adapter = rememberScrollbarAdapter(scrollState),
+                                    style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                )
+                            }
                             }
                             SettingsCategory.Sources -> {
                                 Text(
@@ -419,22 +434,34 @@ fun SettingsDialog(
                                     modifier = Modifier.padding(bottom = 16.dp)
                                 )
 
-                                LazyColumn(
-                                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    items(sourceRegistry.getAllAdapters()) { adapter ->
-                                        SourceSettingItem(
-                                            source = adapter,
-                                            onDecisionChange = { decision ->
-                                                SettingsManager.setUserDecision(adapter.id, decision)
-                                                onSettingsChanged()
-                                            },
-                                            onDeleteClick = {
-                                                deletingSource = adapter
-                                            }
-                                        )
+                                val lazyListState = rememberLazyListState()
+                                Box(modifier = Modifier.weight(1f)) {
+                                    LazyColumn(
+                                        state = lazyListState,
+                                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .dragToScroll(lazyListState)
+                                            .padding(end = 12.dp)
+                                    ) {
+                                        items(sourceRegistry.getAllAdapters()) { adapter ->
+                                            SourceSettingItem(
+                                                source = adapter,
+                                                onDecisionChange = { decision ->
+                                                    SettingsManager.setUserDecision(adapter.id, decision)
+                                                    onSettingsChanged()
+                                                },
+                                                onDeleteClick = {
+                                                    deletingSource = adapter
+                                                }
+                                            )
+                                        }
                                     }
+                                    VerticalScrollbar(
+                                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(6.dp),
+                                        adapter = rememberScrollbarAdapter(lazyListState),
+                                        style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                    )
                                 }
                             }
                             SettingsCategory.Semantic -> {
@@ -447,10 +474,16 @@ fun SettingsDialog(
                                     modifier = Modifier.padding(bottom = 16.dp)
                                 )
 
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                                ) {
+                                val scrollState = rememberScrollState()
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .dragToScroll(scrollState)
+                                            .verticalScroll(scrollState)
+                                            .padding(end = 12.dp)
+                                    ) {
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -541,6 +574,12 @@ fun SettingsDialog(
                                         }
                                     }
                                 }
+                                VerticalScrollbar(
+                                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(6.dp),
+                                    adapter = rememberScrollbarAdapter(scrollState),
+                                    style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                )
+                            }
                             }
                         }
                     }
@@ -587,29 +626,39 @@ fun SettingsDialog(
 
                                 val pathsToDelete = sourceToConfirmDelete.getDataPathsToDelete()
                                 if (pathsToDelete.isNotEmpty()) {
-                                    LazyColumn(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .heightIn(max = 120.dp)
-                                            .background(CardSurface, RoundedCornerShape(8.dp))
-                                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
-                                            .padding(12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        item {
-                                            Text(
-                                                text = "Target paths to be deleted:",
-                                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                                color = TextPrimary
-                                            )
+                                    val lazyListState = rememberLazyListState()
+                                    Box(modifier = Modifier.fillMaxWidth().heightIn(max = 120.dp)) {
+                                        LazyColumn(
+                                            state = lazyListState,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .dragToScroll(lazyListState)
+                                                .background(CardSurface, RoundedCornerShape(8.dp))
+                                                .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                                .padding(end = 12.dp)
+                                                .padding(12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            item {
+                                                Text(
+                                                    text = "Target paths to be deleted:",
+                                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = TextPrimary
+                                                )
+                                            }
+                                            items(pathsToDelete) { path ->
+                                                Text(
+                                                    text = path,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = TextSecondary
+                                                )
+                                            }
                                         }
-                                        items(pathsToDelete) { path ->
-                                            Text(
-                                                text = path,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = TextSecondary
-                                            )
-                                        }
+                                        VerticalScrollbar(
+                                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(6.dp),
+                                            adapter = rememberScrollbarAdapter(lazyListState),
+                                            style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                        )
                                     }
                                 }
 
