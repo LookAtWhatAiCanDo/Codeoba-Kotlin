@@ -253,60 +253,67 @@ object UpdateManager {
         val assetUri = URI(asset.browserDownloadUrl)
         val scheme = assetUri.scheme?.lowercase()
         val allowHttp = isLocalUrl(getUpdateUrl())
-        if (scheme != "https" && !(allowHttp && scheme == "http")) {
-            throw Exception("Unsafe download scheme: $scheme")
+        val isHttpLocalhost = scheme == "http" && (assetUri.host?.lowercase() == "localhost" || assetUri.host == "127.0.0.1")
+        if (scheme != "https" && !(allowHttp && isHttpLocalhost)) {
+            throw Exception("Unsafe download scheme/host: $scheme://${assetUri.host ?: ""}")
         }
         val url = assetUri.toURL()
         val connection = createDownloadConnection(url)
 
         var conn = connection
-        var status = conn.responseCode
-        var redirectCount = 0
-        while (
-            status == HttpURLConnection.HTTP_MOVED_TEMP ||
-            status == HttpURLConnection.HTTP_MOVED_PERM ||
-            status == HttpURLConnection.HTTP_SEE_OTHER ||
-            status == 307 ||
-            status == 308
-        ) {
-            if (redirectCount >= 5) throw Exception("Too many redirects")
-            val location = conn.getHeaderField("Location") ?: throw Exception("Redirect missing Location header")
-            val redirectedUri = conn.url.toURI().resolve(location)
-            val redirectScheme = redirectedUri.scheme?.lowercase()
-            if (redirectScheme != "https" && !(allowHttp && redirectScheme == "http")) {
-                throw Exception("Unsafe redirect scheme: $redirectScheme")
-            }
-            log("UpdateManager: Redirecting ($status) to: $redirectedUri")
-            conn.disconnect()
-            conn = createDownloadConnection(redirectedUri.toURL())
-            status = conn.responseCode
-            redirectCount++
-        }
-
-        log("UpdateManager: Final download response status: $status")
-        if (status !in 200..299) {
-            log("UpdateManager: HTTP Error $status when downloading ${asset.name}")
-            throw Exception("HTTP Error $status: ${conn.responseMessage} when downloading ${asset.name}")
-        }
-
-        val contentLength = conn.contentLengthLong
-        log("UpdateManager: Content length to download: $contentLength bytes")
-        BufferedInputStream(conn.inputStream).use { input ->
-            FileOutputStream(tempFile).use { output ->
-                val data = ByteArray(8192)
-                var totalBytesRead = 0L
-                var bytesRead: Int
-                while (input.read(data).also { bytesRead = it } != -1) {
-                    output.write(data, 0, bytesRead)
-                    totalBytesRead += bytesRead
-                    onProgress(
-                        if (contentLength > 0) totalBytesRead.toFloat() / contentLength else 0f,
-                        totalBytesRead,
-                        contentLength
-                    )
+        try {
+            var status = conn.responseCode
+            var redirectCount = 0
+            while (
+                status == HttpURLConnection.HTTP_MOVED_TEMP ||
+                status == HttpURLConnection.HTTP_MOVED_PERM ||
+                status == HttpURLConnection.HTTP_SEE_OTHER ||
+                status == 307 ||
+                status == 308
+            ) {
+                if (redirectCount >= 5) throw Exception("Too many redirects")
+                val location = conn.getHeaderField("Location") ?: throw Exception("Redirect missing Location header")
+                val redirectedUri = conn.url.toURI().resolve(location)
+                val redirectScheme = redirectedUri.scheme?.lowercase()
+                val redirectHost = redirectedUri.host?.lowercase()
+                val isRedirectHttpLocalhost = redirectScheme == "http" && (redirectHost == "localhost" || redirectHost == "127.0.0.1")
+                if (redirectScheme != "https" && !(allowHttp && isRedirectHttpLocalhost)) {
+                    throw Exception("Unsafe redirect scheme/host: $redirectScheme://$redirectHost")
                 }
-                log("UpdateManager: Download completed successfully. Received $totalBytesRead bytes.")
+                log("UpdateManager: Redirecting ($status) to: $redirectedUri")
+                conn.disconnect()
+                conn = createDownloadConnection(redirectedUri.toURL())
+                status = conn.responseCode
+                redirectCount++
             }
+
+            log("UpdateManager: Final download response status: $status")
+            if (status !in 200..299) {
+                log("UpdateManager: HTTP Error $status when downloading ${asset.name}")
+                throw Exception("HTTP Error $status: ${conn.responseMessage} when downloading ${asset.name}")
+            }
+
+            val contentLength = conn.contentLengthLong
+            log("UpdateManager: Content length to download: $contentLength bytes")
+            BufferedInputStream(conn.inputStream).use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    val data = ByteArray(8192)
+                    var totalBytesRead = 0L
+                    var bytesRead: Int
+                    while (input.read(data).also { bytesRead = it } != -1) {
+                        output.write(data, 0, bytesRead)
+                        totalBytesRead += bytesRead
+                        onProgress(
+                            if (contentLength > 0) totalBytesRead.toFloat() / contentLength else 0f,
+                            totalBytesRead,
+                            contentLength
+                        )
+                    }
+                    log("UpdateManager: Download completed successfully. Received $totalBytesRead bytes.")
+                }
+            }
+        } finally {
+            conn.disconnect()
         }
 
         log("UpdateManager: Renaming temporary download file ${tempFile.name} to ${destFile.name}")

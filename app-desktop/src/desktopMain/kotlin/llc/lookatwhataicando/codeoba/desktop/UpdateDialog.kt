@@ -108,7 +108,10 @@ fun UpdateDialog(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.75f))
-            .clickable(enabled = false) {}, // Consume clicks behind
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null
+            ) { /* consume clicks behind */ },
         contentAlignment = Alignment.Center
     ) {
         Card(
