@@ -33,6 +33,12 @@ object UpdateManager {
     const val GITHUB_REPO = "LookAtWhatAiCanDo/Codeoba"
     const val DEFAULT_MIN_UPDATE_CHECK_INTERVAL_SECONDS = 97200L // 27 hours
     private val json = Json { ignoreUnknownKeys = true }
+    private val ALLOWED_DOWNLOAD_HOSTS = setOf(
+        "github.com",
+        "objects.githubusercontent.com",
+        "github-releases.githubusercontent.com",
+        "release-assets.githubusercontent.com"
+    )
 
     @Volatile var ignoreUpdateThrottling = isLocalUrl(getUpdateUrl())
     @Volatile var forceUpdateAvailable = false
@@ -252,9 +258,11 @@ object UpdateManager {
         log("UpdateManager: Starting download for asset: ${asset.name} from URL: ${asset.browserDownloadUrl}")
         val assetUri = URI(asset.browserDownloadUrl)
         val scheme = assetUri.scheme?.lowercase()
+        val host = assetUri.host?.lowercase()
         val allowHttp = isLocalUrl(getUpdateUrl())
-        val isHttpLocalhost = scheme == "http" && (assetUri.host?.lowercase() == "localhost" || assetUri.host == "127.0.0.1")
-        if (scheme != "https" && !(allowHttp && isHttpLocalhost)) {
+        val isAllowedHost = host in ALLOWED_DOWNLOAD_HOSTS
+        val isHttpLocalhost = scheme == "http" && (host == "localhost" || host == "127.0.0.1")
+        if ((scheme != "https" || !isAllowedHost) && !(allowHttp && isHttpLocalhost)) {
             throw Exception("Unsafe download scheme/host: $scheme://${assetUri.host ?: ""}")
         }
         val url = assetUri.toURL()
@@ -276,8 +284,9 @@ object UpdateManager {
                 val redirectedUri = conn.url.toURI().resolve(location)
                 val redirectScheme = redirectedUri.scheme?.lowercase()
                 val redirectHost = redirectedUri.host?.lowercase()
+                val isRedirectAllowedHost = redirectHost in ALLOWED_DOWNLOAD_HOSTS
                 val isRedirectHttpLocalhost = redirectScheme == "http" && (redirectHost == "localhost" || redirectHost == "127.0.0.1")
-                if (redirectScheme != "https" && !(allowHttp && isRedirectHttpLocalhost)) {
+                if ((redirectScheme != "https" || !isRedirectAllowedHost) && !(allowHttp && isRedirectHttpLocalhost)) {
                     throw Exception("Unsafe redirect scheme/host: $redirectScheme://$redirectHost")
                 }
                 log("UpdateManager: Redirecting ($status) to: $redirectedUri")
