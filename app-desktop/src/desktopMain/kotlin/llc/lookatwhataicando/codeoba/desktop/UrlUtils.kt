@@ -25,13 +25,18 @@ fun isSafeLocalFileLink(url: String): Boolean {
     if (isWebUrl(url)) return false
 
     val trimmed = url.trim()
+    if (trimmed.isEmpty()) return false
     val lower = trimmed.lowercase()
 
     // Block obvious remote/UNC paths (Windows network shares, protocol-relative URLs)
     if (lower.startsWith("\\\\") || lower.startsWith("//")) return false
 
     val colonIdx = lower.indexOf(':')
-    if (colonIdx == -1) return true
+    if (colonIdx == -1) {
+        // Only treat path-like strings as local references; avoid misclassifying bare hostnames (e.g. "example.com").
+        return lower.startsWith("/") || lower.startsWith("./") || lower.startsWith("../") || lower.startsWith("~") ||
+            lower.contains('/') || lower.contains('\\')
+    }
 
     val scheme = lower.substring(0, colonIdx)
 

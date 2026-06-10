@@ -15,6 +15,9 @@ class SemVerTest {
         assertEquals(SemVer(0, 0, 0), SemVer.parse("invalid"))
         assertEquals(SemVer(1, 0, 0), SemVer.parse("1"))
         assertEquals(SemVer(1, 2, 0), SemVer.parse("1.2"))
+        assertEquals(SemVer(1, 2, 3), SemVer.parse("  V1.2.3  "))
+        assertEquals(SemVer(1, 2, 3), SemVer.parse("V1.2.3"))
+        assertEquals(SemVer(1, 2, 3), SemVer.parse("  1.2.3  "))
     }
 
     @Test

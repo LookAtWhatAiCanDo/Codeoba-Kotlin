@@ -85,11 +85,11 @@ object UpdateManager {
                 // Prevent accidental insecure update endpoints in production.
                 trimmed = "https://${trimmed.substring(7)}"
             }
+            trimmed = trimmed.trimEnd('/')
             return if (trimmed.endsWith("/api/update")) {
                 trimmed
             } else {
-                val separator = if (trimmed.endsWith("/")) "" else "/"
-                "$trimmed${separator}api/update"
+                "$trimmed/api/update"
             }
         }
 
@@ -147,44 +147,48 @@ object UpdateManager {
         try {
             val url = URI(urlStr).toURL()
             val connection = url.openConnection() as HttpURLConnection
-            connection.connectTimeout = 10000
-            connection.readTimeout = 10000
-            connection.requestMethod = "POST"
-            connection.setDoOutput(true)
-            connection.setRequestProperty("Content-Length", "0")
-            
-            // Build custom User-Agent: Codeoba/{version} ({OS}; {arch}; GUID-{guid})
-            val version = currentVersion
-            val os = System.getProperty("os.name") ?: "Unknown OS"
-            val arch = System.getProperty("os.arch") ?: "Unknown Arch"
-            val guid = SettingsManager.getInstallGuid()
-            val userAgent = "Codeoba/$version ($os; $arch; GUID-$guid)"
-            
-            connection.setRequestProperty("User-Agent", userAgent)
-            connection.setRequestProperty("Accept", "application/json")
-            
-            val guidForLog = if (guid.length > 8) guid.take(8) + "..." else guid
-            log("UpdateManager: Request Headers: User-Agent=Codeoba/$version ($os; $arch; GUID-$guidForLog), Accept=application/json")
-            log("UpdateManager: Writing empty request body (Content-Length: 0)")
-            connection.outputStream.close()
- 
-            val responseCode = connection.responseCode
-            log("UpdateManager: Received response code: $responseCode")
-            if (responseCode !in 200..299) {
-                val errorMsg = try {
-                    connection.errorStream?.bufferedReader()?.use { it.readText() }?.take(100)?.trim()
-                } catch (e: Exception) { null }
-                val errorDetails = if (!errorMsg.isNullOrBlank()) " ($errorMsg)" else ""
-                log("UpdateManager: HTTP error checking updates: $responseCode$errorDetails")
-                lastCheckError = "HTTP $responseCode$errorDetails"
-                return null
+            try {
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                connection.requestMethod = "POST"
+                connection.setDoOutput(true)
+                connection.setRequestProperty("Content-Length", "0")
+                
+                // Build custom User-Agent: Codeoba/{version} ({OS}; {arch}; GUID-{guid})
+                val version = currentVersion
+                val os = System.getProperty("os.name") ?: "Unknown OS"
+                val arch = System.getProperty("os.arch") ?: "Unknown Arch"
+                val guid = SettingsManager.getInstallGuid()
+                val userAgent = "Codeoba/$version ($os; $arch; GUID-$guid)"
+                
+                connection.setRequestProperty("User-Agent", userAgent)
+                connection.setRequestProperty("Accept", "application/json")
+                
+                val guidForLog = if (guid.length > 8) guid.take(8) + "..." else guid
+                log("UpdateManager: Request Headers: User-Agent=Codeoba/$version ($os; $arch; GUID-$guidForLog), Accept=application/json")
+                log("UpdateManager: Writing empty request body (Content-Length: 0)")
+                connection.outputStream.close()
+     
+                val responseCode = connection.responseCode
+                log("UpdateManager: Received response code: $responseCode")
+                if (responseCode !in 200..299) {
+                    val errorMsg = try {
+                        connection.errorStream?.bufferedReader()?.use { it.readText() }?.take(100)?.trim()
+                    } catch (e: Exception) { null }
+                    val errorDetails = if (!errorMsg.isNullOrBlank()) " ($errorMsg)" else ""
+                    log("UpdateManager: HTTP error checking updates: $responseCode$errorDetails")
+                    lastCheckError = "HTTP $responseCode$errorDetails"
+                    return null
+                }
+     
+                val text = connection.inputStream.bufferedReader().use { it.readText() }
+                log("UpdateManager: Received response body (truncated to 2000 chars): ${text.take(2000)}")
+                val release = json.decodeFromString<GitHubRelease>(text)
+                log("UpdateManager: Update check successful. Latest Release Tag: ${release.tagName}, uiDelayMillis: ${release.uiDelayMillis}, minAutoUpdateCheckIntervalSeconds: ${release.minAutoUpdateCheckIntervalSeconds}")
+                return release
+            } finally {
+                connection.disconnect()
             }
- 
-            val text = connection.inputStream.bufferedReader().use { it.readText() }
-            log("UpdateManager: Received response body (truncated to 2000 chars): ${text.take(2000)}")
-            val release = json.decodeFromString<GitHubRelease>(text)
-            log("UpdateManager: Update check successful. Latest Release Tag: ${release.tagName}, uiDelayMillis: ${release.uiDelayMillis}, minAutoUpdateCheckIntervalSeconds: ${release.minAutoUpdateCheckIntervalSeconds}")
-            return release
         } catch (e: Exception) {
             log("UpdateManager: Exception checking updates: ${e.message}", e)
             val baseMsg = e.localizedMessage ?: e.message ?: e.toString()
