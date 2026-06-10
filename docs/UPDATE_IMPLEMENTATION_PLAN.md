@@ -6,9 +6,9 @@ This document details the architecture and implementation of the auto-update sub
 
 The proxied update architecture provides the following:
 1. **GitHub API Protection:** GitHub limits unauthenticated requests to 60/hour. Our Firebase function caches the GitHub API response for 15 minutes, allowing unlimited clients to check for updates without getting rate-limited.
-2. **Hybrid Telemetry (Profile + 90-day TTL History):**
-   - **Client Profile:** Maintains exactly one permanent document per installation GUID (`/updates/{guid}`) containing the latest `lastSeen` timestamp, application version, OS name, and CPU architecture. This allows fast, low-cost active user and environment queries.
-   - **Request History:** Appends every check event to `/updates/{guid}/requests/{requestTime}` with a `ttl` field set to 90 days in the future. This provides lossless, short-term history for tracking upgrade paths and debugging, while Firestore automatically deletes expired logs in the background for free.
+2. **Cloud Logging Telemetry:**
+   - **Console Ingestion:** Client check information (GUID, app version, OS, architecture, and IP) is printed directly to standard output as a structured telemetry log (`console.info`).
+   - **No Database Writes:** GCP Cloud Logging automatically ingests and indexes these logs. This avoids all Firestore database writes/deletes, eliminates database storage growth and write billing costs, and remains fully secure and public.
 3. **Dynamic Controls:** The server can return custom variables (e.g. `uiDelayMillis` or custom checking intervals) without requiring a new client build.
 4. **Resilience & Security:** Enforces client-side sanitization of changelog markdown to prevent script injection and URL protocol abuse.
 
@@ -30,11 +30,8 @@ The proxied update architecture provides the following:
     - OS name/version
     - CPU architecture
     - Client Installation GUID
-  - **Telemetry Logging:** Perform a batch write to:
-    1. **Client Profile:** `/updates/{guid}` (or `/updates-dev/{guid}`)
-       - Fields: `lastSeen` (server timestamp), `appVersion`, `osName`, `cpuArch`.
-    2. **Request History Log:** `/updates/{guid}/requests/{requestTime}` (or `/updates-dev/{guid}/requests/{requestTime}`)
-       - Fields: `timestamp` (server timestamp), `appVersion`, `osName`, `cpuArch`, `ttl` (current time + 90 days).
+  - **Telemetry Logging:** Output structured logs (`console.info`) prefixed with `[TELEMETRY]` containing the client's sanitized and truncated GUID (up to 128 characters), IP, version, OS, and CPU architecture.
+  - **No Database writes:** Bypasses Firestore database writes entirely to prevent resource exhaustion abuse.
   - **Response Payload:** Return a structured JSON response (matching GitHub's release shape plus custom throttle/UI fields):
     - `tag_name`: latest release tag from GitHub (e.g. `"v1.10.0"`)
     - `html_url`: latest release page URL
@@ -92,12 +89,10 @@ The proxied update architecture provides the following:
 - Run `./gradlew :core:desktopTest` to verify version parsing and comparison.
 
 ### Manual Verification
-1. **Telemetry Logging & Hybrid Storage Test:**
+1. **Telemetry Logging Test:**
    - Run the backend emulator using `firebase emulators:start`.
    - Run the desktop application in dev mode.
-   - Inspect the local Firestore Emulator UI to confirm:
-     - A profile document is created/updated at `/updates-dev/{guid}`.
-     - A log document is created at `/updates-dev/{guid}/requests/{timestamp}` containing a `ttl` timestamp set to 90 days in the future.
+   - Inspect the terminal / console output of the local Firebase emulator to confirm that a structured log prefix `[TELEMETRY]` is printed containing the client's sanitized GUID, version, OS, architecture, and IP, and that no Firestore writes are executed.
 2. **API Caching Test:**
    - Verify that subsequent update requests within 15 minutes reuse the cached GitHub response and do not trigger new external network requests to GitHub.
 3. **URI Sanitization & Diagnostic Overrides:**
