@@ -1,6 +1,6 @@
 # Codeoba Agent Instructions
 
-Welcome! You are an AI coding assistant working on **Codeoba**—a platform-agnostic, zero-external-dependency, 100% local search application that indexes, monitors, and searches conversation transcripts across Claude Code, Google Antigravity, Cursor, OpenAI Codex, and Aider.
+Welcome! You are an AI coding assistant working on **Codeoba**—a platform-agnostic, zero-external-dependency, 100% local search application that indexes, monitors, and searches conversation transcripts across Claude Code, Google Antigravity, Cursor, OpenAI Codex, Aider, and GitHub Copilot.
 
 This file acts as the primary repository context and instructions guide. Read this first to align with the codebase.
 
@@ -62,6 +62,12 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
    - Proactively compensate for this by applying `Modifier.offset(y = 1.dp)` (or custom vertical padding/offsets) to the `Text` composable inside centering containers (such as `Box(contentAlignment = Alignment.Center)`).
    - **Important**: When small texts are nested inside an `OutlinedTextField` (e.g., in a `trailingIcon`), they inherit the parent's `LocalTextStyle` which can have a large `lineHeight` that pushes the text upwards. Break this inheritance by passing `style = TextStyle.Default` (from `androidx.compose.ui.text.TextStyle`) and setting `lineHeight` equal to `fontSize` (e.g. `lineHeight = 11.sp` for `fontSize = 11.sp`).
 
+5. **Scrollbar Controls & Touch/Drag Scrolling**:
+   - Every scrollable container (e.g. `LazyColumn`, `Column` with `verticalScroll`, `Row` with `horizontalScroll`) must support touch-screen and mouse-drag scrolling and display a visual scrollbar.
+   - Use the custom extension `.dragToScroll(scrollState)` or `.dragToScroll(lazyListState)` defined in `./app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Components.kt` on the scrollable container.
+   - Wrap the scrollable container in a `Box` and add a sibling `VerticalScrollbar` (or `HorizontalScrollbar`) aligned to the edge (e.g. `Alignment.CenterEnd`).
+   - Use `themedScrollbarStyle()` to style the scrollbar to match the dynamic color theme's cyan accents (`AccentCyan`). Apply a small padding (e.g., `end = 12.dp`) to the scrollable container so its content doesn't overlap the scrollbar.
+
 ---
 
 ## ⚙️ Core Architecture Patterns
@@ -83,7 +89,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
    - For Google Antigravity, parse the archived status from the companion state annotation files (`~/.gemini/antigravity/annotations/<sessionId>.pbtxt`) by checking if they contain `"archived:true"`. Enable real-time updates by adding `.pbtxt` files to the watcher filter.
    - For OpenAI Codex, detect archived status by verifying if the parent directory name of the session `.jsonl` file is `"archived_sessions"`.
 7. **Exhaustive Settings & Dynamic Sidebar Filtering**:
-    - The settings dialog shows an exhaustive list of all supported source adapters, regardless of whether they are active or ignored, so the user can easily re-enable them.
+    - The settings dialog shows an exhaustive list of all supported source adapters, regardless of whether they are active or ignored, so the user can easily re-enable them. The sources list is sorted alphabetically by their display name, but bisected into two groups: installed adapters are displayed at the top, followed by uninstalled/not-detected adapters at the bottom.
     - A modern toggle switch allows enabling or disabling a source provider by moving its state to `IGNORE` or `MONITOR`/`UNDECIDED`. When disabled, its configuration segments are hidden.
     - The sidebar displays filters for all active (non-ignored) sources, regardless of whether they have any sessions in the index database. Selecting an enabled source with zero sessions displays an empty list, allowing natural discoverability.
     - Added direct product page URLs to settings so users can quickly visit the respective agent products.
@@ -121,7 +127,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Cache features can be toggled in the General settings panel in the UI or overridden using command line arguments (`--cache` / `--no-cache`).
 16. **Desktop Source Adapter Consolidation**:
     - Centralizes common parsing caching logic, directory checking (`getBaseDir()`), availability/installation checks (`isAvailable()`, `isExecutableInstalled(binaryName)`), and session data cleanup (`deleteDataPaths()`, `getDataPathsToDelete()`) into the shared base class `./core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/DesktopSourceAdapter.kt`.
-    - File-based sources (Claude, Codex, Antigravity, Aider) implement `parseSessionContent(File)` and benefit from automated file metadata check/cache write on miss.
+    - File-based sources (Claude, Codex, Antigravity, Aider, Copilot) implement `parseSessionContent(File)` and benefit from automated file metadata check/cache write on miss.
     - Database-based sources (Cursor) override `parseSession(String)` directly to bypass file-based caching and implement custom SQLite row hashing.
 17. **Conversations Sidebar List Sorting**:
     - The left-side conversations sidebar displays a "Sort by" section with interactive horizontal chips: Relevance (only when a search query is active), Updated, Tokens, Speed, Turns, and Duration.
@@ -144,9 +150,12 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
 20. **Markdown Link Resolution & In-App File Viewer**:
     - Parses inline markdown links `[link text](url)` inside `MarkdownParser.kt` and formats them with an underline and standard premium accent color (`AccentCyan`) while adding a `"URL"` string annotation to the `AnnotatedString`.
     - Handles pointer hover icon swaps and tap gestures inside a custom `ClickableMarkdownText` composable, ensuring click bounds match the exact character bounds to avoid false positive clicks on blank line ends.
-    - Resolves external URLs to the system browser and local `file://` URLs to an in-app overlay previewer `FileViewerDialog`.
-    - `FileViewerDialog` renders markdown files (`.md`) recursively using the app's rich `MarkdownView`, and other source code files as scrollable monospace text with line numbers.
-    - Provides a fallback button in the file preview dialog to launch the file in the default OS handler.
+    - Resolves local file references and URIs securely via the centralized utility `LocalFileResolver.resolveLocalFileLink` in the `:core` module.
+    - **Security & Path Traversal Controls**: Implements strict boundary checking. Only the session workspace directory (`session.cwd`) is implicitly trusted (`Allowed`). Files outside this workspace, or directories/scripts, trigger a `ConfirmationRequired` state.
+    - **Action-Specific Permission Store**: Consent choices (`ALLOW` / `DENY`) are persisted in Java Preferences under the child node `file_permissions` via `PermissionManager` and are split by action scopes (`PREVIEW` vs. `EXTERNAL_OPEN`) associated with the MD5 hash and canonical path of the target file to prevent hash collisions. Users can review and revoke these rules in a dedicated "Permissions" category in the settings panel.
+    - **Bounded File Reading**: Restricts file reader allocation by loading a maximum of 5MB + 1 byte using `readNBytes()` to prevent memory exhaustion.
+    - Renders markdown files (`.md`) recursively using the app's rich `MarkdownView`, and other source code files as scrollable monospace text with line numbers.
+    - Provides a fallback button in the file preview dialog to launch the file in the default OS handler after validating external opening permissions.
 
 21. **Sidebar Session Item Tag Display**:
     - Each conversation item in the sidebar list view (`Sidebar.kt`) displays its assigned tags/groups using a `FlowRow` of badges styled in `AccentPurple` (12% alpha background, 40% alpha border, 4.dp rounded corners) positioned below the last message snippet.

@@ -42,16 +42,20 @@ import kotlinx.coroutines.launch
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceRegistry
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.rememberCoroutineScope
-
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.VerticalScrollbar
 
 enum class SettingsCategory(val displayName: String) {
     General("General"),
     Sources("Sources"),
-    Semantic("Semantic")
+    Semantic("Semantic"),
+    Permissions("Permissions")
 }
 
 @Composable
@@ -177,10 +181,16 @@ fun SettingsDialog(
                                     modifier = Modifier.padding(bottom = 16.dp)
                                 )
 
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                                ) {
+                                val scrollState = rememberScrollState()
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .dragToScroll(scrollState)
+                                            .verticalScroll(scrollState)
+                                            .padding(end = 12.dp)
+                                    ) {
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -410,6 +420,12 @@ fun SettingsDialog(
                                         }
                                     }
                                 }
+                                VerticalScrollbar(
+                                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(6.dp),
+                                    adapter = rememberScrollbarAdapter(scrollState),
+                                    style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                )
+                            }
                             }
                             SettingsCategory.Sources -> {
                                 Text(
@@ -419,22 +435,34 @@ fun SettingsDialog(
                                     modifier = Modifier.padding(bottom = 16.dp)
                                 )
 
-                                LazyColumn(
-                                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    items(sourceRegistry.getAllAdapters()) { adapter ->
-                                        SourceSettingItem(
-                                            source = adapter,
-                                            onDecisionChange = { decision ->
-                                                SettingsManager.setUserDecision(adapter.id, decision)
-                                                onSettingsChanged()
-                                            },
-                                            onDeleteClick = {
-                                                deletingSource = adapter
-                                            }
-                                        )
+                                val lazyListState = rememberLazyListState()
+                                Box(modifier = Modifier.weight(1f)) {
+                                    LazyColumn(
+                                        state = lazyListState,
+                                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .dragToScroll(lazyListState)
+                                            .padding(end = 12.dp)
+                                    ) {
+                                        items(sourceRegistry.getAllAdapters()) { adapter ->
+                                            SourceSettingItem(
+                                                source = adapter,
+                                                onDecisionChange = { decision ->
+                                                    SettingsManager.setUserDecision(adapter.id, decision)
+                                                    onSettingsChanged()
+                                                },
+                                                onDeleteClick = {
+                                                    deletingSource = adapter
+                                                }
+                                            )
+                                        }
                                     }
+                                    VerticalScrollbar(
+                                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(6.dp),
+                                        adapter = rememberScrollbarAdapter(lazyListState),
+                                        style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                    )
                                 }
                             }
                             SettingsCategory.Semantic -> {
@@ -447,10 +475,16 @@ fun SettingsDialog(
                                     modifier = Modifier.padding(bottom = 16.dp)
                                 )
 
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                                ) {
+                                val scrollState = rememberScrollState()
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .dragToScroll(scrollState)
+                                            .verticalScroll(scrollState)
+                                            .padding(end = 12.dp)
+                                    ) {
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -541,8 +575,128 @@ fun SettingsDialog(
                                         }
                                     }
                                 }
+                                VerticalScrollbar(
+                                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(6.dp),
+                                    adapter = rememberScrollbarAdapter(scrollState),
+                                    style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                )
+                            }
+                            }
+                            SettingsCategory.Permissions -> {
+                                var permissionsList by remember { mutableStateOf(PermissionManager.getAllDecisions()) }
+
+                                Text(
+                                    text = "Workspace Path Permissions",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = TextPrimary,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+
+                                if (permissionsList.isEmpty()) {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "No custom path permissions saved.",
+                                            color = TextSecondary,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                } else {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                                    ) {
+                                        permissionsList.forEach { entry ->
+                                            Card(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                                                colors = CardDefaults.cardColors(containerColor = CardSurface),
+                                                shape = RoundedCornerShape(12.dp)
+                                            ) {
+                                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Text(
+                                                            text = entry.path,
+                                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace),
+                                                            color = TextPrimary,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                            Text(
+                                                                text = "Preview: ${entry.previewDecision}",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                color = if (entry.previewDecision == PermissionManager.Decision.ALLOW) AccentCyan else TextSecondary
+                                                            )
+                                                            Text(
+                                                                text = "External Open: ${entry.externalDecision}",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                color = if (entry.externalDecision == PermissionManager.Decision.ALLOW) AccentCyan else TextSecondary
+                                                            )
+                                                        }
+                                                    }
+
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+                                                    ) {
+                                                        if (entry.previewDecision != PermissionManager.Decision.ASK) {
+                                                            Button(
+                                                                onClick = {
+                                                                    PermissionManager.removeActionDecision(entry.path, PermissionManager.Action.PREVIEW)
+                                                                    permissionsList = PermissionManager.getAllDecisions()
+                                                                    onSettingsChanged()
+                                                                },
+                                                                colors = ButtonDefaults.buttonColors(containerColor = SlateSurface, contentColor = TextPrimary),
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                modifier = Modifier.height(28.dp),
+                                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                                            ) {
+                                                                Text("Reset Preview", style = MaterialTheme.typography.labelSmall)
+                                                            }
+                                                        }
+
+                                                        if (entry.externalDecision != PermissionManager.Decision.ASK) {
+                                                            Button(
+                                                                onClick = {
+                                                                    PermissionManager.removeActionDecision(entry.path, PermissionManager.Action.EXTERNAL_OPEN)
+                                                                    permissionsList = PermissionManager.getAllDecisions()
+                                                                    onSettingsChanged()
+                                                                },
+                                                                colors = ButtonDefaults.buttonColors(containerColor = SlateSurface, contentColor = TextPrimary),
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                modifier = Modifier.height(28.dp),
+                                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                                            ) {
+                                                                Text("Reset External", style = MaterialTheme.typography.labelSmall)
+                                                            }
+                                                        }
+
+                                                        Button(
+                                                            onClick = {
+                                                                PermissionManager.removeDecision(entry.path)
+                                                                permissionsList = PermissionManager.getAllDecisions()
+                                                                onSettingsChanged()
+                                                            },
+                                                            colors = ButtonDefaults.buttonColors(containerColor = SlateSurface, contentColor = Color(0xFFEF5350)),
+                                                            shape = RoundedCornerShape(6.dp),
+                                                            modifier = Modifier.height(28.dp),
+                                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                                        ) {
+                                                            Text("Clear All", style = MaterialTheme.typography.labelSmall)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
+                    }
                     }
                 }
 
@@ -587,29 +741,39 @@ fun SettingsDialog(
 
                                 val pathsToDelete = sourceToConfirmDelete.getDataPathsToDelete()
                                 if (pathsToDelete.isNotEmpty()) {
-                                    LazyColumn(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .heightIn(max = 120.dp)
-                                            .background(CardSurface, RoundedCornerShape(8.dp))
-                                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
-                                            .padding(12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        item {
-                                            Text(
-                                                text = "Target paths to be deleted:",
-                                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                                color = TextPrimary
-                                            )
+                                    val lazyListState = rememberLazyListState()
+                                    Box(modifier = Modifier.fillMaxWidth().heightIn(max = 120.dp)) {
+                                        LazyColumn(
+                                            state = lazyListState,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .dragToScroll(lazyListState)
+                                                .background(CardSurface, RoundedCornerShape(8.dp))
+                                                .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                                .padding(end = 12.dp)
+                                                .padding(12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            item {
+                                                Text(
+                                                    text = "Target paths to be deleted:",
+                                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = TextPrimary
+                                                )
+                                            }
+                                            items(pathsToDelete) { path ->
+                                                Text(
+                                                    text = path,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = TextSecondary
+                                                )
+                                            }
                                         }
-                                        items(pathsToDelete) { path ->
-                                            Text(
-                                                text = path,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = TextSecondary
-                                            )
-                                        }
+                                        VerticalScrollbar(
+                                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(6.dp),
+                                            adapter = rememberScrollbarAdapter(lazyListState),
+                                            style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                        )
                                     }
                                 }
 
@@ -645,7 +809,6 @@ fun SettingsDialog(
                         }
                     }
                 }
-            }
         }
     }
 }

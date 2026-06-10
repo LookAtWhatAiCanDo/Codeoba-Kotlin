@@ -24,6 +24,7 @@ fun getSourceBadgeColors(sourceId: String): Pair<Color, Color> {
         "cursor" -> Pair(Color(0xFFD500F9), Color(0x1FD500F9)) // Purple
         "codex" -> Pair(Color(0xFF00BCD4), Color(0x1F00BCD4)) // Teal
         "aider" -> Pair(Color(0xFFFF3D00), Color(0x1FFF3D00)) // Red-Orange
+        "copilot" -> Pair(Color(0xFF8F5FE8), Color(0x1F8F5FE8)) // Purple-Violet
         else -> Pair(AccentCyan, Color(0x1F00E5FF))
     }
 }
@@ -39,6 +40,7 @@ fun formatSourceDisplayName(sourceId: String): String {
         "cursor" -> "Cursor"
         "codex" -> "OpenAI Codex"
         "aider" -> "Aider"
+        "copilot" -> "GitHub Copilot"
         else -> sourceId.substring(0, 1).uppercase() + sourceId.substring(1)
     }
 }
@@ -50,6 +52,7 @@ fun getProductUrl(sourceId: String): String? {
         "cursor" -> "https://cursor.com"
         "codex" -> "https://developers.openai.com"
         "aider" -> "https://aider.chat"
+        "copilot" -> "https://github.com/features/ai/github-app"
         else -> null
     }
 }

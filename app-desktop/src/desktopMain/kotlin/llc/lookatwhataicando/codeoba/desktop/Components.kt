@@ -37,6 +37,20 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.composed
+import androidx.compose.foundation.ScrollbarStyle
+import androidx.compose.foundation.defaultScrollbarStyle
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.rememberScrollbarAdapter
+import kotlinx.coroutines.launch
+
 
 @Composable
 fun SidebarToggleIcon(tint: Color) {
@@ -421,29 +435,39 @@ fun WarningOverlay(
 
                         val pathsToDelete = source.getDataPathsToDelete()
                         if (pathsToDelete.isNotEmpty()) {
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 120.dp)
-                                    .background(CardSurface, RoundedCornerShape(8.dp))
-                                    .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
-                                    .padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                item {
-                                    Text(
-                                        text = "Target paths to be deleted:",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                        color = TextPrimary
-                                    )
+                            val lazyListState = rememberLazyListState()
+                            Box(modifier = Modifier.fillMaxWidth().heightIn(max = 120.dp)) {
+                                LazyColumn(
+                                    state = lazyListState,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .dragToScroll(lazyListState)
+                                        .background(CardSurface, RoundedCornerShape(8.dp))
+                                        .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                        .padding(end = 12.dp)
+                                        .padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    item {
+                                        Text(
+                                            text = "Target paths to be deleted:",
+                                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                            color = TextPrimary
+                                        )
+                                    }
+                                    items(pathsToDelete) { path ->
+                                        Text(
+                                            text = path,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = TextSecondary
+                                        )
+                                    }
                                 }
-                                items(pathsToDelete) { path ->
-                                    Text(
-                                        text = path,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = TextSecondary
-                                    )
-                                }
+                                VerticalScrollbar(
+                                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(6.dp),
+                                    adapter = rememberScrollbarAdapter(lazyListState),
+                                    style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                )
                             }
                         }
 
@@ -475,3 +499,41 @@ fun WarningOverlay(
         }
     }
 }
+
+fun Modifier.dragToScroll(
+    scrollState: ScrollState,
+    orientation: Orientation = Orientation.Vertical
+): Modifier = this.composed {
+    val coroutineScope = rememberCoroutineScope()
+    this.draggable(
+        orientation = orientation,
+        state = rememberDraggableState { delta ->
+            coroutineScope.launch {
+                scrollState.scrollBy(-delta)
+            }
+        }
+    )
+}
+
+fun Modifier.dragToScroll(
+    lazyListState: LazyListState,
+    orientation: Orientation = Orientation.Vertical
+): Modifier = this.composed {
+    val coroutineScope = rememberCoroutineScope()
+    this.draggable(
+        orientation = orientation,
+        state = rememberDraggableState { delta ->
+            coroutineScope.launch {
+                lazyListState.scrollBy(-delta)
+            }
+        }
+    )
+}
+
+@Composable
+fun themedScrollbarStyle(): ScrollbarStyle = defaultScrollbarStyle().copy(
+    unhoverColor = AccentCyan.copy(alpha = 0.3f),
+    hoverColor = AccentCyan.copy(alpha = 0.7f),
+    thickness = 8.dp
+)
+

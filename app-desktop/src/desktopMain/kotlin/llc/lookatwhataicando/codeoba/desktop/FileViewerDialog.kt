@@ -10,6 +10,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.HorizontalScrollbar
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Clear
@@ -35,9 +39,15 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 
+import llc.lookatwhataicando.codeoba.core.util.LocalFileResolver
+import llc.lookatwhataicando.codeoba.core.util.LocalFileResolution
+import androidx.compose.animation.*
+import androidx.compose.material.icons.filled.Check
+
 @Composable
 fun FileViewerDialog(
     filePath: String,
+    trustedRootPath: String?,
     onClose: () -> Unit,
     onUrlClick: (String) -> Unit
 ) {
@@ -47,6 +57,22 @@ fun FileViewerDialog(
     var fileSize by remember(filePath) { mutableStateOf(0L) }
     var fileLastModified by remember(filePath) { mutableStateOf(0L) }
     var isLoading by remember(filePath) { mutableStateOf(true) }
+
+    var pendingUrlClickPath by remember { mutableStateOf<java.nio.file.Path?>(null) }
+    var pendingExternalOpen by remember { mutableStateOf(false) }
+    var dontAskAgainChecked by remember { mutableStateOf(false) }
+    var toastMessage by remember { mutableStateOf<String?>(null) }
+
+    val currentFileParent = remember(filePath) {
+        try { java.nio.file.Paths.get(filePath).parent } catch (_: Exception) { null }
+    }
+    val trustedRoot = remember(trustedRootPath) {
+        try {
+            if (!trustedRootPath.isNullOrBlank()) java.nio.file.Paths.get(trustedRootPath) else null
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     LaunchedEffect(filePath) {
         isLoading = true
@@ -68,13 +94,16 @@ fun FileViewerDialog(
             fileSize = file.length()
             fileLastModified = file.lastModified()
 
-            if (fileSize > 5 * 1024 * 1024) { // 5MB limit
-                fileError = "File is too large to render inside Codeoba (${fileSize / 1024} KB). Please open in external editor."
+            val sizeLimit = 5 * 1024 * 1024 // 5MB limit
+            val bytes = java.nio.file.Files.newInputStream(file.toPath()).use { input ->
+                input.readNBytes(sizeLimit + 1)
+            }
+            if (bytes.size > sizeLimit) {
+                fileError = "File is too large to render inside Codeoba (exceeds 5MB limit). Please open in external editor."
                 isLoading = false
                 return@LaunchedEffect
             }
 
-            val bytes = file.readBytes()
             if (bytes.contains(0.toByte())) {
                 isBinaryFile = true
                 isLoading = false
@@ -86,6 +115,13 @@ fun FileViewerDialog(
             fileError = e.message ?: "Failed to read file"
         } finally {
             isLoading = false
+        }
+    }
+
+    LaunchedEffect(toastMessage) {
+        if (toastMessage != null) {
+            kotlinx.coroutines.delay(3000)
+            toastMessage = null
         }
     }
 
@@ -110,12 +146,67 @@ fun FileViewerDialog(
     }
 
     fun openExternally() {
-        try {
-            val file = File(filePath)
-            if (file.exists() && Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().open(file)
+        val pathObj = try { java.nio.file.Paths.get(filePath) } catch (_: Exception) { null }
+        val isTrusted = try {
+            val realPath = pathObj?.toRealPath()
+            val realRoot = trustedRoot?.toRealPath() ?: trustedRoot?.toAbsolutePath()?.normalize()
+            realRoot != null && realPath != null && realPath.startsWith(realRoot)
+        } catch (_: Exception) {
+            false
+        }
+
+        if (isTrusted || trustedRoot == null) {
+            try {
+                val file = File(filePath)
+                if (file.exists() && Desktop.isDesktopSupported()) {
+                    Desktop.getDesktop().open(file)
+                }
+            } catch (_: Exception) {}
+        } else {
+            val decision = PermissionManager.getDecision(filePath, PermissionManager.Action.EXTERNAL_OPEN)
+            if (decision == PermissionManager.Decision.ALLOW) {
+                try {
+                    val file = File(filePath)
+                    if (file.exists() && Desktop.isDesktopSupported()) {
+                        Desktop.getDesktop().open(file)
+                    }
+                } catch (_: Exception) {}
+            } else if (decision == PermissionManager.Decision.DENY) {
+                toastMessage = "External open blocked by user settings"
+            } else {
+                dontAskAgainChecked = false
+                pendingExternalOpen = true
             }
-        } catch (_: Exception) {}
+        }
+    }
+
+    val handleUrlClick: (String) -> Unit = { url ->
+        val trimmed = url.trim()
+        if (isWebUrl(trimmed)) {
+            onUrlClick(trimmed)
+        } else {
+            val fileParent = currentFileParent
+            val resolved = LocalFileResolver.resolveLocalFileLink(trimmed, fileParent, trustedRoot)
+            when (resolved) {
+                is LocalFileResolution.Allowed -> {
+                    onUrlClick(resolved.path.toString())
+                }
+                is LocalFileResolution.ConfirmationRequired -> {
+                    val decision = PermissionManager.getDecision(resolved.path.toString(), PermissionManager.Action.PREVIEW)
+                    if (decision == PermissionManager.Decision.ALLOW) {
+                        onUrlClick(resolved.path.toString())
+                    } else if (decision == PermissionManager.Decision.DENY) {
+                        toastMessage = "Access denied by user settings"
+                    } else {
+                        pendingUrlClickPath = resolved.path
+                        dontAskAgainChecked = false
+                    }
+                }
+                is LocalFileResolution.Rejected -> {
+                    toastMessage = resolved.reason
+                }
+            }
+        }
     }
 
     Box(
@@ -299,21 +390,35 @@ fun FileViewerDialog(
                         val isMarkdown = fileName.endsWith(".md", ignoreCase = true)
 
                         if (isMarkdown) {
-                            Box(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                                SelectionContainer {
-                                    MarkdownView(
-                                        text = content,
-                                        turnIndex = 0,
-                                        isUser = false,
-                                        partIndex = 0,
-                                        query = "",
-                                        findRegex = null,
-                                        activeMatch = null,
-                                        color = TextPrimary.copy(alpha = 0.9f),
-                                        highlightColor = Color.Transparent,
-                                        onUrlClick = onUrlClick
-                                    )
+                            val scrollState = rememberScrollState()
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .dragToScroll(scrollState)
+                                        .verticalScroll(scrollState)
+                                        .padding(end = 12.dp)
+                                ) {
+                                    SelectionContainer {
+                                        MarkdownView(
+                                            text = content,
+                                            turnIndex = 0,
+                                            isUser = false,
+                                            partIndex = 0,
+                                            query = "",
+                                            findRegex = null,
+                                            activeMatch = null,
+                                            color = TextPrimary.copy(alpha = 0.9f),
+                                            highlightColor = Color.Transparent,
+                                            onUrlClick = onUrlClick
+                                        )
+                                    }
                                 }
+                                VerticalScrollbar(
+                                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(6.dp),
+                                    adapter = rememberScrollbarAdapter(scrollState),
+                                    style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                )
                             }
                         } else {
                             val lines = remember(content) { content.split("\n") }
@@ -322,34 +427,51 @@ fun FileViewerDialog(
                                 (1..lineCount).joinToString("\n") { it.toString() }
                             }
 
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(rememberScrollState())
-                                    .horizontalScroll(rememberScrollState())
-                            ) {
-                                SelectionContainer {
-                                    Row(modifier = Modifier.fillMaxHeight()) {
-                                        Text(
-                                            text = lineNumbersText,
-                                            color = TextSecondary.copy(alpha = 0.4f),
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 12.5.sp,
-                                            lineHeight = 18.sp,
-                                            modifier = Modifier.padding(end = 16.dp),
-                                            fontWeight = FontWeight.Normal
-                                        )
+                            val verticalScrollState = rememberScrollState()
+                            val horizontalScrollState = rememberScrollState()
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .dragToScroll(verticalScrollState, Orientation.Vertical)
+                                        .dragToScroll(horizontalScrollState, Orientation.Horizontal)
+                                        .verticalScroll(verticalScrollState)
+                                        .horizontalScroll(horizontalScrollState)
+                                        .padding(end = 12.dp, bottom = 12.dp)
+                                ) {
+                                    SelectionContainer {
+                                        Row(modifier = Modifier.fillMaxHeight()) {
+                                            Text(
+                                                text = lineNumbersText,
+                                                color = TextSecondary.copy(alpha = 0.4f),
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 12.5.sp,
+                                                lineHeight = 18.sp,
+                                                modifier = Modifier.padding(end = 16.dp),
+                                                fontWeight = FontWeight.Normal
+                                            )
 
-                                        Text(
-                                            text = content,
-                                            color = TextPrimary.copy(alpha = 0.85f),
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 12.5.sp,
-                                            lineHeight = 18.sp,
-                                            fontWeight = FontWeight.Normal
-                                        )
+                                            Text(
+                                                text = content,
+                                                color = TextPrimary.copy(alpha = 0.85f),
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 12.5.sp,
+                                                lineHeight = 18.sp,
+                                                fontWeight = FontWeight.Normal
+                                            )
+                                        }
                                     }
                                 }
+                                VerticalScrollbar(
+                                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(bottom = 12.dp).width(6.dp),
+                                    adapter = rememberScrollbarAdapter(verticalScrollState),
+                                    style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                )
+                                HorizontalScrollbar(
+                                    modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(end = 12.dp).height(6.dp),
+                                    adapter = rememberScrollbarAdapter(horizontalScrollState),
+                                    style = themedScrollbarStyle().copy(thickness = 6.dp)
+                                )
                             }
                         }
                     }
@@ -379,6 +501,207 @@ fun FileViewerDialog(
                     }
                 }
             }
+        }
+
+        // Styled Toast Overlay
+        AnimatedVisibility(
+            visible = toastMessage != null,
+            enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
+            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 24.dp)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(CardSurface)
+                    .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Notification",
+                        tint = AccentCyan,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = toastMessage ?: "",
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        lineHeight = 12.sp,
+                        modifier = Modifier.offset(y = 1.dp)
+                    )
+                }
+            }
+        }
+
+        // Preview Permission Modal
+        val pendingPath = pendingUrlClickPath
+        if (pendingPath != null) {
+            val canonicalStr = pendingPath.toString()
+            AlertDialog(
+                onDismissRequest = { pendingUrlClickPath = null },
+                title = {
+                    Text(
+                        text = "Permission Required",
+                        color = TextPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "This file lies outside your active session workspace. Do you want to preview it?",
+                            color = TextPrimary,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = canonicalStr,
+                            color = TextSecondary,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.clickable { dontAskAgainChecked = !dontAskAgainChecked }
+                        ) {
+                            Checkbox(
+                                checked = dontAskAgainChecked,
+                                onCheckedChange = { dontAskAgainChecked = it },
+                                colors = CheckboxDefaults.colors(checkedColor = AccentCyan, uncheckedColor = BorderColor)
+                            )
+                            Text(
+                                text = "Don't ask again",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                modifier = Modifier.offset(y = (-0.5).dp)
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val pathStr = pendingPath.toString()
+                            if (dontAskAgainChecked) {
+                                PermissionManager.setDecision(pathStr, PermissionManager.Action.PREVIEW, PermissionManager.Decision.ALLOW)
+                            }
+                            onUrlClick(pathStr)
+                            pendingUrlClickPath = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = ObsidianBg)
+                    ) {
+                        Text("Allow Preview", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            val pathStr = pendingPath.toString()
+                            if (dontAskAgainChecked) {
+                                PermissionManager.setDecision(pathStr, PermissionManager.Action.PREVIEW, PermissionManager.Decision.DENY)
+                            }
+                            pendingUrlClickPath = null
+                        }
+                    ) {
+                        Text("Block", color = Color(0xFFEF5350), fontSize = 12.sp)
+                    }
+                },
+                containerColor = SlateSurface,
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+
+        // External Open Permission Modal
+        if (pendingExternalOpen) {
+            AlertDialog(
+                onDismissRequest = { pendingExternalOpen = false },
+                title = {
+                    Text(
+                        text = "External Link Warning",
+                        color = TextPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "This file lies outside your active session workspace. Do you want to open it externally in your OS handler?",
+                            color = TextPrimary,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = filePath,
+                            color = TextSecondary,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.clickable { dontAskAgainChecked = !dontAskAgainChecked }
+                        ) {
+                            Checkbox(
+                                checked = dontAskAgainChecked,
+                                onCheckedChange = { dontAskAgainChecked = it },
+                                colors = CheckboxDefaults.colors(checkedColor = AccentCyan, uncheckedColor = BorderColor)
+                            )
+                            Text(
+                                text = "Don't ask again",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                modifier = Modifier.offset(y = (-0.5).dp)
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (dontAskAgainChecked) {
+                                PermissionManager.setDecision(filePath, PermissionManager.Action.EXTERNAL_OPEN, PermissionManager.Decision.ALLOW)
+                            }
+                            pendingExternalOpen = false
+                            try {
+                                val file = File(filePath)
+                                if (file.exists() && Desktop.isDesktopSupported()) {
+                                    Desktop.getDesktop().open(file)
+                                }
+                            } catch (_: Exception) {}
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = ObsidianBg)
+                    ) {
+                        Text("Open Externally", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            if (dontAskAgainChecked) {
+                                PermissionManager.setDecision(filePath, PermissionManager.Action.EXTERNAL_OPEN, PermissionManager.Decision.DENY)
+                            }
+                            pendingExternalOpen = false
+                        }
+                    ) {
+                        Text("Block", color = Color(0xFFEF5350), fontSize = 12.sp)
+                    }
+                },
+                containerColor = SlateSurface,
+                shape = RoundedCornerShape(12.dp)
+            )
         }
     }
 }

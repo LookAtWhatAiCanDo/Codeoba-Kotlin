@@ -1068,13 +1068,16 @@ fun DetailPane(
                         
                         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                             if (selectedTab == 0) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .verticalScroll(rememberScrollState())
-                                        .padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 24.dp),
-                                    verticalArrangement = Arrangement.spacedBy(24.dp)
-                                ) {
+                                val scrollState = rememberScrollState()
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .dragToScroll(scrollState)
+                                            .verticalScroll(scrollState)
+                                            .padding(start = 24.dp, top = 16.dp, end = 36.dp, bottom = 24.dp),
+                                        verticalArrangement = Arrangement.spacedBy(24.dp)
+                                    ) {
                                     if (searchResults.isEmpty()) {
                                         // Empty state (no data at all)
                                         Column(
@@ -1483,6 +1486,12 @@ fun DetailPane(
                                         }
                                     }
                                 }
+                                VerticalScrollbar(
+                                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(8.dp),
+                                    adapter = rememberScrollbarAdapter(scrollState),
+                                    style = themedScrollbarStyle()
+                                )
+                            }
                             } else {
                                 GroupsDashboard(
                                     groups = groups,
@@ -1547,6 +1556,7 @@ fun DetailPane(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier
                             .fillMaxSize()
+                            .dragToScroll(lazyListState)
                             .padding(end = 12.dp)
                     ) {
                         item(key = "header_card") {
@@ -2790,13 +2800,17 @@ fun GroupDetailsView(
         searchResults.filter { group.sessionIds.contains(it.session.id) }
     }
     
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
+    val scrollState = rememberScrollState()
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .dragToScroll(scrollState)
+                .verticalScroll(scrollState)
+                .padding(20.dp)
+                .padding(end = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
         // Row: Header and Actions
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -3337,5 +3351,11 @@ fun GroupDetailsView(
             }
         }
     }
+    VerticalScrollbar(
+        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(8.dp),
+        adapter = rememberScrollbarAdapter(scrollState),
+        style = themedScrollbarStyle()
+    )
+}
 }
 

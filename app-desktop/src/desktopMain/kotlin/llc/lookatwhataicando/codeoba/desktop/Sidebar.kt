@@ -44,6 +44,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
@@ -432,7 +433,10 @@ fun Sidebar(
                     val sourceScrollState = rememberScrollState()
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().horizontalScroll(sourceScrollState),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .dragToScroll(sourceScrollState, Orientation.Horizontal)
+                                .horizontalScroll(sourceScrollState),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             adapters.forEach { adapter ->
@@ -652,7 +656,10 @@ fun Sidebar(
             val sortScrollState = rememberScrollState()
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(sortScrollState),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .dragToScroll(sortScrollState, Orientation.Horizontal)
+                        .horizontalScroll(sortScrollState),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     availableDimensions.forEach { dimension ->
