@@ -175,11 +175,9 @@ import llc.lookatwhataicando.codeoba.core.source.DesktopClaudeSource
 import llc.lookatwhataicando.codeoba.core.source.DesktopCodexSource
 import llc.lookatwhataicando.codeoba.core.source.DesktopCursorSource
 import java.awt.Cursor
-import java.awt.Desktop
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
-import java.net.URI
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -199,19 +197,6 @@ class DynamicSemanticEmbedder(fallback: SemanticEmbedder) : SemanticEmbedder {
     }
 }
 
-internal fun openUrl(url: String) {
-    try {
-        if (Desktop.isDesktopSupported()) {
-            val desktop = Desktop.getDesktop()
-            if (desktop.isSupported(Desktop.Action.BROWSE)) {
-                desktop.browse(URI(url))
-            }
-        }
-    } catch (e: Exception) {
-        log("Failed to open URL $url: ${e.message}")
-    }
-}
-
 @Volatile
 var cacheOverride: Boolean? = null
 
@@ -222,6 +207,19 @@ fun main(args: Array<String>) {
     } else if (args.contains("--cache")) {
         cacheOverride = true
         log("Main: Caching enabled via command-line option --cache.")
+    }
+
+    if (args.contains("--update-ignore-throttling")) {
+        UpdateManager.ignoreUpdateThrottling = true
+        log("Main: Update throttling disabled via command-line option --update-ignore-throttling.")
+    }
+    if (args.contains("--update-force")) {
+        UpdateManager.forceUpdateAvailable = true
+        log("Main: Forced update check availability via command-line option --update-force.")
+    }
+    if (args.contains("--update-mock-notes")) {
+        UpdateManager.mockUpdateNotes = true
+        log("Main: Mock hostile changelog notes enabled via command-line option --update-mock-notes.")
     }
 
     System.setProperty("apple.awt.application.name", "Codeoba")
@@ -513,6 +511,8 @@ fun mainEntry() = application {
     var isSidebarCollapsed by remember { mutableStateOf(SettingsManager.getSidebarCollapsed() ?: false) }
     var sidebarWidth by remember { mutableStateOf((SettingsManager.getSidebarWidth() ?: 360f).dp) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    var latestReleaseForUpdate by remember { mutableStateOf<GitHubRelease?>(null) }
     var activeFileToView by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(sidebarWidth, isSidebarCollapsed) {
@@ -534,6 +534,39 @@ fun mainEntry() = application {
             }
         } catch (e: Exception) {
             log("Failed to register preferences handler: ${e.message}")
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (SettingsManager.getAutoUpdateEnabled()) {
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val lastCheck = SettingsManager.getLastUpdateCheck()
+                val now = System.currentTimeMillis()
+                val intervalMs = SettingsManager.getMinUpdateCheckIntervalSeconds().coerceAtLeast(0L).coerceAtMost(Long.MAX_VALUE / 1000L) * 1000L
+                val elapsed = now - lastCheck
+                
+                if (elapsed in 0 until intervalMs && !UpdateManager.ignoreUpdateThrottling) {
+                    log("Main Startup Update: Throttled (last check: ${Date(lastCheck)}, interval: ${intervalMs / 1000}s)")
+                    return@launch
+                }
+
+                log("Main Startup Update: Running update check...")
+                val release = UpdateManager.checkLatestRelease()
+                if (release != null) {
+                    SettingsManager.setLastUpdateCheck(System.currentTimeMillis())
+                    SettingsManager.setMinUpdateCheckIntervalSeconds(release.minAutoUpdateCheckIntervalSeconds.coerceIn(0L, Long.MAX_VALUE / 1000L))
+                    if (UpdateManager.isUpdateAvailable(release)) {
+                        val skipped = SettingsManager.getSkippedVersion()
+                        if (release.tagName != skipped) {
+                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                kotlinx.coroutines.delay(release.uiDelayMillis.coerceAtLeast(0L))
+                                latestReleaseForUpdate = release
+                                showUpdateDialog = true
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -994,31 +1027,18 @@ fun mainEntry() = application {
                                 onGroupDelete = { groupName -> GroupManager.deleteGroup(groupName).also { if (activeGroupFilter == groupName) activeGroupFilter = null; groupsState = GroupManager.getGroups() } },
                                 onToggleGroupPin = { name, pinned -> GroupManager.setGroupPinned(name, pinned); groupsState = GroupManager.getGroups() },
                             onUrlClick = { url ->
-                                if (url.startsWith("http://") || url.startsWith("https://")) {
-                                    openUrl(url)
-                                } else {
+                                val trimmed = url.trim()
+                                if (isWebUrl(trimmed)) {
+                                    openUrl(trimmed)
+                                } else if (isSafeLocalFileLink(trimmed)) {
                                     try {
-                                        var decodedPath = java.net.URLDecoder.decode(url, "UTF-8")
-                                        decodedPath = decodedPath.substringBefore('#').substringBefore('?')
-                                        if (decodedPath.startsWith("file:///")) {
-                                            decodedPath = "/" + decodedPath.removePrefix("file:///").removePrefix("file:/")
-                                        } else if (decodedPath.startsWith("file://")) {
-                                            decodedPath = decodedPath.removePrefix("file://")
-                                        } else if (decodedPath.startsWith("file:/")) {
-                                            decodedPath = "/" + decodedPath.removePrefix("file:/")
-                                        }
-                                        while (decodedPath.contains("//")) {
-                                            decodedPath = decodedPath.replace("//", "/")
-                                        }
-                                        val isWindows = PlatformUtils.isWindows()
-                                        if (isWindows && decodedPath.startsWith("/") && decodedPath.length > 2 && decodedPath[2] == ':') {
-                                            decodedPath = decodedPath.substring(1)
-                                        }
-                                        activeFileToView = decodedPath
+                                        activeFileToView = parseLocalFilePath(trimmed)
                                     } catch (e: Exception) {
                                         log("Failed to parse file URL $url: ${e.message}")
                                         activeFileToView = url
                                     }
+                                } else {
+                                    log("onUrlClick: Blocked unsafe local file link: $url")
                                 }
                             },
                             modifier = Modifier.weight(1f)
@@ -1053,6 +1073,19 @@ fun mainEntry() = application {
                         },
                         onSettingsChanged = {
                             refreshTrigger++
+                        },
+                        onUpdateAvailable = { release ->
+                            latestReleaseForUpdate = release
+                            showUpdateDialog = true
+                        }
+                    )
+                }
+                if (showUpdateDialog && latestReleaseForUpdate != null) {
+                    UpdateDialog(
+                        latestRelease = latestReleaseForUpdate!!,
+                        onClose = {
+                            showUpdateDialog = false
+                            latestReleaseForUpdate = null
                         }
                     )
                 }
@@ -1061,31 +1094,18 @@ fun mainEntry() = application {
                         filePath = activeFileToView!!,
                         onClose = { activeFileToView = null },
                         onUrlClick = { url ->
-                            if (url.startsWith("http://") || url.startsWith("https://")) {
-                                openUrl(url)
-                            } else {
+                            val trimmed = url.trim()
+                            if (isWebUrl(trimmed)) {
+                                openUrl(trimmed)
+                            } else if (isSafeLocalFileLink(trimmed)) {
                                 try {
-                                    var decodedPath = java.net.URLDecoder.decode(url, "UTF-8")
-                                    decodedPath = decodedPath.substringBefore('#').substringBefore('?')
-                                    if (decodedPath.startsWith("file:///")) {
-                                        decodedPath = "/" + decodedPath.removePrefix("file:///").removePrefix("file:/")
-                                    } else if (decodedPath.startsWith("file://")) {
-                                        decodedPath = decodedPath.removePrefix("file://")
-                                    } else if (decodedPath.startsWith("file:/")) {
-                                        decodedPath = "/" + decodedPath.removePrefix("file:/")
-                                    }
-                                    while (decodedPath.contains("//")) {
-                                        decodedPath = decodedPath.replace("//", "/")
-                                    }
-                                    val isWindows = PlatformUtils.isWindows()
-                                    if (isWindows && decodedPath.startsWith("/") && decodedPath.length > 2 && decodedPath[2] == ':') {
-                                        decodedPath = decodedPath.substring(1)
-                                    }
-                                    activeFileToView = decodedPath
+                                    activeFileToView = parseLocalFilePath(trimmed)
                                 } catch (e: Exception) {
                                     log("Failed to parse file URL $url: ${e.message}")
                                     activeFileToView = url
                                 }
+                            } else {
+                                log("onUrlClick: Blocked unsafe local file link: $url")
                             }
                         }
                     )

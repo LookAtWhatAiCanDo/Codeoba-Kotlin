@@ -203,6 +203,48 @@ object SettingsManager {
 
     fun getCustomAccent2(): Int = prefs.getInt("custom_accent2", 0xFFAB47BC.toInt())
     fun setCustomAccent2(value: Int) = prefs.putInt("custom_accent2", value)
+
+    fun getAutoUpdateEnabled(): Boolean {
+        return prefs.getBoolean("auto_update_enabled", true)
+    }
+
+    fun setAutoUpdateEnabled(value: Boolean) {
+        prefs.putBoolean("auto_update_enabled", value)
+    }
+
+    fun getSkippedVersion(): String {
+        return prefs.get("skipped_version", "")
+    }
+
+    fun setSkippedVersion(value: String) {
+        prefs.put("skipped_version", value)
+    }
+
+    fun getLastUpdateCheck(): Long {
+        return prefs.getLong("last_update_check", 0L)
+    }
+
+    fun setLastUpdateCheck(value: Long) {
+        prefs.putLong("last_update_check", value)
+    }
+
+    fun getInstallGuid(): String {
+        val guid = prefs.get("install_guid", "")
+        if (guid.isEmpty()) {
+            val newGuid = java.util.UUID.randomUUID().toString()
+            prefs.put("install_guid", newGuid)
+            return newGuid
+        }
+        return guid
+    }
+
+    fun getMinUpdateCheckIntervalSeconds(): Long {
+        return prefs.getLong("min_update_check_interval_seconds", UpdateManager.DEFAULT_MIN_UPDATE_CHECK_INTERVAL_SECONDS)
+    }
+
+    fun setMinUpdateCheckIntervalSeconds(value: Long) {
+        prefs.putLong("min_update_check_interval_seconds", value.coerceAtLeast(0L))
+    }
 }
 
 fun SourceAdapter.isEffectiveEnabled(): Boolean {

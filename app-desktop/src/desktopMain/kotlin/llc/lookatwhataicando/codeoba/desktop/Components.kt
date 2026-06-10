@@ -324,7 +324,10 @@ fun WarningOverlay(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.7f))
-            .clickable(enabled = false) {}, // Scrim that consumes clicks
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null
+            ) { /* consume clicks */ },
         contentAlignment = Alignment.Center
     ) {
         Card(

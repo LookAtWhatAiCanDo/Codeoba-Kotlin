@@ -1,7 +1,26 @@
 plugins {
     kotlin("multiplatform")
+    kotlin("plugin.serialization")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+val defaultVersion = "1.0.0"
+val appVersion = project.findProperty("appVersion")?.toString() ?: defaultVersion
+
+val generateVersionResource by tasks.registering {
+    val outputDir = layout.buildDirectory.dir("generated/resources/version")
+    inputs.property("appVersion", appVersion)
+    outputs.dir(outputDir)
+    doLast {
+        val file = outputDir.get().file("version.txt").asFile
+        file.parentFile.mkdirs()
+        file.writeText(appVersion)
+    }
+}
+
+tasks.withType<org.gradle.language.jvm.tasks.ProcessResources>().configureEach {
+    dependsOn(generateVersionResource)
 }
 
 kotlin {
@@ -11,8 +30,10 @@ kotlin {
 
     sourceSets {
         val desktopMain by getting {
+            resources.srcDir(generateVersionResource.map { it.outputs.files.singleFile })
             dependencies {
                 implementation(project(":core"))
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation(compose.desktop.currentOs)
                 implementation(compose.runtime)
                 implementation(compose.foundation)
@@ -36,7 +57,7 @@ compose {
                     org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb
                 )
                 packageName = "Codeoba"
-                packageVersion = project.findProperty("appVersion")?.toString() ?: "1.0.0"
+                packageVersion = appVersion.trim().substringBefore('-').substringBefore('+').lowercase().removePrefix("v").ifBlank { defaultVersion }
                 vendor = "LookAtWhatAiCanDo"
                 includeAllModules = true
                 macOS {

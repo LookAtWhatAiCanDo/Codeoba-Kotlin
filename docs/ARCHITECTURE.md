@@ -19,7 +19,7 @@ graph TD
 
 ### 2. `:app-desktop`
 Jetpack Compose presentation layer split into:
-- `Main.kt` (State coordinator), `Sidebar.kt` (Search filter lists), `DetailPane.kt` (Thread viewer), `Components.kt` (Overlay dialogs), `FormatUtils.kt` (Formatting & Clipboard), `MarkdownParser.kt` (Highlighting), `SettingsDialog.kt` (Preferences UI), and `StatsComponents.kt` (Metrics charts).
+- `Main.kt` (State coordinator), `Sidebar.kt` (Search filter lists), `DetailPane.kt` (Thread viewer), `Components.kt` (Overlay dialogs), `FormatUtils.kt` (Formatting & Clipboard), `MarkdownParser.kt` (Highlighting), `SettingsDialog.kt` (Preferences UI), `StatsComponents.kt` (Metrics charts), `UpdateManager.kt` (Update manager), and `UpdateDialog.kt` (Update prompt UI).
 
 ---
 
@@ -101,3 +101,4 @@ Persisted via `java.util.prefs.Preferences`:
 - **States**: `Monitor` (scan even if not installed), `Ignore` (skip folder), `Default` (prompt on orphaned logs).
 - **Settings UI**: Two-pane dialog in `:app-desktop` for settings toggles and recursive path purges.
 - **Search Filters**: Restores the last selected "Filter by Source" and "Filter by Status" states on application launch.
+- **Auto-Updates**: Configures automatic startup update checks (enabled/disabled) and stores user-skipped version tags, providing manual check hooks and native platform installer deployment.
