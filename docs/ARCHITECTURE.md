@@ -101,4 +101,4 @@ Persisted via `java.util.prefs.Preferences`:
 - **States**: `Monitor` (scan even if not installed), `Ignore` (skip folder), `Default` (prompt on orphaned logs).
 - **Settings UI**: Two-pane dialog in `:app-desktop` for settings toggles and recursive path purges.
 - **Search Filters**: Restores the last selected "Filter by Source" and "Filter by Status" states on application launch.
-- **Auto-Updates**: Configures automatic startup updates checks (enabled/disabled) and stores user-skipped version tags, providing manual check hooks and native platform installer deployment.
+- **Auto-Updates**: Configures automatic startup update checks (enabled/disabled) and stores user-skipped version tags, providing manual check hooks and native platform installer deployment.
