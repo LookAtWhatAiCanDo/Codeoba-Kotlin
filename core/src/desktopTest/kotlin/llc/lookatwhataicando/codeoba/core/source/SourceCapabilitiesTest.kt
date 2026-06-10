@@ -145,4 +145,18 @@ class SourceCapabilitiesTest {
         assertTrue(source.deleteDataPaths())
         assertFalse(brainDir.exists())
     }
+
+    @Test
+    fun testCopilotSourceAppInstalledAndCleanup() = withMockUserHome { home ->
+        val source = DesktopCopilotSource()
+        assertEquals(listOf(File(home, ".copilot/session-state").absolutePath), source.getDataPathsToDelete())
+
+        val brainDir = File(home, ".copilot/session-state")
+        brainDir.mkdirs()
+
+        assertTrue(source.isAvailable())
+
+        assertTrue(source.deleteDataPaths())
+        assertFalse(brainDir.exists())
+    }
 }

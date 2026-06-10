@@ -23,24 +23,28 @@ Run in monorepo root:
 
 ## 🔌 Adding a Log Source Adapter
 
-1. **Implement `SourceAdapter`**: Create a parser class under `core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/`.
-2. **Register**: Add it to `SourceRegistry` in `Main.kt`.
-3. **Configure UI**: Add styling, badges, and name conversion in [FormatUtils.kt](../app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/FormatUtils.kt).
-4. **Test**: Write parser and watch verification tests in `core/src/desktopTest/.../SourceParsersTest.kt`.
+For a detailed step-by-step walkthrough, refer to the [Adding a New Source Adapter Guide](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/docs/ADD_NEW_SOURCE.md).
+1. **Implement `SourceAdapter`**: Create a parser class under `core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/` subclassing `DesktopSourceAdapter`.
+2. **Register**: Add it to the main sources list and register it in `SourceRegistry` in `Main.kt`.
+3. **Configure UI mapping**: Add custom brand accent colors, formatted name mapping, and the product URL in [FormatUtils.kt](../app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/FormatUtils.kt).
+4. **Test**: Add tests in `core/src/desktopTest/.../SourceCapabilitiesTest.kt` and `SourceParsersTest.kt`.
 
 ---
 
 ## 🎨 Customizing Theme & UI
 
 Views reside in `:app-desktop` desktop main:
-- `Main.kt`: Root windows and layout bounds.
-- `Sidebar.kt`: List filters and search inputs.
-- `DetailPane.kt`: Message scroll panels and toolbar.
-- `Components.kt`: Shared layouts and custom dialog overlays.
+- `Main.kt`: Main window state coordinates, breadcrumbs toolbar, detail header card, and overlay dialogs.
+- `Sidebar.kt`: Log lists, sorting filters, status chips, search query input, and context menus.
+- `DetailPane.kt`: Rendered message panels, expandable tool work blocks, and file viewer overlays.
+- `Components.kt`: Drag-to-scroll wrappers, scrollbar templates, and orphaned alert indicators.
 
-### Theme Palette (Obsidian-Dark):
-- Background: `ObsidianBg` (`#0A0E17`) | Surface: `SlateSurface` (`#161F30`) | Cards: `CardSurface` (`#1E293B`)
-- Border: `BorderColor` (`#2C3B54`) | Accents: `AccentCyan` (`#00E5FF`) & `AccentPurple` (`#D500F9`)
+### Dynamic Theme System:
+Theme parameters are resolved dynamically based on the user's active settings selection. The 8 premium theme color definitions (Obsidian, Nordic Frost, Emerald Forest, Dracula, Dracula, Cyberpunk Neon, etc.) reside in `Theme.kt`. Standard color properties include:
+- `ObsidianBg` (Background) | `SlateSurface` (Surface panels) | `CardSurface` (Cards/Items)
+- `BorderColor` (Borders/Dividers) | `AccentCyan` (Primary Accents/Pins) | `AccentPurple` (Secondary Accents/Tags)
+- `TextPrimary` (Primary labels) | `TextSecondary` (Sub-text descriptions)
+
 
 ### UI Rule:
 - **Mixed-Case Casing:** Actor labels must be formatted as "User" and "Assistant" (never uppercase-only like "USER" or "ASSISTANT").

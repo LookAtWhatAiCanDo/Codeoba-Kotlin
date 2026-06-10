@@ -749,4 +749,55 @@ class SourceParsersTest {
             println("Target file does not exist at $targetPath")
         }
     }
+
+    @Test
+    fun testCopilotSourceParsing() = runBlocking {
+        val tempDir = java.nio.file.Files.createTempDirectory("copilot_test_").toFile()
+        tempDir.deleteOnExit()
+
+        val workspaceYaml = File(tempDir, "workspace.yaml")
+        workspaceYaml.writeText(
+            """
+            id: copilot-session-123
+            name: Code review audit
+            cwd: /path/to/project
+            branch: main
+            repository: LookAtWhatAiCanDo/Codeoba
+            created_at: 2026-06-10T14:10:14.691Z
+            updated_at: 2026-06-10T21:10:21.486Z
+            """.trimIndent()
+        )
+
+        val eventsJsonl = File(tempDir, "events.jsonl")
+        eventsJsonl.writeText(
+            """
+            {"type":"user.message","timestamp":"2026-06-10T21:10:16.036Z","data":{"content":"review and audit this code"}}
+            {"type":"tool.execution_start","timestamp":"2026-06-10T21:10:21.480Z","data":{"toolCallId":"call_1","toolName":"run_command","arguments":{"CommandLine":"ls -la"}}}
+            {"type":"tool.execution_complete","timestamp":"2026-06-10T21:10:21.483Z","data":{"toolCallId":"call_1","success":true,"result":{"content":"Intent logged","detailedContent":"Reviewing codebase"}}}
+            {"type":"assistant.message","timestamp":"2026-06-10T21:10:21.479Z","data":{"content":"Reviewing the current diff now...","reasoningText":"Let me start by checking files.","model":"gpt-4o"}}
+            """.trimIndent()
+        )
+
+        val source = DesktopCopilotSource()
+        val session = source.parseSession(eventsJsonl.absolutePath)
+
+        assertNotNull(session)
+        assertEquals("copilot-session-123", session.id)
+        assertEquals("/path/to/project", session.cwd)
+        assertEquals("Code review audit", session.threadName)
+        assertEquals(1, session.turns.size)
+        assertEquals("review and audit this code", session.turns[0].userMessage)
+        
+        val assistantText = session.turns[0].assistantMessage
+        kotlin.test.assertTrue(assistantText.contains("> [!NOTE]"))
+        kotlin.test.assertTrue(assistantText.contains("**Reasoning:**"))
+        kotlin.test.assertTrue(assistantText.contains("Let me start by checking files."))
+        kotlin.test.assertTrue(assistantText.contains("Reviewing the current diff now..."))
+        kotlin.test.assertTrue(assistantText.contains("[[[TOOL:RUN_COMMAND|⚡ Run Command: ls -la"))
+        kotlin.test.assertTrue(assistantText.contains("Reviewing codebase"))
+        
+        assertEquals("gpt-4o", session.turns[0].extraData["model"])
+        tempDir.deleteRecursively()
+        Unit
+    }
 }

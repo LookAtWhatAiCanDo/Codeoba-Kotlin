@@ -1,6 +1,6 @@
 # Codeoba Agent Instructions
 
-Welcome! You are an AI coding assistant working on **Codeoba**—a platform-agnostic, zero-external-dependency, 100% local search application that indexes, monitors, and searches conversation transcripts across Claude Code, Google Antigravity, Cursor, OpenAI Codex, and Aider.
+Welcome! You are an AI coding assistant working on **Codeoba**—a platform-agnostic, zero-external-dependency, 100% local search application that indexes, monitors, and searches conversation transcripts across Claude Code, Google Antigravity, Cursor, OpenAI Codex, Aider, and GitHub Copilot.
 
 This file acts as the primary repository context and instructions guide. Read this first to align with the codebase.
 
@@ -89,7 +89,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
    - For Google Antigravity, parse the archived status from the companion state annotation files (`~/.gemini/antigravity/annotations/<sessionId>.pbtxt`) by checking if they contain `"archived:true"`. Enable real-time updates by adding `.pbtxt` files to the watcher filter.
    - For OpenAI Codex, detect archived status by verifying if the parent directory name of the session `.jsonl` file is `"archived_sessions"`.
 7. **Exhaustive Settings & Dynamic Sidebar Filtering**:
-    - The settings dialog shows an exhaustive list of all supported source adapters, regardless of whether they are active or ignored, so the user can easily re-enable them.
+    - The settings dialog shows an exhaustive list of all supported source adapters, regardless of whether they are active or ignored, so the user can easily re-enable them. The sources list is sorted alphabetically by their display name, but bisected into two groups: installed adapters are displayed at the top, followed by uninstalled/not-detected adapters at the bottom.
     - A modern toggle switch allows enabling or disabling a source provider by moving its state to `IGNORE` or `MONITOR`/`UNDECIDED`. When disabled, its configuration segments are hidden.
     - The sidebar displays filters for all active (non-ignored) sources, regardless of whether they have any sessions in the index database. Selecting an enabled source with zero sessions displays an empty list, allowing natural discoverability.
     - Added direct product page URLs to settings so users can quickly visit the respective agent products.
@@ -127,7 +127,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Cache features can be toggled in the General settings panel in the UI or overridden using command line arguments (`--cache` / `--no-cache`).
 16. **Desktop Source Adapter Consolidation**:
     - Centralizes common parsing caching logic, directory checking (`getBaseDir()`), availability/installation checks (`isAvailable()`, `isExecutableInstalled(binaryName)`), and session data cleanup (`deleteDataPaths()`, `getDataPathsToDelete()`) into the shared base class `./core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/DesktopSourceAdapter.kt`.
-    - File-based sources (Claude, Codex, Antigravity, Aider) implement `parseSessionContent(File)` and benefit from automated file metadata check/cache write on miss.
+    - File-based sources (Claude, Codex, Antigravity, Aider, Copilot) implement `parseSessionContent(File)` and benefit from automated file metadata check/cache write on miss.
     - Database-based sources (Cursor) override `parseSession(String)` directly to bypass file-based caching and implement custom SQLite row hashing.
 17. **Conversations Sidebar List Sorting**:
     - The left-side conversations sidebar displays a "Sort by" section with interactive horizontal chips: Relevance (only when a search query is active), Updated, Tokens, Speed, Turns, and Duration.

@@ -183,6 +183,7 @@ import llc.lookatwhataicando.codeoba.core.source.DesktopAntigravitySource
 import llc.lookatwhataicando.codeoba.core.source.DesktopClaudeSource
 import llc.lookatwhataicando.codeoba.core.source.DesktopCodexSource
 import llc.lookatwhataicando.codeoba.core.source.DesktopCursorSource
+import llc.lookatwhataicando.codeoba.core.source.DesktopCopilotSource
 import java.awt.Cursor
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
@@ -238,7 +239,8 @@ fun main(args: Array<String>) {
         llc.lookatwhataicando.codeoba.core.source.DesktopAntigravitySource(),
         llc.lookatwhataicando.codeoba.core.source.DesktopCursorSource(),
         llc.lookatwhataicando.codeoba.core.source.DesktopCodexSource(),
-        llc.lookatwhataicando.codeoba.core.source.DesktopAiderSource()
+        llc.lookatwhataicando.codeoba.core.source.DesktopAiderSource(),
+        llc.lookatwhataicando.codeoba.core.source.DesktopCopilotSource()
     )
     for (src in sources) {
         println("DIAG_MAIN: ${src.id} -> isEffectiveEnabled = ${src.isEffectiveEnabled()}, isAppInstalled = ${src.isAppInstalled()}, isAvailable = ${src.isAvailable()}, decision = ${SettingsManager.getUserDecision(src.id)}")
@@ -295,6 +297,7 @@ fun mainEntry() = application {
             register(DesktopCursorSource())
             register(DesktopCodexSource())
             register(DesktopAiderSource())
+            register(DesktopCopilotSource())
         }
     }
 

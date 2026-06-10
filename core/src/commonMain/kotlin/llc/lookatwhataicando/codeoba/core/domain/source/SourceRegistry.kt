@@ -13,8 +13,12 @@ class SourceRegistry {
     }
 
     fun getAllAdapters(): List<SourceAdapter> =
-        adapters
+        adapters.sortedWith(
+            compareByDescending<SourceAdapter> { it.isAppInstalled() }
+                .thenBy { it.displayName }
+        )
 
     fun getActiveAdapters(): List<SourceAdapter> =
         adapters.filter { it.isAvailable() && it.id !in ignoredSourceIds }
+            .sortedBy { it.displayName }
 }
