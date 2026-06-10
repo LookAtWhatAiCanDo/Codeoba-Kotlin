@@ -42,6 +42,7 @@ import kotlinx.coroutines.launch
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceRegistry
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -50,11 +51,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.VerticalScrollbar
 
-
 enum class SettingsCategory(val displayName: String) {
     General("General"),
     Sources("Sources"),
-    Semantic("Semantic")
+    Semantic("Semantic"),
+    Permissions("Permissions")
 }
 
 @Composable
@@ -581,7 +582,121 @@ fun SettingsDialog(
                                 )
                             }
                             }
+                            SettingsCategory.Permissions -> {
+                                var permissionsList by remember { mutableStateOf(PermissionManager.getAllDecisions()) }
+
+                                Text(
+                                    text = "Workspace Path Permissions",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = TextPrimary,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+
+                                if (permissionsList.isEmpty()) {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "No custom path permissions saved.",
+                                            color = TextSecondary,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                } else {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                                    ) {
+                                        permissionsList.forEach { entry ->
+                                            Card(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                                                colors = CardDefaults.cardColors(containerColor = CardSurface),
+                                                shape = RoundedCornerShape(12.dp)
+                                            ) {
+                                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Text(
+                                                            text = entry.path,
+                                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace),
+                                                            color = TextPrimary,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                            Text(
+                                                                text = "Preview: ${entry.previewDecision}",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                color = if (entry.previewDecision == PermissionManager.Decision.ALLOW) AccentCyan else TextSecondary
+                                                            )
+                                                            Text(
+                                                                text = "External Open: ${entry.externalDecision}",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                color = if (entry.externalDecision == PermissionManager.Decision.ALLOW) AccentCyan else TextSecondary
+                                                            )
+                                                        }
+                                                    }
+
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+                                                    ) {
+                                                        if (entry.previewDecision != PermissionManager.Decision.ASK) {
+                                                            Button(
+                                                                onClick = {
+                                                                    PermissionManager.removeActionDecision(entry.path, PermissionManager.Action.PREVIEW)
+                                                                    permissionsList = PermissionManager.getAllDecisions()
+                                                                    onSettingsChanged()
+                                                                },
+                                                                colors = ButtonDefaults.buttonColors(containerColor = SlateSurface, contentColor = TextPrimary),
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                modifier = Modifier.height(28.dp),
+                                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                                            ) {
+                                                                Text("Reset Preview", style = MaterialTheme.typography.labelSmall)
+                                                            }
+                                                        }
+
+                                                        if (entry.externalDecision != PermissionManager.Decision.ASK) {
+                                                            Button(
+                                                                onClick = {
+                                                                    PermissionManager.removeActionDecision(entry.path, PermissionManager.Action.EXTERNAL_OPEN)
+                                                                    permissionsList = PermissionManager.getAllDecisions()
+                                                                    onSettingsChanged()
+                                                                },
+                                                                colors = ButtonDefaults.buttonColors(containerColor = SlateSurface, contentColor = TextPrimary),
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                modifier = Modifier.height(28.dp),
+                                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                                            ) {
+                                                                Text("Reset External", style = MaterialTheme.typography.labelSmall)
+                                                            }
+                                                        }
+
+                                                        Button(
+                                                            onClick = {
+                                                                PermissionManager.removeDecision(entry.path)
+                                                                permissionsList = PermissionManager.getAllDecisions()
+                                                                onSettingsChanged()
+                                                            },
+                                                            colors = ButtonDefaults.buttonColors(containerColor = SlateSurface, contentColor = Color(0xFFEF5350)),
+                                                            shape = RoundedCornerShape(6.dp),
+                                                            modifier = Modifier.height(28.dp),
+                                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                                        ) {
+                                                            Text("Clear All", style = MaterialTheme.typography.labelSmall)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
+                    }
                     }
                 }
 
@@ -694,7 +809,6 @@ fun SettingsDialog(
                         }
                     }
                 }
-            }
         }
     }
 }

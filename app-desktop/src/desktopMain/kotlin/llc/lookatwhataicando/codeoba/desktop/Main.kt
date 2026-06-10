@@ -90,6 +90,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -148,6 +149,14 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.awt.ComposeWindow
 import kotlinx.coroutines.launch
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
+import java.nio.file.Paths
+import java.nio.file.Path
+import llc.lookatwhataicando.codeoba.core.util.LocalFileResolver
+import llc.lookatwhataicando.codeoba.core.util.LocalFileResolution
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material.icons.filled.Check
 import llc.lookatwhataicando.codeoba.core.domain.model.Turn
 import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
 import llc.lookatwhataicando.codeoba.core.manager.GroupManager
@@ -514,6 +523,16 @@ fun mainEntry() = application {
     var showUpdateDialog by remember { mutableStateOf(false) }
     var latestReleaseForUpdate by remember { mutableStateOf<GitHubRelease?>(null) }
     var activeFileToView by remember { mutableStateOf<String?>(null) }
+    var pendingMainUrlClickPath by remember { mutableStateOf<Path?>(null) }
+    var mainDontAskAgainChecked by remember { mutableStateOf(false) }
+    var mainToastMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(mainToastMessage) {
+        if (mainToastMessage != null) {
+            kotlinx.coroutines.delay(3000)
+            mainToastMessage = null
+        }
+    }
 
     LaunchedEffect(sidebarWidth, isSidebarCollapsed) {
         // Debounce saving sidebar settings
@@ -1030,15 +1049,46 @@ fun mainEntry() = application {
                                 val trimmed = url.trim()
                                 if (isWebUrl(trimmed)) {
                                     openUrl(trimmed)
-                                } else if (isSafeLocalFileLink(trimmed)) {
-                                    try {
-                                        activeFileToView = parseLocalFilePath(trimmed)
-                                    } catch (e: Exception) {
-                                        log("Failed to parse file URL $url: ${e.message}")
-                                        activeFileToView = url
-                                    }
                                 } else {
-                                    log("onUrlClick: Blocked unsafe local file link: $url")
+                                    val session = selectedSession
+                                    if (session != null) {
+                                        val trustedRoot = try {
+                                            if (!session.cwd.isNullOrBlank()) Paths.get(session.cwd) else null
+                                        } catch (_: Exception) {
+                                            null
+                                        }
+                                        val baseDirectory = try {
+                                            if (!session.cwd.isNullOrBlank()) {
+                                                Paths.get(session.cwd)
+                                            } else {
+                                                val p = Paths.get(session.filePath)
+                                                if (session.filePath.startsWith("composerData:") || !p.isAbsolute) null else p.parent
+                                            }
+                                        } catch (_: Exception) {
+                                            null
+                                        }
+
+                                        when (val res = LocalFileResolver.resolveLocalFileLink(trimmed, baseDirectory, trustedRoot)) {
+                                            is LocalFileResolution.Allowed -> {
+                                                activeFileToView = res.path.toString()
+                                            }
+                                            is LocalFileResolution.ConfirmationRequired -> {
+                                                val pathStr = res.path.toString()
+                                                val decision = PermissionManager.getDecision(pathStr, PermissionManager.Action.PREVIEW)
+                                                if (decision == PermissionManager.Decision.ALLOW) {
+                                                    activeFileToView = pathStr
+                                                } else if (decision == PermissionManager.Decision.DENY) {
+                                                    mainToastMessage = "Access denied by user settings"
+                                                } else {
+                                                    pendingMainUrlClickPath = res.path
+                                                    mainDontAskAgainChecked = false
+                                                }
+                                            }
+                                            is LocalFileResolution.Rejected -> {
+                                                mainToastMessage = res.reason
+                                            }
+                                        }
+                                    }
                                 }
                             },
                             modifier = Modifier.weight(1f)
@@ -1092,22 +1142,135 @@ fun mainEntry() = application {
                 if (activeFileToView != null) {
                     FileViewerDialog(
                         filePath = activeFileToView!!,
+                        trustedRootPath = selectedSession?.cwd,
                         onClose = { activeFileToView = null },
                         onUrlClick = { url ->
                             val trimmed = url.trim()
                             if (isWebUrl(trimmed)) {
                                 openUrl(trimmed)
-                            } else if (isSafeLocalFileLink(trimmed)) {
-                                try {
-                                    activeFileToView = parseLocalFilePath(trimmed)
-                                } catch (e: Exception) {
-                                    log("Failed to parse file URL $url: ${e.message}")
-                                    activeFileToView = url
-                                }
                             } else {
-                                log("onUrlClick: Blocked unsafe local file link: $url")
+                                activeFileToView = trimmed
                             }
                         }
+                    )
+                }
+
+                // Styled Main Toast Overlay
+                AnimatedVisibility(
+                    visible = mainToastMessage != null,
+                    enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
+                    exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 24.dp)
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(CardSurface)
+                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Success",
+                                tint = AccentCyan,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = mainToastMessage ?: "",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                lineHeight = 12.sp,
+                                modifier = Modifier.offset(y = 1.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Main Preview Permission Modal
+                val pendingPath = pendingMainUrlClickPath
+                if (pendingPath != null) {
+                    val canonicalStr = pendingPath.toString()
+                    AlertDialog(
+                        onDismissRequest = { pendingMainUrlClickPath = null },
+                        title = {
+                            Text(
+                                text = "Permission Required",
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = "This file lies outside your active session workspace. Do you want to preview it?",
+                                    color = TextPrimary,
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    text = canonicalStr,
+                                    color = TextSecondary,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.clickable { mainDontAskAgainChecked = !mainDontAskAgainChecked }
+                                ) {
+                                    Checkbox(
+                                        checked = mainDontAskAgainChecked,
+                                        onCheckedChange = { mainDontAskAgainChecked = it },
+                                        colors = CheckboxDefaults.colors(checkedColor = AccentCyan, uncheckedColor = BorderColor)
+                                    )
+                                    Text(
+                                        text = "Don't ask again",
+                                        color = TextPrimary,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.offset(y = (-0.5).dp)
+                                    )
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    val pathStr = pendingPath.toString()
+                                    if (mainDontAskAgainChecked) {
+                                        PermissionManager.setDecision(pathStr, PermissionManager.Action.PREVIEW, PermissionManager.Decision.ALLOW)
+                                    }
+                                    activeFileToView = pathStr
+                                    pendingMainUrlClickPath = null
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentCyan, contentColor = ObsidianBg)
+                            ) {
+                                Text("Allow Preview", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = {
+                                    val pathStr = pendingPath.toString()
+                                    if (mainDontAskAgainChecked) {
+                                        PermissionManager.setDecision(pathStr, PermissionManager.Action.PREVIEW, PermissionManager.Decision.DENY)
+                                    }
+                                    pendingMainUrlClickPath = null
+                                }
+                            ) {
+                                Text("Block", color = Color(0xFFEF5350), fontSize = 12.sp)
+                            }
+                        },
+                        containerColor = SlateSurface,
+                        shape = RoundedCornerShape(12.dp)
                     )
                 }
 

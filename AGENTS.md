@@ -150,9 +150,12 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
 20. **Markdown Link Resolution & In-App File Viewer**:
     - Parses inline markdown links `[link text](url)` inside `MarkdownParser.kt` and formats them with an underline and standard premium accent color (`AccentCyan`) while adding a `"URL"` string annotation to the `AnnotatedString`.
     - Handles pointer hover icon swaps and tap gestures inside a custom `ClickableMarkdownText` composable, ensuring click bounds match the exact character bounds to avoid false positive clicks on blank line ends.
-    - Resolves external URLs to the system browser and local `file://` URLs to an in-app overlay previewer `FileViewerDialog`.
-    - `FileViewerDialog` renders markdown files (`.md`) recursively using the app's rich `MarkdownView`, and other source code files as scrollable monospace text with line numbers.
-    - Provides a fallback button in the file preview dialog to launch the file in the default OS handler.
+    - Resolves local file references and URIs securely via the centralized utility `LocalFileResolver.resolveLocalFileLink` in the `:core` module.
+    - **Security & Path Traversal Controls**: Implements strict boundary checking. Only the session workspace directory (`session.cwd`) is implicitly trusted (`Allowed`). Files outside this workspace, or directories/scripts, trigger a `ConfirmationRequired` state.
+    - **Action-Specific Permission Store**: Consent choices (`ALLOW` / `DENY`) are persisted in Java Preferences under the child node `file_permissions` via `PermissionManager` and are split by action scopes (`PREVIEW` vs. `EXTERNAL_OPEN`) associated with the MD5 hash and canonical path of the target file to prevent hash collisions. Users can review and revoke these rules in a dedicated "Permissions" category in the settings panel.
+    - **Bounded File Reading**: Restricts file reader allocation by loading a maximum of 5MB + 1 byte using `readNBytes()` to prevent memory exhaustion.
+    - Renders markdown files (`.md`) recursively using the app's rich `MarkdownView`, and other source code files as scrollable monospace text with line numbers.
+    - Provides a fallback button in the file preview dialog to launch the file in the default OS handler after validating external opening permissions.
 
 21. **Sidebar Session Item Tag Display**:
     - Each conversation item in the sidebar list view (`Sidebar.kt`) displays its assigned tags/groups using a `FlowRow` of badges styled in `AccentPurple` (12% alpha background, 40% alpha border, 4.dp rounded corners) positioned below the last message snippet.
