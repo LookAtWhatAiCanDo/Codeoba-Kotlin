@@ -5,7 +5,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val defaultVersion = "1.0.0"
+val defaultVersion = "0.1.0"
 val appVersion = project.findProperty("appVersion")?.toString() ?: defaultVersion
 
 val generateVersionResource by tasks.registering {
@@ -57,7 +57,15 @@ compose {
                     org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb
                 )
                 packageName = "Codeoba"
-                packageVersion = appVersion.trim().substringBefore('-').substringBefore('+').lowercase().removePrefix("v").ifBlank { defaultVersion }
+                val cleanPackageVersion = appVersion.trim().substringBefore('-').substringBefore('+').lowercase().removePrefix("v").ifBlank { defaultVersion }
+                val versionParts = cleanPackageVersion.split('.')
+                val major = versionParts.getOrNull(0)?.toIntOrNull() ?: 0
+                packageVersion = if (major == 0) {
+                    val rest = versionParts.drop(1).joinToString(".")
+                    if (rest.isEmpty()) "1.0.0" else "1.$rest"
+                } else {
+                    cleanPackageVersion
+                }
                 vendor = "LookAtWhatAiCanDo"
                 includeAllModules = true
                 macOS {

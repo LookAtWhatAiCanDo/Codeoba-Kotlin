@@ -45,7 +45,7 @@ object UpdateManager {
     @Volatile var mockUpdateNotes = false
     @Volatile var lastCheckError: String? = null
 
-    const val DEFAULT_VERSION = "1.0.0"
+    const val DEFAULT_VERSION = "0.1.0"
 
     val currentVersion: String by lazy {
         UpdateManager::class.java.getResourceAsStream("/version.txt")
