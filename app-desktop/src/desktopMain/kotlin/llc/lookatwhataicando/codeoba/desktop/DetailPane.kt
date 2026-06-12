@@ -54,17 +54,13 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -75,8 +71,6 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
@@ -100,10 +94,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -183,12 +176,7 @@ fun DetailPaneToolbar(
     var showGroupsSubmenu by remember { mutableStateOf(false) }
 
     val workspaceName = remember(session?.cwd) {
-        val cwd = session?.cwd
-        if (cwd != null) {
-            cwd.trimEnd('/').substringAfterLast('/')
-        } else {
-            "Codeoba"
-        }
+        session?.cwd?.trimEnd('/')?.substringAfterLast('/') ?: "Codeoba"
     }
 
     CompositionLocalProvider(
@@ -1086,7 +1074,7 @@ fun DetailPane(
         Column(modifier = Modifier.fillMaxSize()) {
             // Find Bar
             if (session != null && showFindBar) {
-                // If find bar is visible, we shift it down so it is not covered by the toolbar
+                // If the find bar is visible, we shift it down so it is not covered by the toolbar
                 Spacer(modifier = Modifier.height(80.dp))
                 FindBar(
                     queryValue = queryValue,
@@ -1112,13 +1100,13 @@ fun DetailPane(
                     Column(modifier = Modifier.fillMaxSize()) {
                         Spacer(modifier = Modifier.height(72.dp))
                         
-                        TabRow(
+                        SecondaryTabRow(
                             selectedTabIndex = selectedTab,
                             containerColor = SlateSurface,
                             contentColor = AccentCyan,
-                            indicator = { tabPositions ->
-                                TabRowDefaults.Indicator(
-                                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                            indicator = {
+                                TabRowDefaults.SecondaryIndicator(
+                                    modifier = Modifier.tabIndicatorOffset(selectedTab),
                                     color = AccentCyan
                                 )
                             },
@@ -2633,7 +2621,7 @@ fun ClickableMarkdownText(
                                             val rightBound = layout.getBoundingBox(linkEnd).right
                                             val topBound = layout.getLineTop(lineIndex)
                                             val bottomBound = layout.getLineBottom(lineIndex)
-                                            isHoveringLink = position.x >= leftBound && position.x <= rightBound &&
+                                            isHoveringLink = position.x in leftBound..rightBound &&
                                                              position.y >= topBound && position.y <= bottomBound
                                         } else {
                                             isHoveringLink = false
@@ -2661,7 +2649,7 @@ fun ClickableMarkdownText(
                                     val rightBound = layout.getBoundingBox(linkEnd).right
                                     val topBound = layout.getLineTop(lineIndex)
                                     val bottomBound = layout.getLineBottom(lineIndex)
-                                    if (offset.x >= leftBound && offset.x <= rightBound &&
+                                    if (offset.x in leftBound..rightBound &&
                                         offset.y >= topBound && offset.y <= bottomBound) {
                                         onUrlClick(annotation.item)
                                     }

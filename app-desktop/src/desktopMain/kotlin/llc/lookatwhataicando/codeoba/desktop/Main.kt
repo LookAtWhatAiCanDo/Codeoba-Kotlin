@@ -59,7 +59,8 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -647,7 +648,18 @@ fun mainEntry() = application {
         },
         title = "Codeoba — Unified Agent Session Search",
         state = windowState,
-        icon = painterResource("icon.png"),
+        icon = remember {
+            try {
+                val bytes = Thread.currentThread().contextClassLoader.getResourceAsStream("icon.png")?.readBytes()
+                if (bytes != null) {
+                    BitmapPainter(org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap())
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                null
+            }
+        },
         onKeyEvent = { keyEvent ->
             if (keyEvent.type == KeyEventType.KeyDown &&
                 keyEvent.key == Key.F &&

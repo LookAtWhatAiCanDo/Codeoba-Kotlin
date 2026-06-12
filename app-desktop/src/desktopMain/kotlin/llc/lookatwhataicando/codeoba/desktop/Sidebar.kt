@@ -881,7 +881,7 @@ fun Sidebar(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 LinearProgressIndicator(
-                                    progress = modelDownloadProgress,
+                                    progress = { modelDownloadProgress },
                                     color = AccentCyan,
                                     trackColor = SlateSurface,
                                     modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))

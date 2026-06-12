@@ -9,7 +9,7 @@ kotlinx-serialization = "1.6.3"
 ktor = "2.3.12"
 onnxruntime = "1.18.0"
 sqlite-jdbc = "3.45.3.0"
-slf4j = "1.7.36"
+slf4j = "2.0.7"
 
 [libraries]
 compose-components-resources = { group = "org.jetbrains.compose.components", name = "components-resources", version.ref = "compose" }
