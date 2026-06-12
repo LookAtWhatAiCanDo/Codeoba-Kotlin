@@ -2,7 +2,6 @@ package llc.lookatwhataicando.codeoba.core.util
 
 import kotlin.test.Test
 import kotlin.test.assertTrue
-import kotlin.test.assertFalse
 
 class PlatformUtilsTest {
 

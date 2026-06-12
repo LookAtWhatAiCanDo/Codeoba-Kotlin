@@ -1,11 +1,11 @@
 package llc.lookatwhataicando.codeoba.core.domain.search
 
-import llc.lookatwhataicando.codeoba.core.domain.model.Session
-import kotlin.math.sqrt
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import llc.lookatwhataicando.codeoba.core.domain.model.Session
+import kotlin.math.sqrt
 
 class SemanticSearchEngine(
     private val embedder: SemanticEmbedder,

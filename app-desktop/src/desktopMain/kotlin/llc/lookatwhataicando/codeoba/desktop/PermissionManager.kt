@@ -1,7 +1,7 @@
 package llc.lookatwhataicando.codeoba.desktop
 
-import java.util.prefs.Preferences
 import java.security.MessageDigest
+import java.util.prefs.Preferences
 
 object PermissionManager {
     private val prefs: Preferences = Preferences.userNodeForPackage(SettingsManager::class.java).node("file_permissions")

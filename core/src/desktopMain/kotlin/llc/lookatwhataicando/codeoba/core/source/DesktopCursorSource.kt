@@ -8,12 +8,11 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import llc.lookatwhataicando.codeoba.core.domain.model.Turn
-import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
+import llc.lookatwhataicando.codeoba.core.manager.SessionCacheManager
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
+import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
 import java.io.File
 import java.sql.DriverManager
-import llc.lookatwhataicando.codeoba.core.manager.SessionCacheManager
-import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
 
 class DesktopCursorSource : DesktopSourceAdapter() {
     override val id: String = "cursor"

@@ -6,10 +6,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import llc.lookatwhataicando.codeoba.core.domain.model.Turn
-import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import java.io.File
 import java.time.Instant
-import llc.lookatwhataicando.codeoba.core.manager.SessionCacheManager
 
 class DesktopCodexSource : DesktopSourceAdapter() {
     override val id: String = "codex"

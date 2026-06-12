@@ -1,8 +1,8 @@
 package llc.lookatwhataicando.codeoba.desktop
 
-import java.util.prefs.Preferences
 import llc.lookatwhataicando.codeoba.core.domain.search.ArchivalFilter
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
+import java.util.prefs.Preferences
 
 object SettingsManager {
     private val prefs: Preferences = Preferences.userNodeForPackage(SettingsManager::class.java)

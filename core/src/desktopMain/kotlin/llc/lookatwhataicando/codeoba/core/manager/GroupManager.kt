@@ -3,7 +3,6 @@ package llc.lookatwhataicando.codeoba.core.manager
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
-import llc.lookatwhataicando.codeoba.core.domain.model.GroupTask
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
 import java.io.File
 

@@ -3,11 +3,11 @@ package llc.lookatwhataicando.codeoba.core.source
 import kotlinx.coroutines.runBlocking
 import llc.lookatwhataicando.codeoba.core.domain.search.LexicalSearchEngine
 import llc.lookatwhataicando.codeoba.core.domain.search.SearchFilter
+import llc.lookatwhataicando.codeoba.core.manager.SessionCacheManager
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import llc.lookatwhataicando.codeoba.core.manager.SessionCacheManager
 
 class SourceParsersTest {
 

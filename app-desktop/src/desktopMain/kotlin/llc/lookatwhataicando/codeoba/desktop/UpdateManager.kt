@@ -3,9 +3,9 @@ package llc.lookatwhataicando.codeoba.desktop
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import llc.lookatwhataicando.codeoba.core.util.SemVer
-import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
+import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
+import llc.lookatwhataicando.codeoba.core.util.SemVer
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileOutputStream

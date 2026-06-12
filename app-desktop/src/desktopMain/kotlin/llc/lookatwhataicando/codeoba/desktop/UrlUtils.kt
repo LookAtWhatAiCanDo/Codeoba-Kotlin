@@ -1,8 +1,8 @@
 package llc.lookatwhataicando.codeoba.desktop
 
+import llc.lookatwhataicando.codeoba.core.util.Logger.log
 import java.awt.Desktop
 import java.net.URI
-import llc.lookatwhataicando.codeoba.core.util.Logger.log
 
 fun isWebUrl(url: String): Boolean {
     val lower = url.trim().lowercase()

@@ -1,8 +1,8 @@
 package llc.lookatwhataicando.codeoba.core.domain.search
 
 import kotlinx.coroutines.runBlocking
-import java.io.File
 import llc.lookatwhataicando.codeoba.core.util.ModelDownloader
+import java.io.File
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertTrue

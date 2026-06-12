@@ -2,9 +2,7 @@ package llc.lookatwhataicando.codeoba.core.source
 
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import llc.lookatwhataicando.codeoba.core.domain.model.Turn
-import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import java.io.File
-import llc.lookatwhataicando.codeoba.core.manager.SessionCacheManager
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
