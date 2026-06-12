@@ -104,6 +104,7 @@ import llc.lookatwhataicando.codeoba.core.util.LocalFileResolver
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
 import llc.lookatwhataicando.codeoba.core.util.ModelDownloader
 import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
+import llc.lookatwhataicando.codeoba.core.util.BuildConfig
 import java.awt.Cursor
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -521,6 +522,7 @@ fun mainEntry() = application {
     }
 
     LaunchedEffect(Unit) {
+        if (!BuildConfig.ENABLE_SUBSCRIPTION) return@LaunchedEffect
         // Run background ecosystem sync loop
         while (true) {
             val email = SettingsManager.getFirebaseUserEmail()

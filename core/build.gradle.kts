@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
@@ -64,3 +66,37 @@ kotlin {
         val desktopTest by getting
     }
 }
+
+val generateBuildConfig = tasks.register("generateBuildConfig") {
+    val localPropsFile = project.rootProject.file("local.properties")
+    inputs.file(localPropsFile).optional()
+    
+    val outputDir = file("${layout.buildDirectory.get().asFile}/generated-sources/buildconfig")
+    outputs.dir(outputDir)
+    doLast {
+        val enableSub = if (localPropsFile.exists()) {
+            val props = Properties()
+            localPropsFile.inputStream().use { props.load(it) }
+            props.getProperty("codeoba.enable_subscription")?.toBoolean() ?: false
+        } else {
+            false
+        }
+
+        
+        val buildConfigFile = file("$outputDir/llc/lookatwhataicando/codeoba/core/util/BuildConfig.kt")
+        buildConfigFile.parentFile.mkdirs()
+        buildConfigFile.writeText("""
+            package llc.lookatwhataicando.codeoba.core.util
+            
+            object BuildConfig {
+                const val ENABLE_SUBSCRIPTION = $enableSub
+            }
+        """.trimIndent())
+    }
+}
+
+kotlin.sourceSets.commonMain.configure {
+    kotlin.srcDirs(generateBuildConfig)
+}
+
+

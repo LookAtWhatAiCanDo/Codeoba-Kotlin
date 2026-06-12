@@ -163,3 +163,27 @@ If a critical vulnerability or remote-control bypass is detected, the backend ma
 * `disableHighRiskRelay = true`: Instantly blocks all High-Risk commands globally.
 * `disableAllRelay = true`: Disables the remote control stream completely.
 * `minimumClientVersion = "1.1.0"`: Rejects connections from outdated client builds.
+
+---
+
+## 🛠️ Compile-Time Subscription Gating (Developer Toggle)
+
+To enable merging of ongoing subscription development changes to the `main` branch without exposing half-finished or confusing features to production users, the project uses a compile-time static configuration constant (`BuildConfig.ENABLE_SUBSCRIPTION`).
+
+### 1. How Gating Works
+When building for production, `BuildConfig.ENABLE_SUBSCRIPTION` is statically set to `false`. 
+* **UI Gating**: In [SettingsDialog.kt](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/SettingsDialog.kt), the `Account & Subscription` settings tab category is hidden from the sidebar.
+* **Background Logic Gating**: In [Main.kt](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Main.kt), the background token-refresh and device registration sync loop is bypassed.
+* **Dead Code Elimination**: Because `ENABLE_SUBSCRIPTION` is a `const val`, the Kotlin compiler performs constant folding and dead code elimination, physically tree-shaking the gated UI and background sync loop bytecode out of the release binary.
+
+### 2. Enabling Subscription Features Locally
+To enable the subscription/ecosystem features in your local development environment:
+1. Open your local [local.properties](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/local.properties) (which is git-ignored).
+2. Append the following property:
+   ```properties
+   codeoba.enable_subscription=true
+   ```
+3. Re-run or build the project. The Gradle `generateBuildConfig` task will read this value and compile `BuildConfig.kt` with `ENABLE_SUBSCRIPTION = true`.
+
+To disable features again, set the property to `false` or remove it entirely from `local.properties`.
+

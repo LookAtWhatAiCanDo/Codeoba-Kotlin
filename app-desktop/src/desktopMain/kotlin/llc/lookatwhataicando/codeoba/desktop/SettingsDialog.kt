@@ -88,6 +88,7 @@ import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceRegistry
 import llc.lookatwhataicando.codeoba.core.security.DeviceKeyManager
 import llc.lookatwhataicando.codeoba.core.util.AppConfig
+import llc.lookatwhataicando.codeoba.core.util.BuildConfig
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
 import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
 import java.awt.Cursor
@@ -170,7 +171,12 @@ fun SettingsDialog(
                         )
 
                         // Category Buttons
-                        SettingsCategory.values().forEach { category ->
+                        val visibleCategories = remember {
+                            SettingsCategory.values().filter {
+                                it != SettingsCategory.Account || BuildConfig.ENABLE_SUBSCRIPTION
+                            }
+                        }
+                        visibleCategories.forEach { category ->
                             val isSelected = selectedCategory == category
                             Row(
                                 modifier = Modifier
