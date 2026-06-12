@@ -46,12 +46,12 @@ The proxied update architecture provides the following:
 
 ### 2. Codeoba Client (`Codeoba`)
 
-#### [MODIFY] [SettingsManager.kt](../app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/SettingsManager.kt)
+#### [MODIFY] [SettingsManager.kt](../app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/SettingsManager.kt)
 - Add properties for updating rate-limiting and identity:
   - `getLastUpdateCheck(): Long` and `setLastUpdateCheck(Long)`
   - `getInstallGuid(): String`: retrieves a cached UUID. If it does not exist, generates a new random UUID, persists it, and returns it.
 
-#### [MODIFY] [UpdateManager.kt](../app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/UpdateManager.kt)
+#### [MODIFY] [UpdateManager.kt](../app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/UpdateManager.kt)
 - Declare three developer overrides:
   - `@Volatile var ignoreUpdateThrottling = false`
   - `@Volatile var forceUpdateAvailable = false`
@@ -65,7 +65,7 @@ The proxied update architecture provides the following:
 - Update `isUpdateAvailable()`:
   - Return `true` if `forceUpdateAvailable` is active. Otherwise, parse and compare versions using `SemVer`.
 
-#### [MODIFY] [Main.kt](../app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Main.kt)
+#### [MODIFY] [Main.kt](../app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/Main.kt)
 - Parse command-line developer flags inside `main(args)` and set the corresponding properties on `UpdateManager`.
 - Implement a helper `isSafeLocalFileLink(url: String): Boolean` to strictly validate local link protocols (allow `file://`, relative paths, and Windows drives; reject remote schemes like `javascript:` or `data:`).
 - Update `openUrl(url: String)`:
@@ -77,7 +77,7 @@ The proxied update architecture provides the following:
   - Bypass throttling if `ignoreUpdateThrottling` is active.
   - Record the timestamp of successful update checks to `SettingsManager`.
 
-#### [MODIFY] [SettingsDialog.kt](../app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/SettingsDialog.kt)
+#### [MODIFY] [SettingsDialog.kt](../app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/SettingsDialog.kt)
 - Ensure the manual check button bypasses the 27-hour rate limit and updates the last successful check timestamp in `SettingsManager`.
 
 ---

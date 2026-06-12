@@ -67,7 +67,7 @@ This file logs events line-by-line in JSON. The main event types are:
 
 ## ⚙️ Codeoba Parser Implementation (`DesktopCopilotSource`)
 
-Codeoba parses and indexes Copilot sessions in [DesktopCopilotSource.kt](../core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/DesktopCopilotSource.kt) as follows:
+Codeoba parses and indexes Copilot sessions in [DesktopCopilotSource.kt](../core/src/desktopMain/kotlin/com/whataicando/codeoba/core/source/DesktopCopilotSource.kt) as follows:
 
 1.  **Metadata Extraction**: Matches directories in `~/.copilot/session-state/` and parses `workspace.yaml` line-by-line to retrieve the session ID, thread title, git branch, repository binding, and path boundaries (`cwd`).
 2.  **Event Processing**: Parses `events.jsonl` line-by-line.

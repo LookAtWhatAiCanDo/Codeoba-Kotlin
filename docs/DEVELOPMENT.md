@@ -24,9 +24,9 @@ Run in monorepo root:
 ## 🔌 Adding a Log Source Adapter
 
 For a detailed step-by-step walkthrough, refer to the [Adding a New Source Adapter Guide](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/docs/ADD_NEW_SOURCE.md).
-1. **Implement `SourceAdapter`**: Create a parser class under `core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/` subclassing `DesktopSourceAdapter`.
+1. **Implement `SourceAdapter`**: Create a parser class under `core/src/desktopMain/kotlin/com/whataicando/codeoba/core/source/` subclassing `DesktopSourceAdapter`.
 2. **Register**: Add it to the main sources list and register it in `SourceRegistry` in `Main.kt`.
-3. **Configure UI mapping**: Add custom brand accent colors, formatted name mapping, and the product URL in [FormatUtils.kt](../app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/FormatUtils.kt).
+3. **Configure UI mapping**: Add custom brand accent colors, formatted name mapping, and the product URL in [FormatUtils.kt](../app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/FormatUtils.kt).
 4. **Test**: Add tests in `core/src/desktopTest/.../SourceCapabilitiesTest.kt` and `SourceParsersTest.kt`.
 
 ---

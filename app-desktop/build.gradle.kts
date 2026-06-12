@@ -50,7 +50,7 @@ kotlin {
 compose {
     desktop {
         application {
-            mainClass = "llc.lookatwhataicando.codeoba.desktop.MainKt"
+            mainClass = "com.whataicando.codeoba.desktop.MainKt"
             nativeDistributions {
                 targetFormats(
                     org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,

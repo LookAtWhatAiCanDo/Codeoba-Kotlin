@@ -85,10 +85,10 @@ val generateBuildConfig = tasks.register("generateBuildConfig") {
         }
 
         
-        val buildConfigFile = file("$outputDir/llc/lookatwhataicando/codeoba/core/util/BuildConfig.kt")
+        val buildConfigFile = file("$outputDir/com/whataicando/codeoba/core/util/BuildConfig.kt")
         buildConfigFile.parentFile.mkdirs()
         buildConfigFile.writeText("""
-            package llc.lookatwhataicando.codeoba.core.util
+            package com.whataicando.codeoba.core.util
             
             object BuildConfig {
                 const val ENABLE_SUBSCRIPTION = $enableSub

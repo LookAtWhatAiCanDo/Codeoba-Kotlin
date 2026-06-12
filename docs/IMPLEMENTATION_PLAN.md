@@ -41,7 +41,7 @@ We will initialize the following Gradle module structure in `Codeoba`:
 
 #### Directory Structure
 ```
-packages/core/src/commonMain/kotlin/llc/lookatwhataicando/codeoba/
+packages/core/src/commonMain/kotlin/com/whataicando/codeoba/
 ├── domain/
 │   ├── model/
 │   │   ├── Session.kt         # Normalized session structure

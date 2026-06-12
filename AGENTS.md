@@ -44,7 +44,7 @@ To ensure the project context remains accurate:
 When modifying the Compose UI under `app-desktop`, adhere to these style guidelines:
 
 1. **Dynamic Color Theme Styling Palette**:
-   - Background Color `ObsidianBg`, Surface Color `SlateSurface`, Item Container Color `CardSurface`, Border Color `BorderColor`, Highlights/Primary Accent `AccentCyan`, Secondary Accent `AccentPurple`, Text Primary `TextPrimary`, and Text Secondary `TextSecondary` are dynamic package-level properties defined in `./app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Theme.kt`.
+   - Background Color `ObsidianBg`, Surface Color `SlateSurface`, Item Container Color `CardSurface`, Border Color `BorderColor`, Highlights/Primary Accent `AccentCyan`, Secondary Accent `AccentPurple`, Text Primary `TextPrimary`, and Text Secondary `TextSecondary` are dynamic package-level properties defined in `./app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/Theme.kt`.
    - The values resolve dynamically based on the current theme loaded from `SettingsManager.getThemeCode()` into `ThemeManager.currentTheme`.
    - Users can select from 8 handsome themes (Obsidian, Nordic Frost, Emerald Forest, Sunset Copper, Royal Amethyst, Dracula, Cyberpunk Neon, Monochrome Slate) in the General settings panel.
 
@@ -66,7 +66,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
 
 5. **Scrollbar Controls & Touch/Drag Scrolling**:
    - Every scrollable container (e.g. `LazyColumn`, `Column` with `verticalScroll`, `Row` with `horizontalScroll`) must support touch-screen and mouse-drag scrolling and display a visual scrollbar.
-   - Use the custom extension `.dragToScroll(scrollState)` or `.dragToScroll(lazyListState)` defined in `./app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Components.kt` on the scrollable container.
+   - Use the custom extension `.dragToScroll(scrollState)` or `.dragToScroll(lazyListState)` defined in `./app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/Components.kt` on the scrollable container.
    - Wrap the scrollable container in a `Box` and add a sibling `VerticalScrollbar` (or `HorizontalScrollbar`) aligned to the edge (e.g. `Alignment.CenterEnd`).
    - Use `themedScrollbarStyle()` to style the scrollbar to match the dynamic color theme's cyan accents (`AccentCyan`). Apply a small padding (e.g., `end = 12.dp`) to the scrollable container so its content doesn't overlap the scrollbar.
 
@@ -108,7 +108,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Sorting defaults prioritize user interest: numeric metrics (Turns, Tokens, Speed, Duration) default to descending order on first click, whereas lexical metrics (Model Name) default to ascending (A-Z) order.
     - The active sort selection is indicated by an arrow icon reflecting the current direction (Upward for ascending, Downward for descending), toggling direction on subsequent clicks.
 11. **Session Item Context Menu & Toast Notification**:
-    - Right-clicking a session item in the sidebar list view (`./app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Sidebar.kt`) opens a custom `DropdownMenu` at the click cursor location, matching the design and actions of the detail pane actions/tags overflow menu.
+    - Right-clicking a session item in the sidebar list view (`./app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/Sidebar.kt`) opens a custom `DropdownMenu` at the click cursor location, matching the design and actions of the detail pane actions/tags overflow menu.
     - It provides options to toggle pin status, edit groups/tags (via an inline filterable sub-menu checklist), open the session file, and copy the session ID or file path (which triggers the bottom-aligned floating toast notification (`AnimatedVisibility`) overlay with standard premium accents (`AccentCyan`)).
 12. **Search Filter State Persistence**:
     - Persist and restore the last used "Filter by Source" and "Filter by Status" settings via `SettingsManager` (Java Preferences API) to maintain selected search filters across application launches.
@@ -118,8 +118,8 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - If search results match inside any inner tool or text block of the collapsed work block, auto-expand the `WorkedForBlock` via `LaunchedEffect`.
 14. **Antigravity Tool Tag Escaping**:
     - The Antigravity log parser uses `[[[TOOL:` and `[[[/TOOL]]]` tags in the assistant message string to represent tool execution boundaries for the UI.
-    - If log text or tool inputs/outputs contain these tags literally (e.g. from search queries or file content discussions), they must be escaped as `\\[\\[\\[TOOL:` and `\\[\\[\\[/TOOL\\]\\]\\]` during parser extraction in `./core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/DesktopAntigravitySource.kt` to prevent malformed parsing.
-    - The UI's `parseAssistantMessage` in `./app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/MarkdownParser.kt` skips escaped tags during parsing and unescapes them back to their original form for presentation.
+    - If log text or tool inputs/outputs contain these tags literally (e.g. from search queries or file content discussions), they must be escaped as `\\[\\[\\[TOOL:` and `\\[\\[\\[/TOOL\\]\\]\\]` during parser extraction in `./core/src/desktopMain/kotlin/com/whataicando/codeoba/core/source/DesktopAntigravitySource.kt` to prevent malformed parsing.
+    - The UI's `parseAssistantMessage` in `./app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/MarkdownParser.kt` skips escaped tags during parsing and unescapes them back to their original form for presentation.
 15. **Persistent Startup Cache & Index Profiler**:
     - A thread-safe file caching system in `SessionCacheManager` serializes parsed `Session` objects to `~/.codeoba/cache/cache_<sourceId>.json` using `kotlinx.serialization`.
     - File-based sources check if `filePath`, `lastModified` timestamp, and `size` match the cached entry before reading and parsing. Database-based sources (Cursor) query the SQLite DB and match the row value's size and MD5 hash to bypass JSON parsing.
@@ -129,7 +129,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Caching reduces the average startup log scanning/load time from ~2.5s down to ~0.25s (a ~90% performance improvement).
     - Cache features can be toggled in the General settings panel in the UI or overridden using command line arguments (`--cache` / `--no-cache`).
 16. **Desktop Source Adapter Consolidation**:
-    - Centralizes common parsing caching logic, directory checking (`getBaseDir()`), availability/installation checks (`isAvailable()`, `isExecutableInstalled(binaryName)`), and session data cleanup (`deleteDataPaths()`, `getDataPathsToDelete()`) into the shared base class `./core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/DesktopSourceAdapter.kt`.
+    - Centralizes common parsing caching logic, directory checking (`getBaseDir()`), availability/installation checks (`isAvailable()`, `isExecutableInstalled(binaryName)`), and session data cleanup (`deleteDataPaths()`, `getDataPathsToDelete()`) into the shared base class `./core/src/desktopMain/kotlin/com/whataicando/codeoba/core/source/DesktopSourceAdapter.kt`.
     - File-based sources (Claude, Codex, Antigravity, Aider, Copilot) implement `parseSessionContent(File)` and benefit from automated file metadata check/cache write on miss.
     - Database-based sources (Cursor) override `parseSession(String)` directly to bypass file-based caching and implement custom SQLite row hashing.
 17. **Conversations Sidebar List Sorting**:
@@ -170,7 +170,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - To prevent vertical drag conflicts inside scrollable containers (like `verticalScroll` or `LazyColumn` lists on Desktop), use immediate `detectDragGestures` instead of `detectDragGesturesAfterLongPress`. Because scrolling on desktop with a mouse uses the mouse wheel, dragging inside list items can start dragging immediately (past touch slop) to optimize responsiveness and success rates across all directions. Clicks still propagate normally since they do not exceed touch slop.
 
 23. **Consolidated OS Detection**:
-    - Avoid direct system property checks for operating system detection (e.g., `System.getProperty("os.name")`). Use centralized helpers in `./core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/util/PlatformUtils.kt`: `PlatformUtils.isMac()`, `PlatformUtils.isWindows()`, `PlatformUtils.isLinux()`.
+    - Avoid direct system property checks for operating system detection (e.g., `System.getProperty("os.name")`). Use centralized helpers in `./core/src/desktopMain/kotlin/com/whataicando/codeoba/core/util/PlatformUtils.kt`: `PlatformUtils.isMac()`, `PlatformUtils.isWindows()`, `PlatformUtils.isLinux()`.
 
 24. **Local ONNX-based Semantic Search**:
     - Replaces pseudo-random word hashing with a real local neural text embedding pipeline using the quantized `all-MiniLM-L6-v2` transformer model.

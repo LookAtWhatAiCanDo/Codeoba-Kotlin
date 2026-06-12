@@ -14,7 +14,7 @@ Still, it is nice as a Codeoba developer to be able to easily peek at the raw da
 There are lots (dozens? scores? hundreds?) of coding agent apps out there.
 Is it possible to embed a deterministic AI/LLM/Agent **IN CODEOBA** that can find other coding agent apps and intuit the needful from their data format? 
 
-Why did the Agent revert a core SourceRegistry class and replace it with this in `llc.lookatwhataicando.codeoba.desktop.MainKt.main`:
+Why did the Agent revert a core SourceRegistry class and replace it with this in `com.whataicando.codeoba.desktop.MainKt.main`:
 ```kotlin
     val sourceRegistry = remember {
         SourceRegistry().apply {

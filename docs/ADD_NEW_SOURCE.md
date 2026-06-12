@@ -7,16 +7,16 @@ This guide outlines the step-by-step process for developers to add a new AI codi
 ## 🛠️ Step 1: Implement the Source Adapter in `:core`
 
 All log parsers and directory scanning adapters reside in the `:core` module under:
-`core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/`
+`core/src/desktopMain/kotlin/com/whataicando/codeoba/core/source/`
 
 Create a subclass of `DesktopSourceAdapter` (e.g., `DesktopMyAgentSource.kt`):
 
 ```kotlin
-package llc.lookatwhataicando.codeoba.core.source
+package com.whataicando.codeoba.core.source
 
-import llc.lookatwhataicando.codeoba.core.domain.model.Session
-import llc.lookatwhataicando.codeoba.core.domain.model.Turn
-import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
+import com.whataicando.codeoba.core.domain.model.Session
+import com.whataicando.codeoba.core.domain.model.Turn
+import com.whataicando.codeoba.core.util.PlatformUtils
 import java.io.File
 
 class DesktopMyAgentSource : DesktopSourceAdapter() {
@@ -80,17 +80,17 @@ class DesktopMyAgentSource : DesktopSourceAdapter() {
 To integrate the new source with the user interface, register it in the following files:
 
 ### 1. `Main.kt`
-Path: `app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Main.kt`
+Path: `app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/Main.kt`
 
 *   **Import the class**:
     ```kotlin
-    import llc.lookatwhataicando.codeoba.core.source.DesktopMyAgentSource
+    import com.whataicando.codeoba.core.source.DesktopMyAgentSource
     ```
 *   **Add to debug list** inside `main(args: Array<String>)`:
     ```kotlin
     val sources = listOf(
         // ...
-        llc.lookatwhataicando.codeoba.core.source.DesktopMyAgentSource()
+        com.whataicando.codeoba.core.source.DesktopMyAgentSource()
     )
     ```
 *   **Register in `SourceRegistry`** inside `mainEntry()`:
@@ -104,7 +104,7 @@ Path: `app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/
     ```
 
 ### 2. `FormatUtils.kt`
-Path: `app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/FormatUtils.kt`
+Path: `app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/FormatUtils.kt`
 
 *   **Assign Brand Colors** in `getSourceBadgeColors(sourceId: String)`:
     ```kotlin
@@ -126,7 +126,7 @@ Path: `app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/
 Ensure capabilities and parsing logic are covered under the `:core` desktop test module:
 
 ### 1. `SourceCapabilitiesTest.kt`
-Path: `core/src/desktopTest/kotlin/llc/lookatwhataicando/codeoba/core/source/SourceCapabilitiesTest.kt`
+Path: `core/src/desktopTest/kotlin/com/whataicando/codeoba/core/source/SourceCapabilitiesTest.kt`
 
 Add a test validating installation detection and data cleanup rules:
 ```kotlin
@@ -145,7 +145,7 @@ fun testMyAgentSourceAppInstalledAndCleanup() = withMockUserHome { home ->
 ```
 
 ### 2. `SourceParsersTest.kt`
-Path: `core/src/desktopTest/kotlin/llc/lookatwhataicando/codeoba/core/source/SourceParsersTest.kt`
+Path: `core/src/desktopTest/kotlin/com/whataicando/codeoba/core/source/SourceParsersTest.kt`
 
 Add a test verifying that mock log logs parse correctly into turns:
 ```kotlin

@@ -49,8 +49,8 @@ graph TD
     Core --> Desktop[desktopMain: NIO, SQLite, Parsers]
 ```
 
-*   **`:core`**: Holds the unified models ([Session.kt](./core/src/commonMain/kotlin/llc/lookatwhataicando/codeoba/core/domain/model/Session.kt), [Turn.kt](./core/src/commonMain/kotlin/llc/lookatwhataicando/codeoba/core/domain/model/Turn.kt)), parsing adapters, search engines, and directory watchers.
-*   **`:app-desktop`**: Jetpack Compose Multiplatform entry point and modular UI layouts ([Main.kt and UI components](./app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/)).
+*   **`:core`**: Holds the unified models ([Session.kt](./core/src/commonMain/kotlin/com/whataicando/codeoba/core/domain/model/Session.kt), [Turn.kt](./core/src/commonMain/kotlin/com/whataicando/codeoba/core/domain/model/Turn.kt)), parsing adapters, search engines, and directory watchers.
+*   **`:app-desktop`**: Jetpack Compose Multiplatform entry point and modular UI layouts ([Main.kt and UI components](./app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/)).
 
 ---
 

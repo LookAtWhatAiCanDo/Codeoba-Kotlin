@@ -104,9 +104,9 @@ To refine source management and ensure users are only presented with active, rel
 
 ## 📁 Key File Changes
 
-- **[SourceRegistry.kt](../core/src/commonMain/kotlin/llc/lookatwhataicando/codeoba/core/domain/source/SourceRegistry.kt)**: Changed `getAllAdapters()` to return all registered adapters unconditionally, keeping `getActiveAdapters()` filtered for background scanner synchronization.
-- **[FormatUtils.kt](../app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/FormatUtils.kt)**: Added `getProductUrl(sourceId: String)` mapping helper to retrieve official website links.
-- **[Main.kt](../app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Main.kt)**: 
+- **[SourceRegistry.kt](../core/src/commonMain/kotlin/com/whataicando/codeoba/core/domain/source/SourceRegistry.kt)**: Changed `getAllAdapters()` to return all registered adapters unconditionally, keeping `getActiveAdapters()` filtered for background scanner synchronization.
+- **[FormatUtils.kt](../app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/FormatUtils.kt)**: Added `getProductUrl(sourceId: String)` mapping helper to retrieve official website links.
+- **[Main.kt](../app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/Main.kt)**: 
   - Styled and built the floating glassmorphic `DetailPaneToolbar` pill card.
   - Lifted scroll states (`lazyListState`, `isScrollLocked`) in `DetailPane` to reactive level.
   - Synchronized `isHeaderExpanded` to `isScrollLocked` via `LaunchedEffect`.
@@ -114,9 +114,9 @@ To refine source management and ensure users are only presented with active, rel
   - Shifted search `FindBar` down to avoid overlapping the toolbar.
   - Added custom `openUrl` browser integration helper and `Help` menu to `MenuBar`.
   - Simplified sidebar source filters to use `ignoredSources` settings state as single source of truth.
-- **[Sidebar.kt](../app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Sidebar.kt)**: Filtered sidebar filter row using `ignoredSources`, adjusted SessionItem opacity/badge for archived state, added right-click context menu copying support, and implemented the bottom success toast overlay.
-- **[SettingsDialog.kt](../app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/SettingsDialog.kt)**: Integrated product links, custom brand-themed switches, and simplified segmented controls.
-- **[DesktopCursorSource.kt](../core/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/core/source/DesktopCursorSource.kt)**: Updated JDBC URL to remove `immutable=1` for live database refreshes.
+- **[Sidebar.kt](../app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/Sidebar.kt)**: Filtered sidebar filter row using `ignoredSources`, adjusted SessionItem opacity/badge for archived state, added right-click context menu copying support, and implemented the bottom success toast overlay.
+- **[SettingsDialog.kt](../app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/SettingsDialog.kt)**: Integrated product links, custom brand-themed switches, and simplified segmented controls.
+- **[DesktopCursorSource.kt](../core/src/desktopMain/kotlin/com/whataicando/codeoba/core/source/DesktopCursorSource.kt)**: Updated JDBC URL to remove `immutable=1` for live database refreshes.
 - Icon Resources: Copied launch icon from CodexSearch:
   - [icon.png](../app-desktop/src/desktopMain/resources/icon.png)
   - [icon.icns](../app-desktop/src/desktopMain/resources/icon.icns)
@@ -161,7 +161,7 @@ To prevent accidental deletions and resolve false-positive prompts:
 ## 🖱️ Context Menu Path Copying & Premium Toast Notifications
 
 To improve user workflow and data accessibility, we added support for copying a conversation's source data file path directly from the list item:
-1. **Right-Click Context Menu**: Right-clicking any conversation item in the sidebar list view (`../app-desktop/src/desktopMain/kotlin/llc/lookatwhataicando/codeoba/desktop/Sidebar.kt`) triggers a standard desktop context menu via `ContextMenuArea` with a `"Copy Source File Path"` action.
+1. **Right-Click Context Menu**: Right-clicking any conversation item in the sidebar list view (`../app-desktop/src/desktopMain/kotlin/com/whataicando/codeoba/desktop/Sidebar.kt`) triggers a standard desktop context menu via `ContextMenuArea` with a `"Copy Source File Path"` action.
 2. **Clipboard Integration**: Selecting the action retrieves `session.filePath` and copies it to the system clipboard using the platform-integrated clipboard utilities.
 3. **Premium Floating Toast Overlay**: Displays a bottom-aligned, Obsidian-themed, floating success toast notification with standard premium accents (`AccentCyan`) and a checkmark icon to confirm the path was copied to the clipboard. The toast automatically slides/fades away after a 2-second delay.
 
