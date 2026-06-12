@@ -75,8 +75,10 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.whataicando.touch.compose.WindowsTouch
 import kotlinx.coroutines.launch
+import llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthException
 import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
+import llc.lookatwhataicando.codeoba.core.domain.parser.LogParserFactory
 import llc.lookatwhataicando.codeoba.core.domain.search.ArchivalFilter
 import llc.lookatwhataicando.codeoba.core.domain.search.HashSemanticEmbedder
 import llc.lookatwhataicando.codeoba.core.domain.search.LexicalSearchEngine
@@ -101,6 +103,8 @@ import llc.lookatwhataicando.codeoba.core.util.LocalFileResolution
 import llc.lookatwhataicando.codeoba.core.util.LocalFileResolver
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
 import llc.lookatwhataicando.codeoba.core.util.ModelDownloader
+import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
+import llc.lookatwhataicando.codeoba.core.util.BuildConfig
 import java.awt.Cursor
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -147,6 +151,18 @@ fun main(args: Array<String>) {
 
     System.setProperty("apple.awt.application.name", "Codeoba")
     System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Codeoba")
+
+    // Run startup initialization
+    log("Main: Initializing Codeoba client components...")
+
+    // Initialize device ID early to prevent PII-derived legacy ID creation on fresh installs
+    val deviceId = SettingsManager.getDeviceId()
+    log("Main: Initializing device ID to $deviceId")
+
+    val initialMode = SettingsManager.getEffectiveParserMode()
+    LogParserFactory.setParserMode(initialMode)
+    log("Main: Initializing parser mode to $initialMode")
+
     val sources = listOf(
         llc.lookatwhataicando.codeoba.core.source.DesktopClaudeSource(),
         llc.lookatwhataicando.codeoba.core.source.DesktopAntigravitySource(),
@@ -502,6 +518,59 @@ fun mainEntry() = application {
                     }
                 }
             }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!BuildConfig.ENABLE_SUBSCRIPTION) return@LaunchedEffect
+        // Run background ecosystem sync loop
+        while (true) {
+            val email = SettingsManager.getFirebaseUserEmail()
+            val refreshToken = SettingsManager.getFirebaseAuthRefreshToken()
+            if (email != null && refreshToken != null) {
+                log("Main Background Loop: Refreshing ecosystem sync token...")
+                try {
+                    // 1. Refresh ID Token using the refresh token
+                    val refreshedAuth = llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthClient.refreshIdToken(refreshToken)
+                    if (refreshedAuth.idToken.isNotBlank()) {
+                        SettingsManager.setFirebaseAuthIdToken(refreshedAuth.idToken)
+                    }
+                    if (refreshedAuth.refreshToken.isNotBlank()) {
+                        SettingsManager.setFirebaseAuthRefreshToken(refreshedAuth.refreshToken)
+                    }
+                    
+                    // 2. Perform background device registration/sync in the Hub
+                    val deviceId = SettingsManager.getDeviceId()
+                    val host = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" } }
+                    val deviceName = "${if (PlatformUtils.isMac()) "macOS" else if (PlatformUtils.isWindows()) "Windows" else "Linux"} ($host)"
+                    val publicKey = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { llc.lookatwhataicando.codeoba.core.security.DeviceKeyManager.getPublicKeyPem() }
+                    
+                    val nonce = llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthClient.getRegistrationChallenge(
+                        refreshedAuth.idToken, deviceId
+                    )
+                    val signature = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { llc.lookatwhataicando.codeoba.core.security.DeviceKeyManager.signPayload(nonce) }
+                    
+                    val success = llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthClient.registerEcosystemDevice(
+                        refreshedAuth.idToken, deviceId, deviceName, publicKey, nonce, signature
+                    )
+                    if (success) {
+                        log("Main Background Loop: Ecosystem device successfully synced with Hub.")
+                    } else {
+                        log("Main Background Loop: Sync Hub returned failure status for device registration.")
+                    }
+                } catch (e: FirebaseAuthException) {
+                    if (e.status == 402 || e.status == 403) {
+                        log("Main Background Loop: Subscription expired or permission denied (Status ${e.status}). Deactivating ecosystem features.")
+                        SettingsManager.setEcosystemActive(false)
+                        LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
+                    }
+                    log("Main Background Loop: Ecosystem sync refresh failed: ${e.message}")
+                } catch (e: Exception) {
+                    log("Main Background Loop: Ecosystem sync refresh failed: ${e.message}")
+                }
+            }
+            // Sleep for 1 hour before next refresh check
+            kotlinx.coroutines.delay(3600000)
         }
     }
 

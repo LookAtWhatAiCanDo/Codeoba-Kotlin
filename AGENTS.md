@@ -13,6 +13,7 @@ To ensure the project context remains accurate:
 2. **Definition of Done:** A task, refactoring, or feature implementation is not complete until all corresponding documentation has been updated to reflect the new state of the codebase.
 3. **No Automatic Git Staging/Commits:** By default, never stage (`git add`) or commit (`git commit`) changes unless explicitly requested or prompted by the user.
 4. **Relative Pathing Requirement:** Always write file paths relative to the folder they are in (e.g., `./README.md` or `../core/`). Never document absolute file paths or paths outside of the repository, with the important exception of data paths for the source agents this application monitors.
+5. **Plan Synchronization:** Any time a CLI command, parameter, file path, or configuration flag changes or is corrected during implementation, you must immediately propagate that change to the local `implementation_plan.md` in the system app data directory, as well as any architectural plan files under `docs/`.
 
 ---
 
@@ -34,6 +35,7 @@ To ensure the project context remains accurate:
   - `UpdateManager.kt`: Asynchronous release checking, redirect-following download streams, and native installer execution.
   - `UpdateDialog.kt`: Dark-themed update overlay prompting version jumps, markdown release notes, and progress.
 - **[docs](./docs)**: System architecture and developer walkthroughs.
+  - **[ECOSYSTEM_GUIDE.md](./docs/ECOSYSTEM_GUIDE.md)**: User-facing guide explaining device pairing, sync modes, and wearable features.
 
 ---
 
@@ -121,6 +123,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
 15. **Persistent Startup Cache & Index Profiler**:
     - A thread-safe file caching system in `SessionCacheManager` serializes parsed `Session` objects to `~/.codeoba/cache/cache_<sourceId>.json` using `kotlinx.serialization`.
     - File-based sources check if `filePath`, `lastModified` timestamp, and `size` match the cached entry before reading and parsing. Database-based sources (Cursor) query the SQLite DB and match the row value's size and MD5 hash to bypass JSON parsing.
+    - When `ParserMode.SUMMARIZING` is enabled, the cache is queried outside of the parser delegate block (before parsing and summarization run). On cache hits, the fully cached session (with its generated AI summaries) is returned immediately, completely bypassing local model inference and making log re-scans extremely efficient.
     - Orphaned cache entries are automatically deleted during the scan process via an in-memory tracking list (`seenPaths`).
     - Startup scanning timings are measured at millisecond precision for each active adapter and overall total. A detailed and formatted profiling summary is printed in the logs, sorting the sources by their duration in descending order.
     - Caching reduces the average startup log scanning/load time from ~2.5s down to ~0.25s (a ~90% performance improvement).
@@ -182,6 +185,20 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Queries the Firebase-proxied update endpoint (`http://localhost:5000/api/update` in dev/emulator mode, or production Cloud Function URL) on startup using a custom User-Agent (`Codeoba/{version} ({OS}; {arch}; GUID-{guid})`) to avoid GitHub API rate-limiting while logging anonymous telemetry.
     - Downloads matching installer packages (`.msi`, `.pkg`, or `.deb`) to the directory `~/.codeoba/updates/` with real-time progress indicators.
     - Launches native installers via `ProcessBuilder` (e.g. passive MSI `/passive` on Windows for seamless background installation, PKG launcher `open` on macOS, or `xdg-open` on Linux) and exits the JVM with `System.exit(0)` to release write locks.
+
+26. **Multi-Device Ecosystem Sync & Subscription Redesign**:
+    - Free local lexical and semantic searches are enabled by default for all users, while AI-powered summarization is a premium subscription feature.
+    - Paid subscription entitlements are enforced strictly on the backend to gate access to the Device Sync Hub and remote command relay APIs.
+    - Implements secure, browser-delegated OAuth flow utilizing a temporary JDK-native HTTP loopback server (listening on a random port for `/callback` parameters) and a unified Web Console SPA (running on Firebase Hosting) to prevent in-app credential handling.
+    - Stores all sensitive authentication credentials (ID and refresh tokens, licensing JWT, decryption key) in the OS-native keyring (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux) using a secure utility with automatic self-healing migration and a Java Preferences fallback. Keychain/Keyring prompts can be bypassed completely during development or troubleshooting by setting the JVM system property `codeoba.no.keyring=true`.
+    - Billing webhooks query subscriptions using the user's immutable Firebase `uid` mapped in checkout custom metadata rather than mutable emails to support profile email updates.
+    - Implements challenge-response authentication utilizing 90-second single-use nonces and device public/private key pairs (stored securely in the OS-native keyring via `SecureStorage` with a fallback to Preferences).
+    - Integrates a best-effort local regex secrets scanner to redact sensitive credentials on the client side before synchronizing data.
+    - Allows configuring Sync Modes (Local, Metadata, Summaries, Full Sync), target machine Remote Control Policies, and workspace Path Exclusions inside the Settings panel.
+
+26. **Firebase API Key Configuration**:
+    - The Firebase Web API key used for token refresh operations is resolved dynamically via the JVM system property `codeoba.firebase.api_key` or environment variable `CODEOBA_FIREBASE_API_KEY`.
+    - If running in production (non-emulator) mode and the API key matches the default placeholder or is blank, a fail-fast validation check throws an `IllegalArgumentException` with clear configuration instructions.
 
 ---
 

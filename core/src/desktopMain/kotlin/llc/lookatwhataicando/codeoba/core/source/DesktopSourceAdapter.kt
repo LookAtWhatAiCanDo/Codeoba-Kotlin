@@ -127,11 +127,16 @@ abstract class DesktopSourceAdapter : SourceAdapter {
             return refreshed
         }
 
-        val session = parseSessionContent(file) ?: return null
+        val parser = llc.lookatwhataicando.codeoba.core.domain.parser.LogParserFactory.getParser()
+        val parsedSession = parser.parse(file) {
+            parseSessionContent(file)
+        }
 
-        val hash = SessionCacheManager.calculateMd5(file)
-        SessionCacheManager.putCachedSession(id, filePath, file.lastModified(), file.length(), hash, session)
+        if (parsedSession != null) {
+            val hash = SessionCacheManager.calculateMd5(file)
+            SessionCacheManager.putCachedSession(id, filePath, file.lastModified(), file.length(), hash, parsedSession)
+        }
 
-        return session
+        return parsedSession
     }
 }

@@ -164,4 +164,76 @@ class CacheOptimizationTest {
         // Clean up
         SessionCacheManager.endScan(source.id)
     }
+
+    @Test
+    fun testCacheBypassesSummarizationOnHit() = runBlocking {
+        val tempFile = File.createTempFile("cache_summary_test_", ".jsonl")
+        tempFile.deleteOnExit()
+        tempFile.writeText("some session text content")
+
+        val source = object : llc.lookatwhataicando.codeoba.core.source.DesktopSourceAdapter() {
+            override val id: String = "test_summary_source"
+            override val displayName: String = "Test Summary Source"
+            override fun getBaseDir(): File = tempFile.parentFile
+            override suspend fun parseAllSessions(): List<Session> = emptyList()
+            override suspend fun parseSessionContent(file: File): Session? {
+                return Session(
+                    id = "test_session_id",
+                    sourceId = id,
+                    filePath = file.absolutePath,
+                    timestamp = 1000L,
+                    updatedAt = 2000L,
+                    cwd = null,
+                    threadName = "Thread",
+                    turns = listOf(Turn("turn_1", "Hello", "Hi")),
+                    isArchived = false
+                )
+            }
+        }
+
+        // Enable summarizing mode
+        llc.lookatwhataicando.codeoba.core.domain.parser.LogParserFactory.setParserMode(
+            llc.lookatwhataicando.codeoba.core.domain.parser.ParserMode.SUMMARIZING
+        )
+
+        SessionCacheManager.isCacheEnabled = true
+        SessionCacheManager.startScan(source.id)
+
+        try {
+            // First parse: cache miss, runs parser/summarizer, writes finalized session with summary to cache
+            val s1 = source.parseSession(tempFile.absolutePath)
+            assertNotNull(s1)
+            assertNotNull(s1.summary)
+            assertEquals("Parsed 1 dialogue exchanges from source 'test_summary_source'", s1.summary?.keyActions?.first())
+
+            // Modify the summary in the cache entry directly to verify hits use cached summary without re-inference
+            val cachedEntry = SessionCacheManager.getCachedSessionForFile(
+                source.id, tempFile.absolutePath, tempFile.lastModified(), tempFile.length()
+            )
+            assertNotNull(cachedEntry)
+            assertNotNull(cachedEntry.summary)
+
+            val mockedSummary = cachedEntry.summary!!.copy(keyActions = listOf("MOCKED SUMMARY DETECTED"))
+            val modifiedSession = cachedEntry.copy(summary = mockedSummary)
+            
+            // Put modified session back in cache
+            val md5 = SessionCacheManager.calculateMd5(tempFile)
+            SessionCacheManager.putCachedSession(
+                source.id, tempFile.absolutePath, tempFile.lastModified(), tempFile.length(), md5, modifiedSession
+            )
+
+            // Second parse: should be cache hit, returning the modified session directly without invoking inference
+            val s2 = source.parseSession(tempFile.absolutePath)
+            assertNotNull(s2)
+            assertNotNull(s2.summary)
+            assertEquals("MOCKED SUMMARY DETECTED", s2.summary?.keyActions?.first())
+
+        } finally {
+            // Restore default parsing mode
+            llc.lookatwhataicando.codeoba.core.domain.parser.LogParserFactory.setParserMode(
+                llc.lookatwhataicando.codeoba.core.domain.parser.ParserMode.STANDARD
+            )
+            SessionCacheManager.endScan(source.id)
+        }
+    }
 }

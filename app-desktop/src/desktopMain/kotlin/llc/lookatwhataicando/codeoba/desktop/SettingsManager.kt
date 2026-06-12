@@ -1,7 +1,10 @@
 package llc.lookatwhataicando.codeoba.desktop
 
+import llc.lookatwhataicando.codeoba.core.domain.parser.ParserMode
 import llc.lookatwhataicando.codeoba.core.domain.search.ArchivalFilter
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
+import llc.lookatwhataicando.codeoba.core.util.JsonUtils
+import llc.lookatwhataicando.codeoba.core.util.SecureStorage
 import java.util.prefs.Preferences
 
 object SettingsManager {
@@ -149,6 +152,127 @@ object SettingsManager {
 
     fun setSidebarSortAscending(value: Boolean) {
         prefs.putBoolean("sidebar_sort_ascending", value)
+    }
+
+    fun getFirebaseUserEmail(): String? = prefs.get("firebase_user_email", null)
+    fun setFirebaseUserEmail(value: String?) = putOrRemove("firebase_user_email", value)
+
+    fun getFirebaseUserUid(): String? = prefs.get("firebase_user_uid", null)
+    fun setFirebaseUserUid(value: String?) = putOrRemove("firebase_user_uid", value)
+
+    fun getFirebaseAuthIdToken(): String? = SecureStorage.get("firebase_auth_id_token")
+    fun setFirebaseAuthIdToken(value: String?) = SecureStorage.put("firebase_auth_id_token", value)
+
+    fun getFirebaseAuthRefreshToken(): String? = SecureStorage.get("firebase_auth_refresh_token")
+    fun setFirebaseAuthRefreshToken(value: String?) = SecureStorage.put("firebase_auth_refresh_token", value)
+
+    fun getDeviceId(): String {
+        var deviceId = prefs.get("device_id", null)
+        if (deviceId.isNullOrEmpty()) {
+            // For existing logged-in users, migrate legacy device ID to preserve backend pairing.
+            // For new users, generate a clean, random, non-PII UUID.
+            val hasLegacyAccount = !prefs.get("firebase_user_uid", null).isNullOrEmpty() ||
+                    !prefs.get("firebase_user_email", null).isNullOrEmpty()
+            if (hasLegacyAccount) {
+                val os = System.getProperty("os.name") ?: "Unknown"
+                val uid = prefs.get("firebase_user_uid", null)
+                val email = prefs.get("firebase_user_email", null)
+                val stableAccountId = uid ?: email ?: "Unknown"
+                val rawId = "$os:$stableAccountId"
+                deviceId = java.util.UUID.nameUUIDFromBytes(rawId.toByteArray()).toString()
+            } else {
+                deviceId = java.util.UUID.randomUUID().toString()
+            }
+            prefs.put("device_id", deviceId)
+        }
+        return deviceId
+    }
+
+    enum class SyncMode {
+        LOCAL_ONLY,
+        METADATA_ONLY,
+        SUMMARIES_ONLY,
+        FULL_SYNC
+    }
+
+    fun getSyncMode(): SyncMode {
+        val value = prefs.get("ecosystem_sync_mode", SyncMode.METADATA_ONLY.name)
+        return try {
+            SyncMode.valueOf(value)
+        } catch (e: Exception) {
+            SyncMode.METADATA_ONLY
+        }
+    }
+
+    fun setSyncMode(mode: SyncMode) {
+        prefs.put("ecosystem_sync_mode", mode.name)
+    }
+
+    fun getEcosystemActive(): Boolean {
+        return prefs.getBoolean("ecosystem_active", false)
+    }
+
+    fun setEcosystemActive(value: Boolean) {
+        prefs.putBoolean("ecosystem_active", value)
+    }
+
+    fun getPreferredParserMode(): ParserMode {
+        val name = prefs.get("preferred_parser_mode", ParserMode.SUMMARIZING.name)
+        return try {
+            ParserMode.valueOf(name)
+        } catch (e: Exception) {
+            ParserMode.SUMMARIZING
+        }
+    }
+
+    fun setPreferredParserMode(mode: ParserMode) {
+        prefs.put("preferred_parser_mode", mode.name)
+    }
+
+    fun getEffectiveParserMode(): ParserMode {
+        return if (getEcosystemActive()) {
+            getPreferredParserMode()
+        } else {
+            ParserMode.STANDARD
+        }
+    }
+
+    enum class RemoteControlPolicy {
+        ALLOW_ALL,
+        ALLOW_PAIRED_ONLY,
+        BLOCK_ALL
+    }
+
+    fun getRemoteControlPolicy(): RemoteControlPolicy {
+        val value = prefs.get("remote_control_policy", RemoteControlPolicy.ALLOW_PAIRED_ONLY.name)
+        return try {
+            RemoteControlPolicy.valueOf(value)
+        } catch (e: Exception) {
+            RemoteControlPolicy.ALLOW_PAIRED_ONLY
+        }
+    }
+
+    fun setRemoteControlPolicy(policy: RemoteControlPolicy) {
+        prefs.put("remote_control_policy", policy.name)
+    }
+
+    fun getExcludedPaths(): List<String> {
+        val value = prefs.get("excluded_paths", "")
+        return JsonUtils.deserializeList(value)
+    }
+
+    fun setExcludedPaths(paths: List<String>) {
+        val nonBlank = paths.filter { it.isNotBlank() }
+        val jsonStr = JsonUtils.serializeList(nonBlank)
+        prefs.put("excluded_paths", jsonStr)
+    }
+
+    private fun putOrRemove(key: String, value: String?) {
+        if (value == null) {
+            prefs.remove(key)
+        } else {
+            prefs.put(key, value)
+        }
     }
 
     fun getPinnedSessionIds(): Set<String> {
