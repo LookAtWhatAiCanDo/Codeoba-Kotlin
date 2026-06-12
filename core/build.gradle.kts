@@ -69,7 +69,9 @@ kotlin {
 
 val generateBuildConfig = tasks.register("generateBuildConfig") {
     val localPropsFile = project.rootProject.file("local.properties")
-    inputs.file(localPropsFile).optional()
+    if (localPropsFile.exists()) {
+        inputs.file(localPropsFile).optional()
+    }
     
     val outputDir = file("${layout.buildDirectory.get().asFile}/generated-sources/buildconfig")
     outputs.dir(outputDir)
