@@ -1,62 +1,64 @@
 plugins {
-    kotlin("multiplatform")
-    kotlin("plugin.serialization")
-    id("org.jetbrains.compose")
-    id("org.jetbrains.kotlin.plugin.compose")
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.compose)
+    alias(libs.plugins.compose.compiler)
 }
 
 kotlin {
     // Desktop (JVM) target
-    jvm("desktop") {
-        withJava()
-    }
+    jvm("desktop")
 
     sourceSets {
+        @Suppress("unused")
         val commonMain by getting {
             dependencies {
-                implementation(compose.runtime)
-                implementation(compose.foundation)
-                implementation(compose.material3)
-                implementation(compose.ui)
-                implementation(compose.components.resources)
-                implementation(compose.components.uiToolingPreview)
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.foundation)
+                implementation(libs.compose.material3)
+                implementation(libs.compose.ui)
+                implementation(libs.compose.components.resources)
+                implementation(libs.compose.components.ui.tooling.preview)
 
                 // Coroutines & Serialization
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.serialization.json)
 
                 // Ktor HTTP/WebSocket Client
-                implementation("io.ktor:ktor-client-core:2.3.12")
-                implementation("io.ktor:ktor-client-cio:2.3.12")
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.cio)
             }
         }
 
+        @Suppress("unused")
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
             }
         }
 
+        @Suppress("unused")
         val desktopMain by getting {
             dependencies {
                 implementation(compose.desktop.currentOs)
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.1")
-
-                // SQLite JDBC — pure-Java, no subprocess needed
-                implementation("org.xerial:sqlite-jdbc:3.45.3.0")
-
-                // ONNX Runtime for JVM
-                implementation("com.microsoft.onnxruntime:onnxruntime:1.18.0")
+                implementation(libs.kotlinx.coroutines.swing)
 
                 // Ktor Server (for local Hub API)
-                implementation("io.ktor:ktor-server-core:2.3.12")
-                implementation("io.ktor:ktor-server-netty:2.3.12")
-                implementation("io.ktor:ktor-server-content-negotiation:2.3.12")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
-                implementation("io.ktor:ktor-server-cors:2.3.12")
+                implementation(libs.ktor.serialization.kotlinx.json)
+                implementation(libs.ktor.server.core)
+                implementation(libs.ktor.server.cors)
+                implementation(libs.ktor.server.content.negotiation)
+                implementation(libs.ktor.server.netty)
+
+                // ONNX Runtime for JVM
+                implementation(libs.onnxruntime)
+
+                // SQLite JDBC — pure-Java, no subprocess needed
+                implementation(libs.sqlite.jdbc)
             }
         }
 
+        @Suppress("unused")
         val desktopTest by getting
     }
 }

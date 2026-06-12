@@ -1,8 +1,8 @@
 plugins {
-    kotlin("multiplatform") version "2.2.10" apply false
-    kotlin("plugin.serialization") version "2.2.10" apply false
-    id("org.jetbrains.compose") version "1.11.1" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.2.10" apply false
+    alias(libs.plugins.kotlin.multiplatform) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.compose) apply false
+    alias(libs.plugins.compose.compiler) apply false
 }
 
 allprojects {

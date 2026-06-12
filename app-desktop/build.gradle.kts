@@ -1,14 +1,15 @@
 plugins {
-    kotlin("multiplatform")
-    kotlin("plugin.serialization")
-    id("org.jetbrains.compose")
-    id("org.jetbrains.kotlin.plugin.compose")
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.compose)
+    alias(libs.plugins.compose.compiler)
 }
 
 val defaultVersion = "0.1.0"
 val appVersion = project.findProperty("appVersion")?.toString() ?: defaultVersion
 
 val generateVersionResource by tasks.registering {
+    description = "Generate version.txt resource file"
     val outputDir = layout.buildDirectory.dir("generated/resources/version")
     inputs.property("appVersion", appVersion)
     outputs.dir(outputDir)
@@ -19,28 +20,27 @@ val generateVersionResource by tasks.registering {
     }
 }
 
-tasks.withType<org.gradle.language.jvm.tasks.ProcessResources>().configureEach {
+tasks.withType<ProcessResources>().configureEach {
     dependsOn(generateVersionResource)
 }
 
 kotlin {
-    jvm("desktop") {
-        withJava()
-    }
+    jvm("desktop")
 
     sourceSets {
+        @Suppress("unused")
         val desktopMain by getting {
             resources.srcDir(generateVersionResource.map { it.outputs.files.singleFile })
             dependencies {
                 implementation(project(":core"))
-                implementation("com.whataicando:compose-desktop-touch:1.0.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation(compose.desktop.currentOs)
-                implementation(compose.runtime)
-                implementation(compose.foundation)
-                implementation(compose.material3)
-                implementation(compose.ui)
-                implementation(compose.materialIconsExtended)
+                implementation(libs.compose.desktop.touch)
+                implementation(libs.compose.foundation)
+                implementation(libs.compose.material.icons.extended)
+                implementation(libs.compose.material3)
+                implementation(libs.compose.runtime)
+                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.compose.ui)
             }
         }
     }
