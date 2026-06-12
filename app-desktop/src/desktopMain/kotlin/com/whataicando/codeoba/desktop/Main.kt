@@ -314,6 +314,7 @@ fun mainEntry() = application {
 
     LaunchedEffect(refreshTrigger) {
         semanticEngine.similarityThreshold = SettingsManager.getSimilarityThreshold()
+        com.whataicando.codeoba.core.premium.PremiumLoader.sync(SettingsManager.getEcosystemActive())
     }
 
     val onDownloadModel = {
