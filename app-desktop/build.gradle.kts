@@ -41,6 +41,7 @@ kotlin {
                 implementation(libs.compose.runtime)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.compose.ui)
+                implementation(libs.slf4j.simple)
             }
         }
     }

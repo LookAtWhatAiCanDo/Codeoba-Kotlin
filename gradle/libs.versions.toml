@@ -9,6 +9,7 @@ kotlinx-serialization = "1.6.3"
 ktor = "2.3.12"
 onnxruntime = "1.18.0"
 sqlite-jdbc = "3.45.3.0"
+slf4j = "1.7.36"
 
 [libraries]
 compose-components-resources = { group = "org.jetbrains.compose.components", name = "components-resources", version.ref = "compose" }
@@ -31,6 +32,7 @@ ktor-server-cors = { group = "io.ktor", name = "ktor-server-cors", version.ref =
 ktor-server-netty = { group = "io.ktor", name = "ktor-server-netty", version.ref = "ktor" }
 onnxruntime = { group = "com.microsoft.onnxruntime", name = "onnxruntime", version.ref = "onnxruntime" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
+slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4j" }
 
 [plugins]
 compose = { id = "org.jetbrains.compose", version.ref = "compose" }
