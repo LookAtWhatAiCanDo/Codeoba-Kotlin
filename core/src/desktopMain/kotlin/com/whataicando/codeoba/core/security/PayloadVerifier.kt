@@ -1,14 +1,13 @@
 package com.whataicando.codeoba.core.security
 
+import com.whataicando.codeoba.core.util.BuildConfig
+import java.security.GeneralSecurityException
 import java.security.KeyFactory
 import java.security.Signature
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
 object PayloadVerifier {
-    // Pinned Ed25519 Public Key (corresponds to developer private key used to sign premium payloads)
-    private const val PINNED_PUBLIC_KEY = "MCowBQYDK2VwAyEAODI39ZiclCUrQ8b4r+Euel+vXKJ5HReZgUuo5oa82h8="
-
     @Volatile
     private var testPublicKey: java.security.PublicKey? = null
 
@@ -17,7 +16,7 @@ object PayloadVerifier {
     }
 
     private val publicKey by lazy {
-        val keyBytes = Base64.getDecoder().decode(PINNED_PUBLIC_KEY)
+        val keyBytes = Base64.getDecoder().decode(BuildConfig.PREMIUM_PUBLIC_KEY)
         val spec = X509EncodedKeySpec(keyBytes)
         KeyFactory.getInstance("Ed25519").generatePublic(spec)
     }
@@ -28,7 +27,7 @@ object PayloadVerifier {
             sig.initVerify(testPublicKey ?: publicKey)
             sig.update(data)
             sig.verify(signatureBytes)
-        } catch (e: Exception) {
+        } catch (_: GeneralSecurityException) {
             false
         }
     }

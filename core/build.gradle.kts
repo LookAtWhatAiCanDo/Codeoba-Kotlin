@@ -76,14 +76,17 @@ val generateBuildConfig = tasks.register("generateBuildConfig") {
     val outputDir = file("${layout.buildDirectory.get().asFile}/generated-sources/buildconfig")
     outputs.dir(outputDir)
     doLast {
-        val enableSub = if (localPropsFile.exists()) {
-            val props = Properties()
+        val props = Properties()
+        if (localPropsFile.exists()) {
             localPropsFile.inputStream().use { props.load(it) }
-            props.getProperty("codeoba.enable_subscription")?.toBoolean() ?: false
-        } else {
-            false
         }
-
+        val enableSub = props.getProperty("codeoba.enable_subscription")?.toBoolean() ?: false
+        
+        val defaultPublicKey = "MCowBQYDK2VwAyEAODI39ZiclCUrQ8b4r+Euel+vXKJ5HReZgUuo5oa82h8="
+        val premiumPublicKey = System.getenv("CODEOBA_PREMIUM_PUBLIC_KEY")
+            ?: project.findProperty("codeoba.premium.public_key")?.toString()
+            ?: props.getProperty("codeoba.premium.public_key")
+            ?: defaultPublicKey
         
         val buildConfigFile = file("$outputDir/com/whataicando/codeoba/core/util/BuildConfig.kt")
         buildConfigFile.parentFile.mkdirs()
@@ -92,6 +95,7 @@ val generateBuildConfig = tasks.register("generateBuildConfig") {
             
             object BuildConfig {
                 const val ENABLE_SUBSCRIPTION = $enableSub
+                const val PREMIUM_PUBLIC_KEY = "$premiumPublicKey"
             }
         """.trimIndent())
     }
