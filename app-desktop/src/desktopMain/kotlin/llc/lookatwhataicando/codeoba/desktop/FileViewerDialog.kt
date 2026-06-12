@@ -41,6 +41,7 @@ import java.util.Date
 
 import llc.lookatwhataicando.codeoba.core.util.LocalFileResolver
 import llc.lookatwhataicando.codeoba.core.util.LocalFileResolution
+import com.whataicando.touch.compose.touchScrim
 import androidx.compose.animation.*
 import androidx.compose.material.icons.filled.Check
 
@@ -212,6 +213,7 @@ fun FileViewerDialog(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .touchScrim(priority = 1)
             .background(Color.Black.copy(alpha = 0.75f))
             .clickable(
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },

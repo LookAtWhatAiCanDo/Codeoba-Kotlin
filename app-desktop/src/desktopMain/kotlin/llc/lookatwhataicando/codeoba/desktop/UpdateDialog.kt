@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.awt.Cursor
+import com.whataicando.touch.compose.touchScrim
 
 @Composable
 fun UpdateDialog(
@@ -107,6 +108,7 @@ fun UpdateDialog(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .touchScrim(priority = 1)
             .background(Color.Black.copy(alpha = 0.75f))
             .clickable(
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },

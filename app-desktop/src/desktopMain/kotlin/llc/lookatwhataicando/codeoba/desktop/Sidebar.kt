@@ -876,6 +876,7 @@ fun Sidebar(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
+                            .dragToScroll(scrollState)
                             .verticalScroll(scrollState)
                             .padding(end = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)

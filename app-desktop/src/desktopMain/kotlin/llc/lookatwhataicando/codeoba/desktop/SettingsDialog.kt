@@ -42,6 +42,7 @@ import kotlinx.coroutines.launch
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceRegistry
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
+import com.whataicando.touch.compose.touchScrim
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -71,6 +72,7 @@ fun SettingsDialog(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .touchScrim(priority = 1)
             .background(Color.Black.copy(alpha = 0.75f))
             .clickable(
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
@@ -187,7 +189,7 @@ fun SettingsDialog(
                                         verticalArrangement = Arrangement.spacedBy(16.dp),
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .dragToScroll(scrollState)
+                                            .dragToScroll(scrollState, priority = 1)
                                             .verticalScroll(scrollState)
                                             .padding(end = 12.dp)
                                     ) {
@@ -442,7 +444,7 @@ fun SettingsDialog(
                                         verticalArrangement = Arrangement.spacedBy(12.dp),
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .dragToScroll(lazyListState)
+                                            .dragToScroll(lazyListState, priority = 1)
                                             .padding(end = 12.dp)
                                     ) {
                                         items(sourceRegistry.getAllAdapters()) { adapter ->
@@ -481,7 +483,7 @@ fun SettingsDialog(
                                         verticalArrangement = Arrangement.spacedBy(16.dp),
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .dragToScroll(scrollState)
+                                            .dragToScroll(scrollState, priority = 1)
                                             .verticalScroll(scrollState)
                                             .padding(end = 12.dp)
                                     ) {
@@ -604,9 +606,13 @@ fun SettingsDialog(
                                         )
                                     }
                                 } else {
+                                    val permissionsScrollState = rememberScrollState()
                                     Column(
                                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .dragToScroll(permissionsScrollState, priority = 1)
+                                            .verticalScroll(permissionsScrollState)
                                     ) {
                                         permissionsList.forEach { entry ->
                                             Card(
@@ -747,7 +753,7 @@ fun SettingsDialog(
                                             state = lazyListState,
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .dragToScroll(lazyListState)
+                                                .dragToScroll(lazyListState, priority = 1)
                                                 .background(CardSurface, RoundedCornerShape(8.dp))
                                                 .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
                                                 .padding(end = 12.dp)

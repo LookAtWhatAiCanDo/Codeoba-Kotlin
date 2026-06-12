@@ -50,6 +50,8 @@ import androidx.compose.foundation.defaultScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.rememberScrollbarAdapter
 import kotlinx.coroutines.launch
+import com.whataicando.touch.compose.touchScrollable
+import com.whataicando.touch.compose.touchScrim
 
 
 @Composable
@@ -337,6 +339,7 @@ fun WarningOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .touchScrim(priority = 1)
             .background(Color.Black.copy(alpha = 0.7f))
             .clickable(
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
@@ -502,32 +505,38 @@ fun WarningOverlay(
 
 fun Modifier.dragToScroll(
     scrollState: ScrollState,
-    orientation: Orientation = Orientation.Vertical
+    orientation: Orientation = Orientation.Vertical,
+    priority: Int = 0
 ): Modifier = this.composed {
     val coroutineScope = rememberCoroutineScope()
-    this.draggable(
-        orientation = orientation,
-        state = rememberDraggableState { delta ->
-            coroutineScope.launch {
-                scrollState.scrollBy(-delta)
+    this
+        .touchScrollable(scrollState, orientation, priority = priority)
+        .draggable(
+            orientation = orientation,
+            state = rememberDraggableState { delta ->
+                coroutineScope.launch {
+                    scrollState.scrollBy(-delta)
+                }
             }
-        }
-    )
+        )
 }
 
 fun Modifier.dragToScroll(
     lazyListState: LazyListState,
-    orientation: Orientation = Orientation.Vertical
+    orientation: Orientation = Orientation.Vertical,
+    priority: Int = 0
 ): Modifier = this.composed {
     val coroutineScope = rememberCoroutineScope()
-    this.draggable(
-        orientation = orientation,
-        state = rememberDraggableState { delta ->
-            coroutineScope.launch {
-                lazyListState.scrollBy(-delta)
+    this
+        .touchScrollable(lazyListState, orientation, priority = priority)
+        .draggable(
+            orientation = orientation,
+            state = rememberDraggableState { delta ->
+                coroutineScope.launch {
+                    lazyListState.scrollBy(-delta)
+                }
             }
-        }
-    )
+        )
 }
 
 @Composable

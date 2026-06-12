@@ -33,6 +33,7 @@ kotlin {
             resources.srcDir(generateVersionResource.map { it.outputs.files.singleFile })
             dependencies {
                 implementation(project(":core"))
+                implementation("com.whataicando:compose-desktop-touch:1.0.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 implementation(compose.desktop.currentOs)
                 implementation(compose.runtime)
