@@ -45,8 +45,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -232,7 +237,7 @@ fun DetailPaneToolbar(
                     modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Navigate back",
                         tint = if (canGoBack) AccentCyan else TextSecondary.copy(alpha = 0.4f),
                         modifier = Modifier.size(18.dp)
@@ -247,7 +252,7 @@ fun DetailPaneToolbar(
                     modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ArrowForward,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = "Navigate forward",
                         tint = if (canGoForward) AccentCyan else TextSecondary.copy(alpha = 0.4f),
                         modifier = Modifier.size(18.dp)
@@ -424,7 +429,7 @@ fun DetailPaneToolbar(
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                 ) {
                                                     Icon(
-                                                        imageVector = Icons.Default.ArrowBack,
+                                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                                         contentDescription = "Back",
                                                         tint = TextSecondary,
                                                         modifier = Modifier.size(16.dp)
@@ -631,7 +636,7 @@ fun DetailPaneToolbar(
                         modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
-                            imageVector = if (isHeaderExpanded) Icons.Default.KeyboardArrowLeft else Icons.Default.KeyboardArrowRight,
+                            imageVector = if (isHeaderExpanded) Icons.AutoMirrored.Filled.KeyboardArrowLeft else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                             contentDescription = if (isHeaderExpanded) "Collapse details" else "Expand details",
                             tint = AccentCyan,
                             modifier = Modifier.size(18.dp)
@@ -1270,7 +1275,7 @@ fun DetailPane(
                                                         title = "Dialogue Exchanges",
                                                         value = formatNumber(totalTurns.toLong()),
                                                         subtitle = "Avg. Depth: ${String.format("%.1f", avgTurns)} turns / session",
-                                                        icon = Icons.Default.Chat
+                                                        icon = Icons.AutoMirrored.Filled.Chat
                                                     )
                                                 }
                                             }
@@ -1292,7 +1297,7 @@ fun DetailPane(
                                                         title = "Est. Total Tokens",
                                                         value = formatNumber(totalEstTokens.toLong()),
                                                         subtitle = "Prompt + Completion tokens",
-                                                        icon = Icons.Default.CompareArrows
+                                                        icon = Icons.AutoMirrored.Filled.CompareArrows
                                                     )
                                                 }
                                             }
@@ -2056,7 +2061,7 @@ fun WorkedForBlock(
                 fontWeight = FontWeight.Medium
             )
             Icon(
-                imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = TextSecondary,
                 modifier = Modifier.size(16.dp)
