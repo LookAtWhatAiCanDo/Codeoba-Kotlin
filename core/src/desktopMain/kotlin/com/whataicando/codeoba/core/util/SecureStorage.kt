@@ -8,6 +8,7 @@ object SecureStorage {
 
     private val keyring: Keyring? = try {
         if (System.getProperty("codeoba.no.keyring") == "true") {
+            // This is used for development when the app is not signed to prevent keyring access popups.
             Logger.log("SecureStorage: Native Keyring disabled via system property. Falling back to Java Preferences.")
             null
         } else {
