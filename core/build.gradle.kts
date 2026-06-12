@@ -34,7 +34,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("io.ktor:ktor-client-mock:2.3.12")
+                implementation(libs.ktor.client.mock)
             }
         }
 
@@ -42,6 +42,7 @@ kotlin {
         val desktopMain by getting {
             dependencies {
                 implementation(compose.desktop.currentOs)
+                implementation(libs.java.keyring)
                 implementation(libs.kotlinx.coroutines.swing)
 
                 // Ktor Server (for local Hub API)
@@ -56,13 +57,6 @@ kotlin {
 
                 // SQLite JDBC — pure-Java, no subprocess needed
                 implementation(libs.sqlite.jdbc)
-                // Ktor Server (for local Hub API)
-                implementation("io.ktor:ktor-server-core:2.3.12")
-                implementation("io.ktor:ktor-server-netty:2.3.12")
-                implementation("io.ktor:ktor-server-content-negotiation:2.3.12")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
-                implementation("io.ktor:ktor-server-cors:2.3.12")
-                implementation("com.github.javakeyring:java-keyring:1.0.4")
             }
         }
 
