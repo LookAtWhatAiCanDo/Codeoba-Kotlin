@@ -3,8 +3,8 @@ package llc.lookatwhataicando.codeoba.desktop
 import llc.lookatwhataicando.codeoba.core.domain.parser.ParserMode
 import llc.lookatwhataicando.codeoba.core.domain.search.ArchivalFilter
 import llc.lookatwhataicando.codeoba.core.domain.source.SourceAdapter
-import llc.lookatwhataicando.codeoba.core.util.SecureStorage
 import llc.lookatwhataicando.codeoba.core.util.JsonUtils
+import llc.lookatwhataicando.codeoba.core.util.SecureStorage
 import java.util.prefs.Preferences
 
 object SettingsManager {

@@ -1,13 +1,13 @@
 package llc.lookatwhataicando.codeoba.core.auth
 
 import com.sun.net.httpserver.HttpServer
-import llc.lookatwhataicando.codeoba.core.util.Logger.log
-import java.net.InetSocketAddress
-import java.net.URLDecoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import llc.lookatwhataicando.codeoba.core.util.AppConfig
+import llc.lookatwhataicando.codeoba.core.util.Logger.log
+import java.net.InetSocketAddress
+import java.net.URLDecoder
 
 object LocalAuthServer {
     private var server: HttpServer? = null

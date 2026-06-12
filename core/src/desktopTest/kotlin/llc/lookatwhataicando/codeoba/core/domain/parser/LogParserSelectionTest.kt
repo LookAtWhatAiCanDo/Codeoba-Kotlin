@@ -1,12 +1,12 @@
 package llc.lookatwhataicando.codeoba.core.domain.parser
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-import kotlin.test.assertNotNull
+import kotlinx.coroutines.runBlocking
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import java.io.File
-import kotlinx.coroutines.runBlocking
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class LogParserSelectionTest {
 

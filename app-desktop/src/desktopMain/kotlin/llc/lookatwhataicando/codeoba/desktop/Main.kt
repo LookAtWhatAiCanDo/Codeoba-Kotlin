@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -76,14 +74,8 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.whataicando.touch.compose.WindowsTouch
-import androidx.compose.ui.window.WindowPlacement
-import androidx.compose.ui.window.WindowPosition
-import androidx.compose.ui.window.application
-import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.launch
 import llc.lookatwhataicando.codeoba.core.domain.auth.FirebaseAuthException
-import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
-import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import llc.lookatwhataicando.codeoba.core.domain.model.ConversationGroup
 import llc.lookatwhataicando.codeoba.core.domain.model.Session
 import llc.lookatwhataicando.codeoba.core.domain.parser.LogParserFactory
@@ -111,16 +103,11 @@ import llc.lookatwhataicando.codeoba.core.util.LocalFileResolution
 import llc.lookatwhataicando.codeoba.core.util.LocalFileResolver
 import llc.lookatwhataicando.codeoba.core.util.Logger.log
 import llc.lookatwhataicando.codeoba.core.util.ModelDownloader
-import llc.lookatwhataicando.codeoba.core.util.Logger.log
-import llc.lookatwhataicando.codeoba.core.util.ModelDownloader
 import llc.lookatwhataicando.codeoba.core.util.PlatformUtils
 import java.awt.Cursor
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.Date
-import kotlin.math.round
-import java.awt.Desktop
-import java.net.URI
 
 // Premium Dark Color Palette (dynamic definitions located in Theme.kt)
 
