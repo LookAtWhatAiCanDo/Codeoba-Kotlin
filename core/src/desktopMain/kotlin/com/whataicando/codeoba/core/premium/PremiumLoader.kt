@@ -2,6 +2,7 @@ package com.whataicando.codeoba.core.premium
 
 import com.whataicando.codeoba.core.domain.parser.SummarizerProvider
 import com.whataicando.codeoba.core.util.AppConfig
+import com.whataicando.codeoba.core.util.Logger.log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -21,6 +22,9 @@ object PremiumLoader {
     suspend fun sync(isSubscribed: Boolean) {
         withContext(Dispatchers.IO) {
             if (!isSubscribed) {
+                if (SummarizerProvider.current().javaClass.simpleName != "StubSummarizer") {
+                    log("PremiumLoader: Reverting to StubSummarizer (Ecosystem Sync disabled).")
+                }
                 SummarizerProvider.revertToStub()
                 return@withContext
             }
@@ -46,6 +50,7 @@ object PremiumLoader {
                                     manifest.entrypointClass
                                 )
                                 SummarizerProvider.install(instance)
+                                log("PremiumLoader: Successfully loaded local developer override module: ${manifest.entrypointClass}")
                                 return@withContext
                             }
                         }
@@ -70,8 +75,10 @@ object PremiumLoader {
                         serverManifest.entrypointClass
                     )
                     SummarizerProvider.install(instance)
+                    log("PremiumLoader: Successfully loaded premium module from cache: ${serverManifest.entrypointClass}")
                 } else {
                     // Cache is invalid or outdated, download new jar
+                    log("PremiumLoader: Cache missing or outdated. Syncing module from $jarUrl...")
                     val jarBytes = downloadBytes(jarUrl)
                     
                     // Verify hash and signature before writing to disk
@@ -93,9 +100,10 @@ object PremiumLoader {
                         serverManifest.entrypointClass
                     )
                     SummarizerProvider.install(instance)
+                    log("PremiumLoader: Successfully downloaded, verified, and loaded premium module: ${serverManifest.entrypointClass}")
                 }
             } catch (e: Exception) {
-                System.err.println("Premium Loader sync failed: ${e.message}")
+                log("PremiumLoader: Sync failed: ${e.message}")
                 // Fall back to stub or try loading cached version as offline grace period if valid
                 if (PremiumCache.verifyCachedPayload()) {
                     try {
@@ -105,10 +113,13 @@ object PremiumLoader {
                             cachedManifest.entrypointClass
                         )
                         SummarizerProvider.install(instance)
+                        log("PremiumLoader: Offline fallback to cached premium module succeeded: ${cachedManifest.entrypointClass}")
                     } catch (inner: Exception) {
+                        log("PremiumLoader: Reverting to StubSummarizer after fallback exception.")
                         SummarizerProvider.revertToStub()
                     }
                 } else {
+                    log("PremiumLoader: Reverting to StubSummarizer.")
                     SummarizerProvider.revertToStub()
                 }
             }
