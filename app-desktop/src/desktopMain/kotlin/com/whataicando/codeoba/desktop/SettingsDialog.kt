@@ -1849,7 +1849,7 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                                                 val portalUrl = FirebaseAuthClient.getCustomerPortalUrl(refreshedAuth.idToken)
                                                                 java.awt.Desktop.getDesktop().browse(java.net.URI(portalUrl))
                                                             } catch (refreshEx: Exception) {
-                                                                log("Failed to refresh token after auth error: ${refreshEx.message}")
+                                                                log("Failed to refresh token after auth error", refreshEx)
                                                                 throw e
                                                             }
                                                         } else {
@@ -1960,7 +1960,7 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                                 isLoading = false
                                                 onSettingsChanged()
                                             } catch (e: Exception) {
-                                                log("Error configuring device keys: ${e.message}")
+                                                log("Error configuring device keys", e)
                                                 // Roll back partial sign-in state so the user can retry cleanly.
                                                 SettingsManager.setFirebaseUserEmail(null)
                                                 SettingsManager.setFirebaseUserUid(null)

@@ -51,7 +51,25 @@ object FirebaseAuthClient {
     private val useEmulator: Boolean
         get() = AppConfig.useEmulator()
 
-
+    private fun extractErrorMessage(responseText: String, defaultMsg: String): String {
+        if (responseText.isBlank()) return defaultMsg
+        return try {
+            val root = json.parseToJsonElement(responseText).jsonObject
+            val errorObj = root["error"]?.jsonObject
+            val message = errorObj?.get("message")?.jsonPrimitive?.content
+            val status = errorObj?.get("status")?.jsonPrimitive?.content
+            if (message != null && status != null) {
+                "$message (Status: $status)"
+            } else if (message != null) {
+                message
+            } else {
+                val errorDetails = root["error"]?.jsonPrimitive?.content
+                errorDetails ?: responseText.take(500)
+            }
+        } catch (_: Exception) {
+            responseText.take(500)
+        }
+    }
 
     suspend fun refreshIdToken(refreshToken: String): AuthResponse {
         return withContext(Dispatchers.IO) {
@@ -118,7 +136,8 @@ object FirebaseAuthClient {
             
             val responseText = response.bodyAsText()
             if (response.status.value != 200) {
-                throw FirebaseAuthException(response.status.value, "Failed to get registration challenge. Status: ${response.status.value}")
+                val errorMsg = extractErrorMessage(responseText, "Failed to get registration challenge. Status: ${response.status.value}")
+                throw FirebaseAuthException(response.status.value, errorMsg)
             }
             
             val root = json.parseToJsonElement(responseText).jsonObject
@@ -152,7 +171,8 @@ object FirebaseAuthClient {
             
             val responseText = response.bodyAsText()
             if (response.status.value != 200) {
-                throw FirebaseAuthException(response.status.value, "Failed to register device in Sync Hub. Status: ${response.status.value}")
+                val errorMsg = extractErrorMessage(responseText, "Failed to register device in Sync Hub. Status: ${response.status.value}")
+                throw FirebaseAuthException(response.status.value, errorMsg)
             }
             
             val root = json.parseToJsonElement(responseText).jsonObject
@@ -180,11 +200,8 @@ object FirebaseAuthClient {
             
             val responseText = response.bodyAsText()
             if (response.status.value != 200) {
-                val errorMsg = try {
-                    val root = json.parseToJsonElement(responseText).jsonObject
-                    root["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
-                } catch (_: Exception) { null }
-                throw FirebaseAuthException(response.status.value, errorMsg ?: "Failed to get customer portal URL. Status: ${response.status.value}")
+                val errorMsg = extractErrorMessage(responseText, "Failed to get customer portal URL. Status: ${response.status.value}")
+                throw FirebaseAuthException(response.status.value, errorMsg)
             }
             
             val root = json.parseToJsonElement(responseText).jsonObject

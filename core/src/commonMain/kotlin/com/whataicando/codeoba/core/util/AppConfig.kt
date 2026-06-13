@@ -67,7 +67,10 @@ object AppConfig {
      */
     fun getFirebaseProjectId(): String {
         val host = getBaseUrl()
-        val isDev = useEmulator() || Regex("(^|\\.)codeoba-dev(\\.|$)").containsMatchIn(host)
+        val domain = host.substringBefore(':')
+        val isDev = useEmulator() || 
+            Regex("(^|\\.)codeoba-dev(\\.|$)").containsMatchIn(domain) ||
+            domain == "dev.codeoba.com"
         return if (isDev) {
             "codeoba-dev"
         } else {
