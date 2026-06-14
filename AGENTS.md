@@ -206,4 +206,4 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
 
 - Compile Desktop Client: `./gradlew :app-desktop:compileKotlinDesktop`
 - Run Unit Tests: `./gradlew :core:desktopTest`
-- Launch Application in Dev Mode: `./gradlew :app-desktop:run`
+- Launch Application in Dev Mode: `./gradlew :app-desktop:run -Dcodeoba.no.keyring=true -Dcodeoba.base_url=localhost:5000`

@@ -1,5 +1,6 @@
 package com.whataicando.codeoba.core.premium
 
+import com.whataicando.codeoba.core.domain.model.PremiumManifest
 import com.whataicando.codeoba.core.domain.parser.SummarizerProvider
 import com.whataicando.codeoba.core.util.AppConfig
 import com.whataicando.codeoba.core.util.Logger.log
@@ -57,29 +58,42 @@ object PremiumLoader {
                     }
                 }
 
-                // 2. Online CDN download path
+                // 2. Authenticated download path from Cloud Function via rewrite endpoint
                 val consoleUrl = AppConfig.getWebConsoleUrl()
-                val manifestUrl = "$consoleUrl/premium-manifest.json"
-                val jarUrl = "$consoleUrl/premium.jar"
+                
+                // Get ID token and Device ID
+                val idToken = com.whataicando.codeoba.core.util.SecureStorage.get("firebase_auth_id_token")
+                val deviceId = try {
+                    java.util.prefs.Preferences.userRoot().node("com/whataicando/codeoba/desktop").get("device_id", null)
+                } catch (_: Exception) {
+                    null
+                }
 
-                val manifestBytes = downloadBytes(manifestUrl)
+                val deviceQuery = if (deviceId != null) "&deviceId=${java.net.URLEncoder.encode(deviceId, "UTF-8")}" else ""
+                val manifestUrl = "$consoleUrl/api/premium-download?file=manifest$deviceQuery"
+                val jarUrl = "$consoleUrl/api/premium-download?file=jar"
+
+                log("PremiumLoader: Fetching manifest from $manifestUrl")
+                val manifestBytes = downloadBytes(manifestUrl, idToken)
                 val serverManifest = json.decodeFromString<PremiumManifest>(manifestBytes.decodeToString())
 
                 val cachedManifest = PremiumCache.getCachedManifest()
                 val cacheValid = PremiumCache.verifyCachedPayload()
 
                 if (cacheValid && cachedManifest != null && cachedManifest.jarHash == serverManifest.jarHash) {
-                    // Cache is up to date and valid, load from cache
+                    // Cache is up to date and valid, update the manifest in cache (keeps watermark fresh)
+                    PremiumCache.saveManifest(serverManifest)
                     val instance = ClassLoaderInstaller.install(
                         PremiumCache.getJarFile(),
                         serverManifest.entrypointClass
                     )
                     SummarizerProvider.install(instance)
+                    PremiumCache.saveLastSyncTimestamp()
                     log("PremiumLoader: Successfully loaded premium module from cache: ${serverManifest.entrypointClass}")
                 } else {
                     // Cache is invalid or outdated, download new jar
                     log("PremiumLoader: Cache missing or outdated. Syncing module from $jarUrl...")
-                    val jarBytes = downloadBytes(jarUrl)
+                    val jarBytes = downloadBytes(jarUrl, idToken)
                     
                     // Verify hash and signature before writing to disk
                     if (PremiumCache.sha256(jarBytes) != serverManifest.jarHash) {
@@ -100,12 +114,13 @@ object PremiumLoader {
                         serverManifest.entrypointClass
                     )
                     SummarizerProvider.install(instance)
+                    PremiumCache.saveLastSyncTimestamp()
                     log("PremiumLoader: Successfully downloaded, verified, and loaded premium module: ${serverManifest.entrypointClass}")
                 }
             } catch (e: Exception) {
                 log("PremiumLoader: Sync failed: ${e.message}")
                 // Fall back to stub or try loading cached version as offline grace period if valid
-                if (PremiumCache.verifyCachedPayload()) {
+                if (PremiumCache.verifyCachedPayload() && PremiumCache.isWithinGracePeriod()) {
                     try {
                         val cachedManifest = PremiumCache.getCachedManifest()!!
                         val instance = ClassLoaderInstaller.install(
@@ -119,19 +134,22 @@ object PremiumLoader {
                         SummarizerProvider.revertToStub()
                     }
                 } else {
-                    log("PremiumLoader: Reverting to StubSummarizer.")
+                    log("PremiumLoader: Cache invalid or offline grace period expired. Reverting to StubSummarizer.")
                     SummarizerProvider.revertToStub()
                 }
             }
         }
     }
 
-    private fun downloadBytes(urlStr: String): ByteArray {
+    private fun downloadBytes(urlStr: String, idToken: String?): ByteArray {
         val url = java.net.URI(urlStr).toURL()
         val connection = url.openConnection() as HttpURLConnection
         connection.connectTimeout = 5000
         connection.readTimeout = 10000
         connection.requestMethod = "GET"
+        if (idToken != null) {
+            connection.setRequestProperty("Authorization", "Bearer $idToken")
+        }
 
         val responseCode = connection.responseCode
         if (responseCode !in 200..299) {

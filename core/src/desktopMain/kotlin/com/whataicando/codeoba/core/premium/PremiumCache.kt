@@ -1,19 +1,12 @@
 package com.whataicando.codeoba.core.premium
 
+import com.whataicando.codeoba.core.domain.model.PremiumManifest
 import com.whataicando.codeoba.core.security.PayloadVerifier
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.security.MessageDigest
 import java.util.Base64
-
-@Serializable
-data class PremiumManifest(
-    val version: String,
-    val jarHash: String, // SHA-256
-    val signature: String, // Base64 encoded Ed25519 signature
-    val entrypointClass: String
-)
 
 object PremiumCache {
     private val json = Json { ignoreUnknownKeys = true }
@@ -73,5 +66,19 @@ object PremiumCache {
         val digest = MessageDigest.getInstance("SHA-256")
         val hash = digest.digest(bytes)
         return hash.joinToString("") { "%02x".format(it) }
+    }
+
+    fun saveLastSyncTimestamp() {
+        com.whataicando.codeoba.core.util.SecureStorage.put("premium_last_sync_ms", System.currentTimeMillis().toString())
+    }
+
+    fun getLastSyncTimestamp(): Long? {
+        return com.whataicando.codeoba.core.util.SecureStorage.get("premium_last_sync_ms")?.toLongOrNull()
+    }
+
+    fun isWithinGracePeriod(graceMs: Long = 24 * 60 * 60 * 1000L): Boolean {
+        val lastSync = getLastSyncTimestamp() ?: return false
+        val elapsed = System.currentTimeMillis() - lastSync
+        return elapsed in 0 until graceMs
     }
 }
