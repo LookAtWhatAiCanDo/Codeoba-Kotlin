@@ -166,9 +166,12 @@ If a critical vulnerability or remote-control bypass is detected, the backend ma
 
 ---
 
-## 🛠️ Compile-Time Subscription Gating (Developer Toggle)
+## 🛠️ Compile-Time Subscription Gating (Temporary Developer Toggle)
 
-To enable merging of ongoing subscription development changes to the `main` branch without exposing half-finished or confusing features to production users, the project uses a compile-time static configuration constant (`BuildConfig.ENABLE_SUBSCRIPTION`).
+To enable merging of ongoing subscription development changes to the `main` branch without exposing half-finished or confusing features to production users, and to allow developers to A/B test the application's behavior with and without subscription capabilities, the project uses a compile-time static configuration constant (`BuildConfig.ENABLE_SUBSCRIPTION`).
+
+> [!IMPORTANT]
+> **Temporary Transition Control:** This compile-time setting and the `codeoba.enable_subscription` toggle are temporary transition mechanisms. Once the subscription features are officially released, this toggle and gating logic will be removed, leaving the subscription and sync integration permanently enabled in all builds.
 
 ### 1. How Gating Works
 When building for production, `BuildConfig.ENABLE_SUBSCRIPTION` is statically set to `false`. 

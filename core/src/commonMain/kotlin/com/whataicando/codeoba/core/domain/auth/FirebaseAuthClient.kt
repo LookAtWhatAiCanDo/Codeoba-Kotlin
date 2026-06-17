@@ -28,6 +28,7 @@ object FirebaseAuthClient {
             val env = System.getenv("CODEOBA_FIREBASE_API_KEY")?.trim()
             prop.takeUnless { it.isNullOrBlank() }
                 ?: env.takeUnless { it.isNullOrBlank() }
+                ?: com.whataicando.codeoba.core.util.BuildConfig.FIREBASE_API_KEY.takeUnless { it == "EMULATOR_ONLY" }
                 ?: DEFAULT_FIREBASE_API_KEY
         } catch (_: Throwable) {
             DEFAULT_FIREBASE_API_KEY
@@ -130,6 +131,7 @@ object FirebaseAuthClient {
             
             val response: HttpResponse = client.post(url) {
                 header("Authorization", "Bearer $idToken")
+                header("X-App-Signature", com.whataicando.codeoba.core.util.BuildConfig.APP_SIGNATURE)
                 contentType(ContentType.Application.Json)
                 setBody(bodyStr)
             }
@@ -165,6 +167,7 @@ object FirebaseAuthClient {
             
             val response: HttpResponse = client.post(url) {
                 header("Authorization", "Bearer $idToken")
+                header("X-App-Signature", com.whataicando.codeoba.core.util.BuildConfig.APP_SIGNATURE)
                 contentType(ContentType.Application.Json)
                 setBody(bodyStr)
             }
@@ -194,6 +197,7 @@ object FirebaseAuthClient {
             
             val response: HttpResponse = client.post(url) {
                 header("Authorization", "Bearer $idToken")
+                header("X-App-Signature", com.whataicando.codeoba.core.util.BuildConfig.APP_SIGNATURE)
                 contentType(ContentType.Application.Json)
                 setBody(bodyStr)
             }

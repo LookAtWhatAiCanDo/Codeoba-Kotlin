@@ -80,14 +80,35 @@ val generateBuildConfig = tasks.register("generateBuildConfig") {
         if (localPropsFile.exists()) {
             localPropsFile.inputStream().use { props.load(it) }
         }
-        val enableSub = props.getProperty("codeoba.enable_subscription")?.toBoolean() ?: false
+        val enableSub = System.getenv("CODEOBA_ENABLE_SUBSCRIPTION")?.toBoolean()
+            ?: project.findProperty("codeoba.enable_subscription")?.toString()?.toBoolean()
+            ?: props.getProperty("codeoba.enable_subscription")?.toBoolean()
+            ?: false
         
-        val defaultPublicKey = "MCowBQYDK2VwAyEAODI39ZiclCUrQ8b4r+Euel+vXKJ5HReZgUuo5oa82h8="
         val premiumPublicKey = System.getenv("CODEOBA_PREMIUM_PUBLIC_KEY")
             ?: project.findProperty("codeoba.premium.public_key")?.toString()
             ?: props.getProperty("codeoba.premium.public_key")
-            ?: defaultPublicKey
+            ?: ""
+
+        if (enableSub && premiumPublicKey.isBlank()) {
+            throw GradleException(
+                "Error: Subscription features are enabled (codeoba.enable_subscription=true), but the premium public verification key is missing.\n" +
+                "Please configure 'codeoba.premium.public_key' in local.properties, or run developer key generation tasks to set up verification keys."
+            )
+        }
         
+        val defaultFirebaseApiKey = "EMULATOR_ONLY"
+        val firebaseApiKey = System.getenv("CODEOBA_FIREBASE_API_KEY")
+            ?: project.findProperty("codeoba.firebase.api_key")?.toString()
+            ?: props.getProperty("codeoba.firebase.api_key")
+            ?: defaultFirebaseApiKey
+
+        val defaultAppSignature = "DEVELOPMENT_ONLY"
+        val appSignature = System.getenv("CODEOBA_APP_SIGNATURE_HASH")
+            ?: project.findProperty("codeoba.app_signature_hash")?.toString()
+            ?: props.getProperty("codeoba.app_signature_hash")
+            ?: defaultAppSignature
+
         val buildConfigFile = file("$outputDir/com/whataicando/codeoba/core/util/BuildConfig.kt")
         buildConfigFile.parentFile.mkdirs()
         buildConfigFile.writeText("""
@@ -96,6 +117,8 @@ val generateBuildConfig = tasks.register("generateBuildConfig") {
             object BuildConfig {
                 const val ENABLE_SUBSCRIPTION = $enableSub
                 const val PREMIUM_PUBLIC_KEY = "$premiumPublicKey"
+                const val FIREBASE_API_KEY = "$firebaseApiKey"
+                const val APP_SIGNATURE = "$appSignature"
             }
         """.trimIndent())
     }

@@ -190,7 +190,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Free local lexical and semantic searches are enabled by default for all users, while AI-powered summarization is a premium subscription feature.
     - Paid subscription entitlements are enforced strictly on the backend to gate access to the Device Sync Hub and remote command relay APIs.
     - Implements secure, browser-delegated OAuth flow utilizing a temporary JDK-native HTTP loopback server (listening on a random port for `/callback` parameters) and a unified Web Console SPA (running on Firebase Hosting) to prevent in-app credential handling.
-    - Stores all sensitive authentication credentials (ID and refresh tokens, licensing JWT, decryption key) in the OS-native keyring (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux) using a secure utility with automatic self-healing migration and a Java Preferences fallback. Keychain/Keyring prompts can be bypassed completely during development or troubleshooting by setting the JVM system property `codeoba.no.keyring=true`.
+    - Stores all sensitive authentication credentials (ID and refresh tokens, licensing JWT, decryption key) in the OS-native keyring (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux) using a secure utility with automatic self-healing migration and a Java Preferences fallback. Keychain/Keyring prompts are bypassed by default in non-production configurations to simplify testing, and can be explicitly controlled via the JVM system property `codeoba.no.keyring=<true|false>`.
     - Billing webhooks query subscriptions using the user's immutable Firebase `uid` mapped in checkout custom metadata rather than mutable emails to support profile email updates.
     - Implements challenge-response authentication utilizing 90-second single-use nonces and device public/private key pairs (stored securely in the OS-native keyring via `SecureStorage` with a fallback to Preferences).
     - Integrates a best-effort local regex secrets scanner to redact sensitive credentials on the client side before synchronizing data.
@@ -200,10 +200,14 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - The Firebase Web API key used for token refresh operations is resolved dynamically via the JVM system property `codeoba.firebase.api_key` or environment variable `CODEOBA_FIREBASE_API_KEY`.
     - If running in production (non-emulator) mode and the API key matches the default placeholder or is blank, a fail-fast validation check throws an `IllegalArgumentException` with clear configuration instructions.
 
+27. **App Signature Configuration**:
+    - The client app injects an app signature token resolved at build-time (from environment `CODEOBA_APP_SIGNATURE_HASH` or build properties) into `BuildConfig.APP_SIGNATURE`.
+    - This token is sent as the `X-App-Signature` header in all requests to backend functions. The backend compares it to `CODEOBA_APP_SIGNATURE_HASH` to verify that the request originates from the official signed distribution.
+
 ---
 
 ## 🛠️ Common Gradle Development Commands
 
 - Compile Desktop Client: `./gradlew :app-desktop:compileKotlinDesktop`
 - Run Unit Tests: `./gradlew :core:desktopTest`
-- Launch Application in Dev Mode: `./gradlew :app-desktop:run -Dcodeoba.no.keyring=true -Dcodeoba.base_url=localhost:5000`
+- Launch Application in Dev Mode: `./gradlew :app-desktop:run -Dcodeoba.base_url=localhost:5000`

@@ -7,9 +7,17 @@ object SecureStorage {
     private const val SERVICE_NAME = "Codeoba"
 
     private val keyring: Keyring? = try {
-        if (System.getProperty("codeoba.no.keyring") == "true") {
-            // This is used for development when the app is not signed to prevent keyring access popups.
-            Logger.log("SecureStorage: Native Keyring disabled via system property. Falling back to Java Preferences.")
+        val noKeyringProp = System.getProperty("codeoba.no.keyring")
+        val disableKeyring = if (AppConfig.isEmulatorOrDev()) {
+            // In non-production (dev or emulator), native keyring is disabled by default to prevent access prompts on unsigned builds, unless explicitly set to "false".
+            noKeyringProp != "false"
+        } else {
+            // In production, native keyring is always enabled.
+            false
+        }
+
+        if (disableKeyring) {
+            Logger.log("SecureStorage: Native Keyring disabled by default in non-production. Falling back to Java Preferences.")
             null
         } else {
             Keyring.create()

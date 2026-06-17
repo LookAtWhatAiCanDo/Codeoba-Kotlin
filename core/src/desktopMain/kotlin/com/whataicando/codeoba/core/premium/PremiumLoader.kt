@@ -147,6 +147,7 @@ object PremiumLoader {
         connection.connectTimeout = 5000
         connection.readTimeout = 10000
         connection.requestMethod = "GET"
+        connection.setRequestProperty("X-App-Signature", com.whataicando.codeoba.core.util.BuildConfig.APP_SIGNATURE)
         if (idToken != null) {
             connection.setRequestProperty("Authorization", "Bearer $idToken")
         }
