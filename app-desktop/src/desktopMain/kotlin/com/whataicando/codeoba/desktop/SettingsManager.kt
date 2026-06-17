@@ -1,11 +1,21 @@
 package com.whataicando.codeoba.desktop
 
+import com.whataicando.codeoba.core.domain.parser.LogParserFactory
 import com.whataicando.codeoba.core.domain.parser.ParserMode
 import com.whataicando.codeoba.core.domain.search.ArchivalFilter
 import com.whataicando.codeoba.core.domain.source.SourceAdapter
+import com.whataicando.codeoba.core.util.AppConfig
 import com.whataicando.codeoba.core.util.JsonUtils
 import com.whataicando.codeoba.core.util.SecureStorage
 import java.util.prefs.Preferences
+
+/**
+ * Annotates settings, properties, or functions in [SettingsManager] whose stored values
+ * are keyed off and isolated by the active target server base URL.
+ */
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY)
+@Retention(AnnotationRetention.SOURCE)
+annotation class ServerDependent
 
 object SettingsManager {
     private val prefs: Preferences = Preferences.userNodeForPackage(SettingsManager::class.java)
@@ -154,36 +164,130 @@ object SettingsManager {
         prefs.putBoolean("sidebar_sort_ascending", value)
     }
 
-    fun getFirebaseUserEmail(): String? = prefs.get("firebase_user_email", null)
-    fun setFirebaseUserEmail(value: String?) = putOrRemove("firebase_user_email", value)
+    //region Server Dependent settings
 
-    fun getFirebaseUserUid(): String? = prefs.get("firebase_user_uid", null)
-    fun setFirebaseUserUid(value: String?) = putOrRemove("firebase_user_uid", value)
+    private fun serverKey(key: String): String {
+        return "${AppConfig.getBaseUrl()}:$key"
+    }
 
-    fun getFirebaseAuthIdToken(): String? = SecureStorage.get("firebase_auth_id_token")
-    fun setFirebaseAuthIdToken(value: String?) = SecureStorage.put("firebase_auth_id_token", value)
+    @ServerDependent
+    fun getFirebaseUserEmail(): String? {
+        val sKey = serverKey("firebase_user_email")
+        var value = prefs.get(sKey, null)
+        if (value == null && AppConfig.getBaseUrl() == "codeoba.com") {
+            value = prefs.get("firebase_user_email", null)
+            if (value != null) {
+                prefs.put(sKey, value)
+                prefs.remove("firebase_user_email")
+            }
+        }
+        return value
+    }
 
-    fun getFirebaseAuthRefreshToken(): String? = SecureStorage.get("firebase_auth_refresh_token")
-    fun setFirebaseAuthRefreshToken(value: String?) = SecureStorage.put("firebase_auth_refresh_token", value)
+    @ServerDependent
+    fun setFirebaseUserEmail(value: String?) {
+        val sKey = serverKey("firebase_user_email")
+        putOrRemove(sKey, value)
+        if (AppConfig.getBaseUrl() == "codeoba.com") {
+            prefs.remove("firebase_user_email")
+        }
+    }
 
+    @ServerDependent
+    fun getFirebaseUserUid(): String? {
+        val sKey = serverKey("firebase_user_uid")
+        var value = prefs.get(sKey, null)
+        if (value == null && AppConfig.getBaseUrl() == "codeoba.com") {
+            value = prefs.get("firebase_user_uid", null)
+            if (value != null) {
+                prefs.put(sKey, value)
+                prefs.remove("firebase_user_uid")
+            }
+        }
+        return value
+    }
+
+    @ServerDependent
+    fun setFirebaseUserUid(value: String?) {
+        val sKey = serverKey("firebase_user_uid")
+        putOrRemove(sKey, value)
+        if (AppConfig.getBaseUrl() == "codeoba.com") {
+            prefs.remove("firebase_user_uid")
+        }
+    }
+
+    @ServerDependent
+    fun getFirebaseAuthIdToken(): String? {
+        val sKey = serverKey("firebase_auth_id_token")
+        var value = SecureStorage.get(sKey)
+        if (value == null && AppConfig.getBaseUrl() == "codeoba.com") {
+            value = SecureStorage.get("firebase_auth_id_token")
+            if (value != null) {
+                SecureStorage.put(sKey, value)
+                SecureStorage.delete("firebase_auth_id_token")
+            }
+        }
+        return value
+    }
+
+    @ServerDependent
+    fun setFirebaseAuthIdToken(value: String?) {
+        val sKey = serverKey("firebase_auth_id_token")
+        SecureStorage.put(sKey, value)
+        if (AppConfig.getBaseUrl() == "codeoba.com") {
+            SecureStorage.delete("firebase_auth_id_token")
+        }
+    }
+
+    @ServerDependent
+    fun getFirebaseAuthRefreshToken(): String? {
+        val sKey = serverKey("firebase_auth_refresh_token")
+        var value = SecureStorage.get(sKey)
+        if (value == null && AppConfig.getBaseUrl() == "codeoba.com") {
+            value = SecureStorage.get("firebase_auth_refresh_token")
+            if (value != null) {
+                SecureStorage.put(sKey, value)
+                SecureStorage.delete("firebase_auth_refresh_token")
+            }
+        }
+        return value
+    }
+
+    @ServerDependent
+    fun setFirebaseAuthRefreshToken(value: String?) {
+        val sKey = serverKey("firebase_auth_refresh_token")
+        SecureStorage.put(sKey, value)
+        if (AppConfig.getBaseUrl() == "codeoba.com") {
+            SecureStorage.delete("firebase_auth_refresh_token")
+        }
+    }
+
+    @ServerDependent
     fun getDeviceId(): String {
-        var deviceId = prefs.get("device_id", null)
+        val sKey = serverKey("device_id")
+        var deviceId = prefs.get(sKey, null)
         if (deviceId.isNullOrEmpty()) {
-            // For existing logged-in users, migrate legacy device ID to preserve backend pairing.
-            // For new users, generate a clean, random, non-PII UUID.
-            val hasLegacyAccount = !prefs.get("firebase_user_uid", null).isNullOrEmpty() ||
-                    !prefs.get("firebase_user_email", null).isNullOrEmpty()
+            if (AppConfig.getBaseUrl() == "codeoba.com") {
+                val legacyId = prefs.get("device_id", null)
+                if (!legacyId.isNullOrEmpty()) {
+                    prefs.put(sKey, legacyId)
+                    prefs.remove("device_id")
+                    return legacyId
+                }
+            }
+            val hasLegacyAccount = !getFirebaseUserUid().isNullOrEmpty() ||
+                    !getFirebaseUserEmail().isNullOrEmpty()
             if (hasLegacyAccount) {
                 val os = System.getProperty("os.name") ?: "Unknown"
-                val uid = prefs.get("firebase_user_uid", null)
-                val email = prefs.get("firebase_user_email", null)
+                val uid = getFirebaseUserUid()
+                val email = getFirebaseUserEmail()
                 val stableAccountId = uid ?: email ?: "Unknown"
                 val rawId = "$os:$stableAccountId"
                 deviceId = java.util.UUID.nameUUIDFromBytes(rawId.toByteArray()).toString()
             } else {
                 deviceId = java.util.UUID.randomUUID().toString()
             }
-            prefs.put("device_id", deviceId)
+            prefs.put(sKey, deviceId)
         }
         return deviceId
     }
@@ -195,8 +299,18 @@ object SettingsManager {
         FULL_SYNC
     }
 
+    @ServerDependent
     fun getSyncMode(): SyncMode {
-        val value = prefs.get("ecosystem_sync_mode", SyncMode.METADATA_ONLY.name)
+        val sKey = serverKey("ecosystem_sync_mode")
+        val hasKey = prefs.get(sKey, null) != null
+        if (!hasKey && AppConfig.getBaseUrl() == "codeoba.com") {
+            val legacyVal = prefs.get("ecosystem_sync_mode", null)
+            if (legacyVal != null) {
+                prefs.put(sKey, legacyVal)
+                prefs.remove("ecosystem_sync_mode")
+            }
+        }
+        val value = prefs.get(sKey, SyncMode.METADATA_ONLY.name)
         return try {
             SyncMode.valueOf(value)
         } catch (e: Exception) {
@@ -204,17 +318,39 @@ object SettingsManager {
         }
     }
 
+    @ServerDependent
     fun setSyncMode(mode: SyncMode) {
-        prefs.put("ecosystem_sync_mode", mode.name)
+        val sKey = serverKey("ecosystem_sync_mode")
+        prefs.put(sKey, mode.name)
+        if (AppConfig.getBaseUrl() == "codeoba.com") {
+            prefs.remove("ecosystem_sync_mode")
+        }
     }
 
+    @ServerDependent
     fun getEcosystemActive(): Boolean {
-        return prefs.getBoolean("ecosystem_active", false)
+        val sKey = serverKey("ecosystem_active")
+        val hasKey = prefs.get(sKey, null) != null
+        if (!hasKey && AppConfig.getBaseUrl() == "codeoba.com") {
+            val legacyVal = prefs.get("ecosystem_active", null)
+            if (legacyVal != null) {
+                prefs.putBoolean(sKey, legacyVal.toBoolean())
+                prefs.remove("ecosystem_active")
+            }
+        }
+        return prefs.getBoolean(sKey, false)
     }
 
+    @ServerDependent
     fun setEcosystemActive(value: Boolean) {
-        prefs.putBoolean("ecosystem_active", value)
+        val sKey = serverKey("ecosystem_active")
+        prefs.putBoolean(sKey, value)
+        if (AppConfig.getBaseUrl() == "codeoba.com") {
+            prefs.remove("ecosystem_active")
+        }
     }
+
+    //endregion
 
     fun getPreferredParserMode(): ParserMode {
         val name = prefs.get("preferred_parser_mode", ParserMode.SUMMARIZING.name)
@@ -235,6 +371,15 @@ object SettingsManager {
         } else {
             ParserMode.STANDARD
         }
+    }
+
+    fun signOut() {
+        setFirebaseUserEmail(null)
+        setFirebaseUserUid(null)
+        setFirebaseAuthIdToken(null)
+        setFirebaseAuthRefreshToken(null)
+        setEcosystemActive(false)
+        LogParserFactory.setParserMode(getEffectiveParserMode())
     }
 
     enum class RemoteControlPolicy {
@@ -379,5 +524,3 @@ fun SourceAdapter.isEffectiveEnabled(): Boolean {
         SettingsManager.Decision.UNDECIDED -> this.isAppInstalled() || this.isAvailable()
     }
 }
-
-

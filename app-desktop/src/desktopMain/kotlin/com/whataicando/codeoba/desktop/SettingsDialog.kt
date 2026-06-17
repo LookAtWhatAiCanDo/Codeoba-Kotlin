@@ -1790,12 +1790,7 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                     ) {
                         Button(
                             onClick = {
-                                SettingsManager.setFirebaseUserEmail(null)
-                                SettingsManager.setFirebaseUserUid(null)
-                                SettingsManager.setFirebaseAuthIdToken(null)
-                                SettingsManager.setFirebaseAuthRefreshToken(null)
-                                SettingsManager.setEcosystemActive(false)
-                                LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
+                                SettingsManager.signOut()
                                 errorMessage = null
                                 isLoading = false
                                 LocalAuthServer.stop()
@@ -1962,11 +1957,7 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                             } catch (e: Exception) {
                                                 log("Error configuring device keys", e)
                                                 // Roll back partial sign-in state so the user can retry cleanly.
-                                                SettingsManager.setFirebaseUserEmail(null)
-                                                SettingsManager.setFirebaseUserUid(null)
-                                                SettingsManager.setFirebaseAuthIdToken(null)
-                                                SettingsManager.setFirebaseAuthRefreshToken(null)
-                                                SettingsManager.setEcosystemActive(false)
+                                                SettingsManager.signOut()
                                                 onSettingsChanged()
                                                 errorMessage = e.message ?: "Error configuring device credentials."
                                                 isLoading = false

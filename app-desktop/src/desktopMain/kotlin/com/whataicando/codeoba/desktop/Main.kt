@@ -560,7 +560,10 @@ fun mainEntry() = application {
                         log("Main Background Loop: Sync Hub returned failure status for device registration.")
                     }
                 } catch (e: FirebaseAuthException) {
-                    if (e.status == 402 || e.status == 403) {
+                    if (e.status == 400) {
+                        log("Main Background Loop: Session expired or invalid on server (Status 400). Signing out.")
+                        SettingsManager.signOut()
+                    } else if (e.status == 402 || e.status == 403) {
                         log("Main Background Loop: Subscription expired or permission denied (Status ${e.status}). Deactivating ecosystem features.")
                         SettingsManager.setEcosystemActive(false)
                         LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
