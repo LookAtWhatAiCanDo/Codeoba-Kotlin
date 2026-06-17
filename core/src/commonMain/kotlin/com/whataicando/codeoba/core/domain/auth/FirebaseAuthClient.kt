@@ -213,6 +213,36 @@ object FirebaseAuthClient {
             result["url"]?.jsonPrimitive?.content ?: throw Exception("URL missing in response")
         }
     }
+
+    suspend fun checkSubscriptionStatus(idToken: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            val url = if (useEmulator) {
+                "http://127.0.0.1:5001/$firebaseProjectId/$CLOUD_FUNCTION_REGION/checkSubscriptionStatus"
+            } else {
+                "https://$CLOUD_FUNCTION_REGION-$firebaseProjectId.cloudfunctions.net/checkSubscriptionStatus"
+            }
+            val bodyStr = buildJsonObject {
+                put("data", buildJsonObject {})
+            }.toString()
+            
+            val response: HttpResponse = client.post(url) {
+                header("Authorization", "Bearer $idToken")
+                header("X-App-Signature", com.whataicando.codeoba.core.util.BuildConfig.APP_SIGNATURE)
+                contentType(ContentType.Application.Json)
+                setBody(bodyStr)
+            }
+            
+            val responseText = response.bodyAsText()
+            if (response.status.value != 200) {
+                val errorMsg = extractErrorMessage(responseText, "Failed to check subscription status. Status: ${response.status.value}")
+                throw FirebaseAuthException(response.status.value, errorMsg)
+            }
+            
+            val root = json.parseToJsonElement(responseText).jsonObject
+            val result = root["result"]?.jsonObject ?: throw Exception("Invalid subscription response format")
+            result["active"]?.jsonPrimitive?.content == "true"
+        }
+    }
 }
 
 data class AuthResponse(

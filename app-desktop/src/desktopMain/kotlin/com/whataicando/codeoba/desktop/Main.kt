@@ -541,23 +541,25 @@ fun mainEntry() = application {
                     }
                     
                     // 2. Perform background device registration/sync in the Hub
-                    val deviceId = SettingsManager.getDeviceId()
-                    val host = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" } }
-                    val deviceName = "${if (PlatformUtils.isMac()) "macOS" else if (PlatformUtils.isWindows()) "Windows" else "Linux"} ($host)"
-                    val publicKey = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.whataicando.codeoba.core.security.DeviceKeyManager.getPublicKeyPem() }
-                    
-                    val nonce = com.whataicando.codeoba.core.domain.auth.FirebaseAuthClient.getRegistrationChallenge(
-                        refreshedAuth.idToken, deviceId
-                    )
-                    val signature = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.whataicando.codeoba.core.security.DeviceKeyManager.signPayload(nonce) }
-                    
-                    val success = com.whataicando.codeoba.core.domain.auth.FirebaseAuthClient.registerEcosystemDevice(
-                        refreshedAuth.idToken, deviceId, deviceName, publicKey, nonce, signature
-                    )
-                    if (success) {
-                        log("Main Background Loop: Ecosystem device successfully synced with Hub.")
-                    } else {
-                        log("Main Background Loop: Sync Hub returned failure status for device registration.")
+                    if (SettingsManager.getEcosystemActive()) {
+                        val deviceId = SettingsManager.getDeviceId()
+                        val host = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" } }
+                        val deviceName = "${if (PlatformUtils.isMac()) "macOS" else if (PlatformUtils.isWindows()) "Windows" else "Linux"} ($host)"
+                        val publicKey = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.whataicando.codeoba.core.security.DeviceKeyManager.getPublicKeyPem() }
+                        
+                        val nonce = com.whataicando.codeoba.core.domain.auth.FirebaseAuthClient.getRegistrationChallenge(
+                            refreshedAuth.idToken, deviceId
+                        )
+                        val signature = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.whataicando.codeoba.core.security.DeviceKeyManager.signPayload(nonce) }
+                        
+                        val success = com.whataicando.codeoba.core.domain.auth.FirebaseAuthClient.registerEcosystemDevice(
+                            refreshedAuth.idToken, deviceId, deviceName, publicKey, nonce, signature
+                        )
+                        if (success) {
+                            log("Main Background Loop: Ecosystem device successfully synced with Hub.")
+                        } else {
+                            log("Main Background Loop: Sync Hub returned failure status for device registration.")
+                        }
                     }
                 } catch (e: FirebaseAuthException) {
                     if (e.status == 400) {

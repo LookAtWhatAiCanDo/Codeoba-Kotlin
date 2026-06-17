@@ -24,7 +24,7 @@ object LocalAuthServer {
         "https://codeoba-dev.firebaseapp.com"
     )
 
-    fun start(onSuccess: (idToken: String, refreshToken: String, email: String, uid: String) -> Unit): Int = synchronized(this) {
+    fun start(onSuccess: (idToken: String, refreshToken: String, email: String, uid: String, isSubscribed: Boolean) -> Unit): Int = synchronized(this) {
         // Stop any running instance first
         stop()
 
@@ -146,8 +146,10 @@ object LocalAuthServer {
                 val refreshToken = if (isPost) params["refreshToken"] else null
                 val email = if (isPost) (params["email"] ?: "") else ""
                 val uid = if (isPost) (params["uid"] ?: "") else ""
+                val subscriptionStatus = if (isPost) (params["subscriptionStatus"] ?: "inactive") else "inactive"
+                val isSubscribed = subscriptionStatus == "active"
                 val responseBody = if (!idToken.isNullOrBlank() && !refreshToken.isNullOrBlank() && uid.isNotBlank()) {
-                    onSuccess(idToken, refreshToken, email, uid)
+                    onSuccess(idToken, refreshToken, email, uid, isSubscribed)
                     wasSuccessful = true
                     if (isPost) {
                         """
