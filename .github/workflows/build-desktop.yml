@@ -213,6 +213,24 @@ jobs:
             echo "Production-level version detected ($APP_VERSION). No filename mapping required."
           fi
 
+      - name: Rename pre-release package files superficially
+        run: |
+          if [[ "$APP_VERSION" =~ ^0\. ]]; then
+            # Under the hood, Gradle maps 0.x.y to 1.x.y to satisfy macOS CFBundleVersion rules.
+            # Here we rename the generated file names back to 0.x.y so the user sees a pre-release version name.
+            MAPPED_VERSION="1.${APP_VERSION#0.}"
+            echo "Pre-release version detected ($APP_VERSION). Searching for generated files matching mapped version $MAPPED_VERSION..."
+            
+            # Find files containing the mapped version and rename them to use the actual version
+            find app-desktop/build/compose/binaries/main -type f \( -name "*${MAPPED_VERSION}*" \) | while read -r file; do
+              new_file=$(echo "$file" | sed "s/${MAPPED_VERSION}/${APP_VERSION}/g")
+              echo "Renaming $file to $new_file"
+              mv "$file" "$new_file"
+            done
+          else
+            echo "Production-level version detected ($APP_VERSION). No filename mapping required."
+          fi
+
       - name: Upload Main Package Artifact
         uses: actions/upload-artifact@v7
         with:
