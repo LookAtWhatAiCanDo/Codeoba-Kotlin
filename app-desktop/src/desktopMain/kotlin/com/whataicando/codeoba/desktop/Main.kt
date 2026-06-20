@@ -105,6 +105,8 @@ import com.whataicando.codeoba.core.util.Logger.log
 import com.whataicando.codeoba.core.util.ModelDownloader
 import com.whataicando.codeoba.core.util.PlatformUtils
 import com.whataicando.codeoba.core.util.BuildConfig
+import com.whataicando.codeoba.core.util.DebugStoreConfig
+import kotlinx.cli.*
 import java.awt.Cursor
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -128,23 +130,100 @@ class DynamicSemanticEmbedder(fallback: SemanticEmbedder) : SemanticEmbedder {
 var cacheOverride: Boolean? = null
 
 fun main(args: Array<String>) {
-    if (args.contains("--no-cache")) {
+    val parser = ArgParser("codeoba")
+
+    val sizeOpt by parser.option(
+        ArgType.String,
+        fullName = "size",
+        description = "Set the initial application window size (e.g. 1920x1080)"
+    )
+
+    val cacheOpt by parser.option(
+        ArgType.Boolean,
+        fullName = "cache",
+        description = "Force enable persistent startup caching"
+    )
+
+    val noCacheOpt by parser.option(
+        ArgType.Boolean,
+        fullName = "no-cache",
+        description = "Disable persistent startup caching"
+    )
+
+    val updateIgnoreThrottlingOpt by parser.option(
+        ArgType.Boolean,
+        fullName = "update-ignore-throttling",
+        description = "Bypasses update check time throttling (debug only)"
+    )
+
+    val updateForceOpt by parser.option(
+        ArgType.Boolean,
+        fullName = "update-force",
+        description = "Force fake an update being available (debug only)"
+    )
+
+    val updateMockNotesOpt by parser.option(
+        ArgType.Boolean,
+        fullName = "update-mock-notes",
+        description = "Show fake mock release notes (debug only)"
+    )
+
+    val processedArgs = mutableListOf<String>()
+    for (arg in args) {
+        if (arg.startsWith("--") && arg.contains("=")) {
+            processedArgs.add(arg.substringBefore("="))
+            processedArgs.add(arg.substringAfter("="))
+        } else {
+            processedArgs.add(arg)
+        }
+    }
+
+    try {
+        parser.parse(processedArgs.toTypedArray())
+    } catch (e: Exception) {
+        kotlin.system.exitProcess(0)
+    }
+
+    if (noCacheOpt == true) {
         cacheOverride = false
         log("Main: Caching disabled via command-line option --no-cache.")
-    } else if (args.contains("--cache")) {
+    } else if (cacheOpt == true) {
         cacheOverride = true
         log("Main: Caching enabled via command-line option --cache.")
     }
 
-    if (args.contains("--update-ignore-throttling")) {
+    if (BuildConfig.DEBUG) {
+        System.getProperty("codeoba.store")?.lowercase()?.let {
+            DebugStoreConfig.storeMode = it
+            log("Main: Store screenshot mode enabled via system property: $it")
+        }
+        System.getProperty("codeoba.canned_data")?.let {
+            DebugStoreConfig.cannedDataPath = it
+            log("Main: Canned data path set via system property to $it")
+        }
+
+        sizeOpt?.let { sizeStr ->
+            val parts = sizeStr.split('x', 'X', '×')
+            if (parts.size == 2) {
+                val w = parts[0].toIntOrNull()
+                val h = parts[1].toIntOrNull()
+                if (w != null && h != null) {
+                    DebugStoreConfig.sizeOverride = Pair(w, h)
+                    log("Main: Size override set via argument: ${w}x${h}")
+                }
+            }
+        }
+    }
+
+    if (updateIgnoreThrottlingOpt == true) {
         UpdateManager.ignoreUpdateThrottling = true
         log("Main: Update throttling disabled via command-line option --update-ignore-throttling.")
     }
-    if (args.contains("--update-force")) {
+    if (updateForceOpt == true) {
         UpdateManager.forceUpdateAvailable = true
         log("Main: Forced update check availability via command-line option --update-force.")
     }
-    if (args.contains("--update-mock-notes")) {
+    if (updateMockNotesOpt == true) {
         UpdateManager.mockUpdateNotes = true
         log("Main: Mock hostile changelog notes enabled via command-line option --update-mock-notes.")
     }
@@ -178,16 +257,32 @@ fun main(args: Array<String>) {
 }
 
 fun mainEntry() = application {
-    val initialX = SettingsManager.getWindowX()
-    val initialY = SettingsManager.getWindowY()
-    val initialWidth = SettingsManager.getWindowWidth() ?: 1280
-    val initialHeight = SettingsManager.getWindowHeight() ?: 800
-    val initialMaximized = SettingsManager.getWindowMaximized() ?: false
+    val isStoreMode = DebugStoreConfig.isStoreMode
+    val targetSize = if (isStoreMode) {
+        val override = DebugStoreConfig.sizeOverride
+        if (override != null) {
+            override
+        } else {
+            if (DebugStoreConfig.storeMode == "apple") {
+                Pair(1280, 800)
+            } else {
+                Pair(1920, 1080)
+            }
+        }
+    } else {
+        null
+    }
+
+    val initialWidth = targetSize?.first ?: SettingsManager.getWindowWidth() ?: 1280
+    val initialHeight = targetSize?.second ?: SettingsManager.getWindowHeight() ?: 800
+    val initialMaximized = if (isStoreMode) false else (SettingsManager.getWindowMaximized() ?: false)
 
     // Validate position coordinates: make sure the window intersects at least one active screen
     var validatedBounds: java.awt.Rectangle? = null
-    if (initialX != null && initialY != null) {
-        val savedRect = java.awt.Rectangle(initialX, initialY, initialWidth, initialHeight)
+    if (!isStoreMode && SettingsManager.getWindowX() != null && SettingsManager.getWindowY() != null) {
+        val initialX = SettingsManager.getWindowX()
+        val initialY = SettingsManager.getWindowY()
+        val savedRect = java.awt.Rectangle(initialX!!, initialY!!, initialWidth, initialHeight)
         val ge = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
         for (screen in ge.screenDevices) {
             val bounds = screen.defaultConfiguration.bounds
@@ -205,7 +300,7 @@ fun mainEntry() = application {
 
     val windowState = rememberWindowState(
         placement = if (initialMaximized) WindowPlacement.Maximized else WindowPlacement.Floating,
-        position = if (finalX != null && finalY != null) {
+        position = if (!isStoreMode && finalX != null && finalY != null) {
             WindowPosition.Absolute(finalX.dp, finalY.dp)
         } else {
             WindowPosition(Alignment.Center)
@@ -687,6 +782,7 @@ fun mainEntry() = application {
     }
 
     fun saveWindowState() {
+        if (DebugStoreConfig.isStoreMode) return // Do not save settings in store screenshot mode
         windowInstance?.let { win ->
             try {
                 val state = win.extendedState

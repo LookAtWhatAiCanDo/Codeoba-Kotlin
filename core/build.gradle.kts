@@ -109,6 +109,11 @@ val generateBuildConfig = tasks.register("generateBuildConfig") {
             ?: props.getProperty("codeoba.app_signature_hash")
             ?: defaultAppSignature
 
+        val isDebug = System.getenv("CODEOBA_DEBUG")?.toBoolean()
+            ?: project.findProperty("codeoba.debug")?.toString()?.toBoolean()
+            ?: props.getProperty("codeoba.debug")?.toBoolean()
+            ?: !project.gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+
         val buildConfigFile = file("$outputDir/com/whataicando/codeoba/core/util/BuildConfig.kt")
         buildConfigFile.parentFile.mkdirs()
         buildConfigFile.writeText("""
@@ -119,6 +124,7 @@ val generateBuildConfig = tasks.register("generateBuildConfig") {
                 const val PREMIUM_PUBLIC_KEY = "$premiumPublicKey"
                 const val FIREBASE_API_KEY = "$firebaseApiKey"
                 const val APP_SIGNATURE = "$appSignature"
+                const val DEBUG = $isDebug
             }
         """.trimIndent())
     }

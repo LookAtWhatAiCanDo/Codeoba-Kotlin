@@ -40,6 +40,7 @@ kotlin {
                 implementation(libs.compose.material3)
                 implementation(libs.compose.runtime)
                 implementation(libs.kotlinx.serialization.json)
+                implementation(libs.kotlinx.cli)
                 implementation(libs.compose.ui)
                 implementation(libs.slf4j.simple)
             }

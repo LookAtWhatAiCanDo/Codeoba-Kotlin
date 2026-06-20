@@ -134,3 +134,9 @@ The app UI loads colors dynamically based on the active theme selected in Settin
 * **Temporary Storage**: Always allocate test storage dynamically using JUnit's temporary folder rules or standard Java temp file creation (`File.createTempFile` + `deleteOnExit()`).
 * **Database Tests**: Use in-memory SQLite instances (`jdbc:sqlite::memory:`) or write to temporary databases to prevent side-effects.
 
+---
+
+## 📸 Marketing Screenshot Generator
+
+For debug builds, Codeoba features a built-in marketing screenshot generation tool that sizes the application window to store guidelines and loads realistic faked mock data. See the detailed guide at [SCREENSHOT_GENERATOR.md](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/docs/SCREENSHOT_GENERATOR.md).
+

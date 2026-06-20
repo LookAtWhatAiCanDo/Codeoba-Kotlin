@@ -204,6 +204,11 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - The client app injects an app signature token resolved at build-time (from environment `CODEOBA_APP_SIGNATURE_HASH` or build properties) into `BuildConfig.APP_SIGNATURE`.
     - This token is sent as the `X-App-Signature` header in all requests to backend functions. The backend compares it to `CODEOBA_APP_SIGNATURE_HASH` to verify that the request originates from the official signed distribution.
 
+28. **Store Screenshot Generator & Mock Mode**:
+    - Restricted to debug builds only (`BuildConfig.DEBUG == true`). Activated using the JVM system property `-Dcodeoba.store=apple|microsoft` (with optional custom JSON path via `-Dcodeoba.canned_data=PATH`).
+    - Sized and centered to specific default dimensions (Apple: 1280x800, Microsoft: 1920x1080) unless overridden via the program argument `--size=WIDTHxHEIGHT`.
+    - Intercepts directory/database scanning and loads faked, high-quality session lists from `store/canned_apple.json` or `store/canned_microsoft.json` relative to the current working directory, preventing local data updates to settings.
+
 ---
 
 ## 🛠️ Common Gradle Development Commands

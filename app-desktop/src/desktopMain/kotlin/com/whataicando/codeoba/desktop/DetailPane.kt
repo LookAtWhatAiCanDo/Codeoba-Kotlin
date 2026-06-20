@@ -152,6 +152,7 @@ import com.whataicando.codeoba.core.domain.parser.ParserMode
 import com.whataicando.codeoba.core.domain.parser.SessionSummary
 import com.whataicando.codeoba.core.domain.search.SearchResult
 import com.whataicando.codeoba.core.domain.search.buildFindRegex
+import com.whataicando.codeoba.desktop.provider.*
 import java.awt.Desktop
 import java.io.File
 import java.text.SimpleDateFormat
@@ -1043,6 +1044,7 @@ fun DetailPane(
     onGroupUpdate: (ConversationGroup) -> Unit,
     onGroupDelete: (String) -> Unit,
     onToggleGroupPin: (String, Boolean) -> Unit,
+    statsProvider: WorkspaceStatsProvider = rememberWorkspaceStatsProvider(searchResults),
     dragDropState: DragDropState = remember { DragDropState() },
     onUrlClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
@@ -1172,69 +1174,23 @@ fun DetailPane(
                                             )
                                         }
                                     } else {
-                                        // Compute statistics
-                                        val totalConversations = searchResults.size
-                                        val totalTurns = searchResults.sumOf { it.session.turns.size }
-                                        val totalUserChars = searchResults.sumOf { it.session.turns.sumOf { turn -> turn.userMessage.length } }
-                                        val totalAssistantChars = searchResults.sumOf { it.session.turns.sumOf { turn -> turn.assistantMessage.length } }
-                                        val promptTokens = (totalUserChars + 3) / 4
-                                        val responseTokens = (totalAssistantChars + 3) / 4
-                                        val totalEstTokens = promptTokens + responseTokens
-                                        val avgTurns = if (totalConversations > 0) totalTurns.toFloat() / totalConversations else 0f
-                                        val totalDurationMs = searchResults.sumOf { getSessionComputeTimeMs(it.session) }
-                                        val avgDurationMs = if (totalConversations > 0) totalDurationMs / totalConversations else 0L
-                                        val avgSpeedText = formatSpeed(totalEstTokens.toLong(), totalDurationMs)
+                                         // Retrieve statistics from the provider
+                                         val totalConversations = statsProvider.totalConversations
+                                         val totalTurns = statsProvider.totalTurns
+                                         val promptTokens = statsProvider.promptTokens
+                                         val responseTokens = statsProvider.responseTokens
+                                         val totalEstTokens = statsProvider.totalEstTokens
+                                         val avgTurns = statsProvider.avgTurns
+                                         val totalDurationMs = statsProvider.totalDurationMs
+                                         val avgDurationMs = statsProvider.avgDurationMs
+                                         val avgSpeedText = statsProvider.avgSpeedText
 
-                                        val totalCompactions = searchResults.sumOf { res ->
-                                            res.session.turns.count { it.extraData["isCompaction"] == "true" }
-                                        }
-                                        val totalCompactionTimeMs = searchResults.sumOf { res ->
-                                            res.session.turns.sumOf { it.extraData["compactionTimeMs"]?.toLongOrNull() ?: 0L }
-                                        }
+                                         val totalCompactions = statsProvider.totalCompactions
+                                         val totalCompactionTimeMs = statsProvider.totalCompactionTimeMs
 
-                                        val modelStatsList = remember(searchResults) {
-                                            class ModelStats(
-                                                var turnCount: Int = 0,
-                                                var promptChars: Long = 0,
-                                                var responseChars: Long = 0,
-                                                var computeTimeMs: Long = 0
-                                            )
-                                            val modelStatsMap = mutableMapOf<String, ModelStats>()
-                                            for (res in searchResults) {
-                                                for (turn in res.session.turns) {
-                                                    val mName = turn.extraData["model"] ?: "Unknown Model"
-                                                    val stats = modelStatsMap.getOrPut(mName) { ModelStats() }
-                                                    stats.turnCount++
-                                                    stats.promptChars += turn.userMessage.length
-                                                    stats.responseChars += turn.assistantMessage.length
-                                                    val ms = turn.extraData["computeTimeMs"]?.toLongOrNull()
-                                                    if (ms != null && ms > 0) {
-                                                        stats.computeTimeMs += ms.coerceAtMost(900_000L)
-                                                    } else if (turn.assistantMessage.isNotEmpty()) {
-                                                        val estMs = (turn.assistantMessage.length / 120.0 * 1000.0).toLong()
-                                                        stats.computeTimeMs += estMs.coerceIn(2000L, 60000L)
-                                                    }
-                                                }
-                                            }
-
-                                            modelStatsMap.entries.map { (modelName, stats) ->
-                                                val modelPromptTokens = (stats.promptChars + 3) / 4
-                                                val modelResponseTokens = (stats.responseChars + 3) / 4
-                                                val modelTotalTokens = modelPromptTokens + modelResponseTokens
-                                                val speedTps = if (stats.computeTimeMs > 0) {
-                                                    (modelTotalTokens.toDouble() * 1000.0) / stats.computeTimeMs
-                                                } else 0.0
-                                                ModelItemStats(
-                                                    modelName = modelName,
-                                                    turnCount = stats.turnCount,
-                                                    promptChars = stats.promptChars,
-                                                    responseChars = stats.responseChars,
-                                                    computeTimeMs = stats.computeTimeMs,
-                                                    totalTokens = modelTotalTokens,
-                                                    speedTps = speedTps
-                                                )
-                                            }
-                                        }
+                                         val modelStatsList = remember(statsProvider) {
+                                             statsProvider.modelStatsList
+                                         }
 
                                         val sortedModelStats = remember(modelStatsList, sortBy, sortAscending) {
                                             val comparator = when (sortBy) {
@@ -1502,10 +1458,7 @@ fun DetailPane(
                                                     fontWeight = FontWeight.Bold
                                                 )
 
-                                                val sourceGroups = searchResults.groupBy { it.session.sourceId }
-                                                    .mapValues { it.value.size }
-                                                    .toList()
-                                                    .sortedByDescending { it.second }
+                                                val sourceGroups = statsProvider.sourceGroups
 
                                                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                                     sourceGroups.forEach { (sourceId, count) ->
@@ -2631,15 +2584,7 @@ enum class ModelSortDimension(val displayName: String) {
     NAME("Model Name")
 }
 
-data class ModelItemStats(
-    val modelName: String,
-    val turnCount: Int,
-    val promptChars: Long,
-    val responseChars: Long,
-    val computeTimeMs: Long,
-    val totalTokens: Long,
-    val speedTps: Double
-)
+
 
 @Composable
 fun ClickableMarkdownText(

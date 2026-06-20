@@ -134,3 +134,11 @@ Connects the client app to the live production database and backend services.
 
 *   100% local-first: no remote accounts, telemetry, trackers, or cloud storage syncing.
 *   All parser steps, SQL queries, and semantic embeddings are executed directly on your local machine.
+
+---
+
+## 📸 Developer Guides
+
+*   [Adding a New Log Adapter Guide](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/docs/ADD_NEW_SOURCE.md)
+*   [Developer Setup & Build Guide](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/docs/DEVELOPMENT.md)
+*   [Marketing Screenshot Mock Generator Guide](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/docs/SCREENSHOT_GENERATOR.md)
