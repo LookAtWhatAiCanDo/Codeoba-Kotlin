@@ -72,6 +72,20 @@ compose {
                 includeAllModules = true
                 macOS {
                     iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
+                    bundleID = "com.whataicando.codeoba"
+                    val signingIdentity = System.getenv("MACOS_SIGNING_IDENTITY")
+                    if (!signingIdentity.isNullOrBlank()) {
+                        signing {
+                            sign.set(true)
+                            identity.set(signingIdentity)
+                            entitlementsFile.set(project.file("src/desktopMain/resources/entitlements.plist"))
+                        }
+                        notarization {
+                            appleID.set(System.getenv("APPLE_ID"))
+                            password.set(System.getenv("APPLE_ID_PASSWORD"))
+                            teamID.set(System.getenv("APPLE_TEAM_ID"))
+                        }
+                    }
                 }
                 windows {
                     iconFile.set(project.file("src/desktopMain/resources/icon.ico"))

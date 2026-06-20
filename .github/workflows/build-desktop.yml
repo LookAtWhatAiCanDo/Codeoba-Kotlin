@@ -242,7 +242,7 @@ jobs:
           retention-days: 7
 
       - name: Upload PKG Package Artifact (macOS only)
-        if: matrix.platform == 'macos'
+        if: matrix.platform == 'macos' && env.MACOS_INSTALLER_PRESENT == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: Codeoba-macos-pkg
