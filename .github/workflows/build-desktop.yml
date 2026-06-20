@@ -225,7 +225,7 @@ jobs:
             echo "Pre-release version detected ($APP_VERSION). Searching for generated files matching mapped version $MAPPED_VERSION..."
             
             # Find files containing the mapped version and rename them to use the actual version
-            find app-desktop/build/compose/binaries/main -type f \( -name "*${MAPPED_VERSION}*" \) | while read -r file; do
+            find app-desktop/build/compose/binaries/main* -type f \( -name "*${MAPPED_VERSION}*" \) | while read -r file; do
               new_file=$(echo "$file" | sed "s/${MAPPED_VERSION}/${APP_VERSION}/g")
               echo "Renaming $file to $new_file"
               mv "$file" "$new_file"
