@@ -119,7 +119,11 @@ During workflow execution on the `macos-latest` runner:
 Windows `.msi` and `.exe` installers are signed post-build on the GitHub Actions runner using **Artifact Signing** (formerly *Azure Code Signing* / *Trusted Signing*).  
 Microsoft acts as the Certificate Authority, removing the need to buy or manage third-party code-signing certificates.
 
-Authentication is managed securely via **OpenID Connect (OIDC)**, eliminating the need to store client secrets in GitHub.
+Authentication is managed securely via **OpenID Connect (OIDC)**. This eliminates the need to store long-lived Entra ID credentials (like client secrets, passwords, or certificate files) in GitHub, though identifier parameters (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID`) are still configured as GitHub secrets to identify the targets.
+
+References:
+* https://learn.microsoft.com/en-us/azure/artifact-signing/
+* https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart
 
 ---
 
@@ -127,23 +131,22 @@ Authentication is managed securely via **OpenID Connect (OIDC)**, eliminating th
 
 Follow these steps to set up the signing infrastructure in Azure.
 
-References:
-* https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart
-* https://learn.microsoft.com/en-us/entra/fundamentals/create-new-tenant?tabs=workforce#create-a-new-tenant-for-your-organization
-
 #### Step 1: Sign Up
-NOTE 1: DO NOT USE INDIVIDUAL SIGN UP! Individual sign up gets a generated name and cannot specify a custom `*.onmicrosoft.com` domain name.
+NOTE: DO NOT USE INDIVIDUAL SIGN UP! Individual sign up generates a weird `${user}${domain}.onmicrosoft.com` domain name that cannot be changed. Only a Windows 365 Business Trial sign up can specify a custom `${domain}.onmicrosoft.com` domain name.
 
-1. Windows 365 Business Trial: https://www.microsoft.com/en-us/windows-365/business/windows-365-free-trial
+1. Windows 365 Business Trial:  
+   https://www.microsoft.com/en-us/windows-365/business/windows-365-free-trial
    * Sign up with your billing email and specify your default Azure domain name.
-2. Cancel trial
-   * https://admin.cloud.microsoft/?source=applauncher#/subscriptions
-     * Select the business trial subscription.
-     * Click **Edit recurring billing** and choose **Cancel on expiration**.
-3. Add Custom Domain: https://entra.microsoft.com/#view/Microsoft_AAD_IAM/DomainsManagementMenuBlade/~/CustomDomainNames
+2. Cancel trial:  
+   https://admin.cloud.microsoft/?source=applauncher#/subscriptions
+   * Select the business trial subscription.
+   * Click **Edit recurring billing** and choose **Cancel on expiration**.
+3. Add Custom Domain:  
+   https://entra.microsoft.com/#view/Microsoft_AAD_IAM/DomainsManagementMenuBlade/~/CustomDomainNames
    * Add `whataicando.com` and verify DNS records.
    * Make `whataicando.com` Primary.
-4. Setup Users: https://portal.azure.com/#view/Microsoft_AAD_UsersAndTenants/UserManagementMenuBlade/~/AllUsers
+4. Setup Users:  
+   https://portal.azure.com/#view/Microsoft_AAD_UsersAndTenants/UserManagementMenuBlade/~/AllUsers
    * Update the primary administrator properties to change the User Principal Name to `<admin-user>@whataicando.com`.
    * Create other admin and developer accounts as needed, assigning appropriate user `Global Administrator` roles and subscription `Owner` roles.
 
@@ -384,6 +387,18 @@ Azure automatically packages and exports logs to your storage account hourly.
 4. Navigate through the folder hierarchy which is organized by date and time:
    `resourceId=.../y=<year>/m=<month>/d=<day>/h=<hour>/m=<minute>/`
 5. Click on the file named **`PT1H.json`**.
-6. Select the **Edit** tab at the top (or click **Download**) to view the raw JSON lines containing information on every signed binary (including timestamps, certificate profiles, and operation statuses).
+6. Since these are **Append Blobs** (which Azure Monitor uses to write logs sequentially), the Azure Portal's built-in **Edit** or **Preview** tab will display a warning (*"Only block blobs can be edited from the Portal"*) and will not render the contents.
+7. To view the log data, you must use one of the following methods:
+   - **Download the file:** Click the **Download** button and open the `.json` file in your local text editor.
+   - **Use Azure Storage Explorer:** Use the desktop application (available from the [Azure Storage Explorer Download Page](https://azure.microsoft.com/en-us/products/storage/storage-explorer#Download-4)) to preview the file directly.
+   - **Use Azure CLI:** Run the following command to download and display the contents directly in your terminal screen without saving a local file:
+     ```bash
+     az storage blob download \
+       --account-name whataicandostorage \
+       --container-name insights-logs-signtransactions \
+       --name "<full-blob-path-copied-from-portal-properties>" \
+       --file /dev/stdout \
+       --auth-mode login
+     ```
 
 
