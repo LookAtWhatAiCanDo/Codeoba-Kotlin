@@ -317,7 +317,7 @@ During workflow execution on the `windows-latest` runner when a release tag is p
 1. The runner requests a temporary OIDC token from GitHub's token authority.
 2. The `Azure Login` step uses this OIDC token to authenticate against Azure Entra ID using the client, tenant, and subscription IDs.
 3. The runner builds the unsigned package (e.g. `./gradlew packageReleaseMsi` or `npm run tauri build`).
-4. The `Sign MSI installer with Trusted Signing` step connects to the Artifact Signing service using the logged-in context, signs the generated package using your Certificate Profile, and appends a secure timestamp.
+4. The `Sign MSI installer with Azure Artifact Signing` step connects to the Artifact Signing service using the logged-in context, signs the generated package using your Certificate Profile, and appends a secure timestamp.
 
 ```yaml
       - name: Azure Login
@@ -328,16 +328,53 @@ During workflow execution on the `windows-latest` runner when a release tag is p
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Sign MSI installer with Trusted Signing
+      - name: Sign MSI installer with Azure Artifact Signing
         if: matrix.platform == 'windows' && startsWith(github.ref, 'refs/tags/v')
         uses: azure/artifact-signing-action@v2
         with:
           endpoint: ${{ vars.AZURE_TRUSTED_SIGNING_ENDPOINT || 'https://cus.codesigning.azure.net/' }}
           signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT_NAME }}
           certificate-profile-name: ${{ vars.AZURE_CERTIFICATE_PROFILE_NAME }}
-          files-folder: 'app-desktop/build/compose/binaries/main/msi' # Adjust this path for Tauri (e.g. src-tauri/target/release/bundle/msi)
+          files-folder: 'app-desktop/build/compose/binaries/main-release/msi' # Adjust this path for Tauri (e.g. src-tauri/target/release/bundle/msi)
           files-folder-filter: 'msi'
           file-digest: 'SHA512'
           timestamp-digest: 'SHA512'
           timestamp-rfc3161: 'http://timestamp.acs.microsoft.com'
 ```
+
+---
+
+## 📊 Monitoring & Logging
+
+When release builds are signed in CI/CD, execution and verification activity is logged in three separate places:
+
+### 1. GitHub Actions Logs (Runner Execution)
+The console output of the `azure/artifact-signing-action` step shows:
+- The list of discovered files.
+- File hashes (digests) and signing results.
+- The regional signing endpoint and certificate profile used.
+
+### 2. Entra ID Sign-In Logs (OIDC Authentication)
+Every time GitHub Actions logs in keylessly, it registers as a sign-in event under your service principal App Registration in Microsoft Entra.
+* **Where to find it:**
+  1. Open the [Microsoft Entra admin center](https://entra.microsoft.com/).
+  2. In the left menu, select **Identity** -> **Monitoring & health** -> **Sign-in logs**.
+  3. Select the **Service principal sign-ins** tab.
+  4. Look for your corporate signing client App Registration. If OIDC login fails (e.g., due to configuration mismatches), the exact error description and token claims are listed here.
+
+### 3. Artifact Signing Account Logs (Transaction & Audit)
+* **Administrative Audit Logs:** Account-level changes (creating profiles, editing access control) are logged under the **Activity log** tab of your Artifact Signing Account in the Azure portal.
+* **Individual File Signing Transaction Logs:** To keep a detailed record of every individual file signed, configure a **Diagnostic setting** targeting an Azure Storage Account. 
+  *(Note: Microsoft's Artifact Signing service currently has a known integration issue where transaction logs fail to ingest into Log Analytics workspaces, making them appear empty. Routing to a Storage Account is the reliable, working workaround).*
+  1. Go to your **Artifact Signing Account** page in the Azure portal.
+  2. Under **Monitoring** in the left menu, select **Diagnostic settings** -> **Edit setting** (on your existing audit setting) or **+ Add diagnostic setting**.
+  3. Configure the settings:
+     * **Diagnostic setting name:** `whataicando-signing-audit`.
+     * **Logs:** Check **`Sign Transactions`** (this logs the actual files signed). Under **Category groups**, check **`audit`** (this logs admin events).
+     * **Destination details:** Check **`Archive to a storage account`** (leave *Send to Log Analytics workspace* unchecked).
+     * **Subscription / Storage Account:** Select your active subscription and choose or create a simple Azure Storage Account (e.g., `whataicandosigningstore`).
+  4. Click **Save** in the top left.
+  5. Once saved, every signing transaction will write a JSON log blob inside your storage account under the container `insights-logs-signtransactions`.
+
+
+
