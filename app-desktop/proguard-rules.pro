@@ -1,5 +1,6 @@
 # Suppress overall warning failures
 -ignorewarnings
+-dontoptimize
 
 # --- ONNX Runtime ---
 -keep class ai.onnxruntime.** { *; }
