@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   build:
@@ -164,6 +165,27 @@ jobs:
             echo "Standard commit. Executing standard unsigned package build: gradlew $TASK_NAME"
             ./gradlew $TASK_NAME -PappVersion=${{ env.APP_VERSION }}
           fi
+
+      - name: Azure Login
+        if: matrix.platform == 'windows' && startsWith(github.ref, 'refs/tags/v')
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign MSI installer with Trusted Signing
+        if: matrix.platform == 'windows' && startsWith(github.ref, 'refs/tags/v')
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_TRUSTED_SIGNING_ENDPOINT || 'https://eus.codesigning.azure.net/' }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ vars.AZURE_CERTIFICATE_PROFILE_NAME }}
+          files-folder: 'app-desktop/build/compose/binaries/main/msi'
+          files-folder-filter: 'msi'
+          file-digest: 'SHA512'
+          timestamp-digest: 'SHA512'
+          timestamp-rfc3161: 'http://timestamp.acs.microsoft.com'
 
       - name: Clean Up Credentials
         if: always() && matrix.platform == 'macos' && startsWith(github.ref, 'refs/tags/v')

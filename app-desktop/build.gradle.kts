@@ -84,6 +84,9 @@ compose {
                     iconFile.set(project.file("src/desktopMain/resources/icon.png"))
                 }
             }
+            buildTypes.release.proguard {
+                configurationFiles.from(project.file("proguard-rules.pro"))
+            }
         }
     }
 }
