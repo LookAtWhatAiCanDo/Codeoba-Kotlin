@@ -250,23 +250,28 @@ Follow these steps to set up keyless authentication (OIDC) between GitHub Action
 
 #### Step 2: Configure Federated Credentials (OIDC)
 Authorize your GitHub repository to authenticate securely:
-1. In corporate signing client app registration, select **Certificates & secrets** in the left menu.
-2. Select the **Federated credentials** tab at the top and click **Add credential**.
-3. Select the scenario: **`GitHub Actions active on a repository`**.
-4. Fill in your repository details:
-   * **Organization:** Enter `LookAtWhatAiCanDo`.
-   * **Repository:** Enter the repository name (e.g., `Codeoba`, `Codeoba-Kotlin`, or `Codeoba-Tauri`).
-   * **Entity type:** Select **`Tag`** (since release builds run on tags).
-   * **Tag:** Enter **`v*`** (to authorize tags starting with `v`).
-   * **Name:** Enter a descriptive identifier (e.g., `GitHub-LookAtWhatAiCanDo-Codeoba-Tags`).
-5. Click **Add**.
+1. **Create the GitHub Environment:**
+   - In your GitHub Repository, go to **Settings** -> **Environments** -> **New environment**.
+   - Name the environment **`Production`** and click **Configure environment**.
+2. **Add Federated Credential in Azure:**
+   - In the Entra signing client App Registration, select **Certificates & secrets** in the left menu.
+   - Select the **Federated credentials** tab at the top and click **Add credential**.
+   - Select the scenario: **`GitHub Actions active on a repository`**.
+   - Fill in your repository details:
+     * **Organization:** Enter `LookAtWhatAiCanDo`.
+     * **Repository:** Enter the repository name (e.g., `Codeoba` or `Codeoba-Tauri`).
+     * **Entity type:** Select **`Environment`**.
+     * **Environment:** Enter **`Production`**.
+     * **Name:** Enter a descriptive identifier (e.g., `GitHub-LookAtWhatAiCanDo-Codeoba-Environment-Production`).
+   - Click **Add**.
 
 **Reusing the Setup for Sibling Repositories (e.g., `Codeoba-Tauri`):**
 To sign a different application, you do **not** need to repeat the Azure Portal setup. Simply:
-1. Open the existing Entra App Registration `WhatAiCanDoSigningClient`.
-2. Go to **Certificates & secrets** -> **Federated credentials** -> **Add credential**.
-3. Select **GitHub Actions active on a repository** and fill in the sibling repository name (e.g., `Codeoba-Tauri`) and credentials.
-4. Reuse the same GitHub Actions variables and secrets in the new repository.
+1. Create a **`Production`** environment in the sibling GitHub repository settings.
+2. Open the existing Entra signing client App Registration.
+3. Go to **Certificates & secrets** -> **Federated credentials** -> **Add credential**.
+4. Select **GitHub Actions active on a repository** and fill in the sibling repository name (e.g., `Codeoba-Tauri`) and choose **Environment** (`Production`).
+5. Reuse the same GitHub Actions variables and secrets in the new repository.
 
 #### Step 3: Grant Signing Permission to the App
 Grant your Entra App Registration permission to sign using your Artifact Signing account:
@@ -274,7 +279,7 @@ Grant your Entra App Registration permission to sign using your Artifact Signing
 2. Click **Access control (IAM)** -> **Add** -> **Add role assignment**.
 3. Search for the role **`Artifact Signing Certificate Profile Signer`** and click **Next**.
 4. Under **Members**, keep *User, group, or service principal* selected and click **+ Select members**.
-5. Search for your App Registration (**`WhatAiCanDoSigningClient`**), select it, and click **Select**.
+5. Search for your Entra signing client App Registration, select it, and click **Select**.
 6. Click **Review + assign** to save.
 
 ---
