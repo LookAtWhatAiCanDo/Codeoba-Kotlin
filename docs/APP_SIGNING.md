@@ -376,5 +376,14 @@ Every time GitHub Actions logs in keylessly, it registers as a sign-in event und
   4. Click **Save** in the top left.
   5. Once saved, every signing transaction will write a JSON log blob inside your storage account under the container `insights-logs-signtransactions`.
 
+### How to View the Log Files:
+Azure automatically packages and exports logs to your storage account hourly.
+1. In the Azure portal, search for and open your **Storage Account** (`whataicandostorage`).
+2. In the left-hand menu under **Data storage**, select **Containers**.
+3. Click on the container named **`insights-logs-signtransactions`** (this container is created automatically after your first signed release build runs).
+4. Navigate through the folder hierarchy which is organized by date and time:
+   `resourceId=.../y=<year>/m=<month>/d=<day>/h=<hour>/m=<minute>/`
+5. Click on the file named **`PT1H.json`**.
+6. Select the **Edit** tab at the top (or click **Download**) to view the raw JSON lines containing information on every signed binary (including timestamps, certificate profiles, and operation statuses).
 
 
