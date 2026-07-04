@@ -93,7 +93,6 @@ import com.whataicando.codeoba.core.domain.source.SourceRegistry
 import com.whataicando.codeoba.core.manager.EmbeddingCacheManager
 import com.whataicando.codeoba.core.manager.GroupManager
 import com.whataicando.codeoba.core.manager.IndexManager
-import com.whataicando.codeoba.core.source.DesktopAiderSource
 import com.whataicando.codeoba.core.source.DesktopAntigravitySource
 import com.whataicando.codeoba.core.source.DesktopClaudeSource
 import com.whataicando.codeoba.core.source.DesktopCodexSource
@@ -247,7 +246,6 @@ fun main(args: Array<String>) {
         com.whataicando.codeoba.core.source.DesktopAntigravitySource(),
         com.whataicando.codeoba.core.source.DesktopCursorSource(),
         com.whataicando.codeoba.core.source.DesktopCodexSource(),
-        com.whataicando.codeoba.core.source.DesktopAiderSource(),
         com.whataicando.codeoba.core.source.DesktopCopilotSource()
     )
     for (src in sources) {
@@ -320,7 +318,6 @@ fun mainEntry() = application {
             register(DesktopAntigravitySource())
             register(DesktopCursorSource())
             register(DesktopCodexSource())
-            register(DesktopAiderSource())
             register(DesktopCopilotSource())
         }
     }

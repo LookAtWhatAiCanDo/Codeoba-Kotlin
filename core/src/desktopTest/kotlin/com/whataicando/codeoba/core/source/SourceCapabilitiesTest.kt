@@ -65,42 +65,6 @@ class SourceCapabilitiesTest {
         assertFalse(File(home, ".codex").exists())
     }
 
-    @Test
-    fun testAiderSourceAppInstalledAndCleanup() = withMockUserHome { home ->
-        val source = DesktopAiderSource()
-        assertFalse(source.isAvailable())
-        assertTrue(source.getDataPathsToDelete().isEmpty())
-
-        // Create Dev directory and a mock aider history file inside it
-        val devDir = File(home, "Dev/project")
-        devDir.mkdirs()
-        val historyFile = File(devDir, ".aider.chat.history.md")
-        historyFile.writeText(
-            """
-            # Aider chat started at 2026-05-20 12:00:00
-            
-            #### User:
-            Hello Aider
-            
-            #### Assistant:
-            Hello
-            """.trimIndent()
-        )
-
-        // Trigger parseAllSessions so Aider scans and identifies active watch paths
-        val list = kotlinx.coroutines.runBlocking { source.parseAllSessions() }
-        assertEquals(1, list.size)
-
-        // Now it should be available and count as installed
-        assertTrue(source.isAvailable())
-        assertTrue(source.isAppInstalled())
-        assertEquals(listOf(historyFile.absolutePath), source.getDataPathsToDelete())
-
-        // Verify deleteDataPaths cleans up the history files
-        assertTrue(source.deleteDataPaths())
-        assertFalse(historyFile.exists())
-        assertTrue(source.getDataPathsToDelete().isEmpty())
-    }
 
     @Test
     fun testCursorSourceCleanup() = withMockUserHome { home ->
