@@ -262,18 +262,18 @@ Authorize your GitHub repository to authenticate securely:
    - Select the scenario: **`GitHub Actions active on a repository`**.
    - Fill in your repository details:
      * **Organization:** Enter `LookAtWhatAiCanDo`.
-     * **Repository:** Enter the repository name (e.g., `Codeoba` or `Codeoba-Tauri`).
+     * **Repository:** Enter the repository name (e.g., `Codeoba` or `Codeoba-Kotlin`).
      * **Entity type:** Select **`Environment`**.
      * **Environment:** Enter **`Production`**.
      * **Name:** Enter a descriptive identifier (e.g., `GitHub-LookAtWhatAiCanDo-Codeoba-Environment-Production`).
    - Click **Add**.
 
-**Reusing the Setup for Sibling Repositories (e.g., `Codeoba-Tauri`):**
+**Reusing the Setup for Sibling Repositories (e.g., `Codeoba-Kotlin`):**
 To sign a different application, you do **not** need to repeat the Azure Portal setup. Simply:
 1. Create a **`Production`** environment in the sibling GitHub repository settings.
 2. Open the existing Entra signing client App Registration.
 3. Go to **Certificates & secrets** -> **Federated credentials** -> **Add credential**.
-4. Select **GitHub Actions active on a repository** and fill in the sibling repository name (e.g., `Codeoba-Tauri`) and choose **Environment** (`Production`).
+4. Select **GitHub Actions active on a repository** and fill in the sibling repository name (e.g., `Codeoba-Kotlin`) and choose **Environment** (`Production`).
 5. Reuse the same GitHub Actions variables and secrets in the new repository.
 
 #### Step 3: Grant Signing Permission to the App
@@ -300,9 +300,9 @@ These are added as **Repository Secrets** because they contain GUIDs specific to
 
 | Secret Name | Description |
 | :--- | :--- |
-| `AZURE_CLIENT_ID` | The **Application (client) ID** of Entra App Registration. |
-| `AZURE_TENANT_ID` | The **Directory (tenant) ID** of your Azure subscription. |
-| `AZURE_SUBSCRIPTION_ID` | The ID of your Azure subscription (visible on the Subscriptions page in the Azure portal). |
+| `AZURE_CLIENT_ID` | The **Application (client) ID** of your Entra App Registration. |
+| `AZURE_TENANT_ID` | The **Directory (tenant) ID** of your Entra App Registration. |
+| `AZURE_SUBSCRIPTION_ID` | The **Subscription ID** your Azure subscription. |
 
 #### Variables (Non-Sensitive)
 These are added as **Repository Variables**:

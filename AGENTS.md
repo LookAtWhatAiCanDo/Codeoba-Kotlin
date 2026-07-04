@@ -14,6 +14,7 @@ To ensure the project context remains accurate:
 3. **No Automatic Git Staging/Commits:** By default, never stage (`git add`) or commit (`git commit`) changes unless explicitly requested or prompted by the user.
 4. **Relative Pathing Requirement:** Always write file paths relative to the folder they are in (e.g., `./README.md` or `../core/`). Never document absolute file paths or paths outside of the repository, with the important exception of data paths for the source agents this application monitors.
 5. **Plan Synchronization:** Any time a CLI command, parameter, file path, or configuration flag changes or is corrected during implementation, you must immediately propagate that change to the local `implementation_plan.md` in the system app data directory, as well as any architectural plan files under `docs/`.
+6. **Conventional Commits:** All commits MUST follow the Conventional Commits specification (https://www.conventionalcommits.org) using standard prefixes (e.g., `feat:`, `fix:`, `docs:`, `chore:`).
 
 ---
 
