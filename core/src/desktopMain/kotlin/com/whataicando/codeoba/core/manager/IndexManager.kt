@@ -9,6 +9,8 @@ import com.whataicando.codeoba.core.domain.search.SearchEngine
 import com.whataicando.codeoba.core.domain.source.SourceRegistry
 import com.whataicando.codeoba.core.util.Logger.log
 import com.whataicando.codeoba.core.watcher.DirectoryWatcher
+import com.whataicando.codeoba.core.util.BuildConfig
+import com.whataicando.codeoba.core.util.DebugStoreConfig
 import java.io.File
 
 class IndexManager(
@@ -40,6 +42,27 @@ class IndexManager(
         log("IndexManager: Beginning initial scan and watch...")
 
         try {
+            val isCannedMode = DebugStoreConfig.isCannedDataMode
+            if (isCannedMode) {
+                onProgressCallback?.invoke("Loading canned screenshot data...")
+                log("IndexManager: Loading canned data for store mode...")
+                try {
+                    val cannedSessions = loadCannedSessions()
+                    log("IndexManager: Loaded ${cannedSessions.size} canned sessions.")
+
+                    onProgressCallback?.invoke("Updating search index...")
+                    searchEngine.updateIndex(cannedSessions) { processed, total ->
+                        onProgressCallback?.invoke("Indexing: $processed / $total...")
+                    }
+                    log("IndexManager: Canned index updated successfully. Notifying listeners...")
+                    notifyListeners()
+                    return@withContext
+                } catch (e: Exception) {
+                    log("IndexManager: Failed to load canned sessions:", e)
+                    onProgressCallback?.invoke("Error loading canned sessions: ${e.message}")
+                }
+            }
+
             SessionCacheManager.isCacheEnabled = cacheEnabled
             val allSessions = mutableListOf<Session>()
             val activeAdapters = sourceRegistry.getActiveAdapters()
@@ -188,5 +211,40 @@ class IndexManager(
         scope.launch(Dispatchers.Main) {
             onIndexUpdatedListeners.forEach { it() }
         }
+    }
+
+    private fun loadCannedSessions(): List<Session> {
+        val path = DebugStoreConfig.cannedDataPath ?: run {
+            val store = DebugStoreConfig.storeMode ?: "apple"
+            "store/canned_$store.json"
+        }
+        val file = File(path)
+        val resolvedFile = if (file.isAbsolute) {
+            file
+        } else {
+            val cwdFile = File(System.getProperty("user.dir"), path)
+            if (cwdFile.exists()) {
+                cwdFile
+            } else {
+                val parentFile = File(System.getProperty("user.dir"), "../$path")
+                if (parentFile.exists()) {
+                    parentFile
+                } else {
+                    cwdFile
+                }
+            }
+        }
+
+        if (!resolvedFile.exists()) {
+            throw java.io.FileNotFoundException("Canned data file not found at: ${resolvedFile.absolutePath}")
+        }
+
+        val jsonParser = kotlinx.serialization.json.Json {
+            ignoreUnknownKeys = true
+            prettyPrint = true
+        }
+
+        val content = resolvedFile.readText()
+        return jsonParser.decodeFromString<List<Session>>(content)
     }
 }

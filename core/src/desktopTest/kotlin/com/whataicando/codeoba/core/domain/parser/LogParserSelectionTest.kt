@@ -35,23 +35,63 @@ class LogParserSelectionTest {
     }
 
     @Test
-    fun testSummarizingParserExceptionSafety() {
+    fun testSummarizingParserDefaultStub() {
         runBlocking {
-            val parser = SummarizingLogParser(null) // This will cause runLocalInference to throw Exception
-            val dummySession = Session(
-                id = "test-id",
-                sourceId = "test-source",
-                filePath = "test-path",
-                timestamp = 0L,
-                updatedAt = 0L,
-                cwd = null,
-                threadName = null,
-                turns = emptyList(),
-                isArchived = false,
-                isPinned = false,
-                summary = null
+            // Revert/reset to default StubSummarizer
+            SummarizerProvider.revertToStub()
+            
+            val parser = SummarizingLogParser(null)
+            val dummySession = createDummySession()
+            val file = File("dummy-file")
+            val resultSession = parser.parse(file) { dummySession }
+            
+            assertNotNull(resultSession)
+            val summary = resultSession.summary
+            assertNotNull(summary)
+            assertTrue(summary.keyActions.contains("AI-powered summarization requires an active subscription."))
+            assertTrue(summary.errors.first().contains("requires an active Codeoba subscription"))
+        }
+    }
+
+    @Test
+    fun testSummarizingParserWithCustomSummarizer() {
+        runBlocking {
+            val expectedSummary = SessionSummary(
+                keyActions = listOf("Custom action"),
+                errors = emptyList(),
+                performanceCharts = emptyList()
             )
             
+            SummarizerProvider.install(object : Summarizer {
+                override fun summarize(session: Session, parserConfigJson: String?): SummaryResult {
+                    return SummaryResult.Ok(expectedSummary)
+                }
+            })
+            
+            val parser = SummarizingLogParser(null)
+            val dummySession = createDummySession()
+            val file = File("dummy-file")
+            val resultSession = parser.parse(file) { dummySession }
+            
+            assertNotNull(resultSession)
+            assertEquals(expectedSummary, resultSession.summary)
+            
+            // Clean up
+            SummarizerProvider.revertToStub()
+        }
+    }
+
+    @Test
+    fun testSummarizingParserExceptionSafety() {
+        runBlocking {
+            SummarizerProvider.install(object : Summarizer {
+                override fun summarize(session: Session, parserConfigJson: String?): SummaryResult {
+                    throw RuntimeException("Simulated inference failure")
+                }
+            })
+            
+            val parser = SummarizingLogParser(null)
+            val dummySession = createDummySession()
             val file = File("dummy-file")
             val resultSession = parser.parse(file) { dummySession }
             
@@ -59,7 +99,26 @@ class LogParserSelectionTest {
             val summary = resultSession.summary
             assertNotNull(summary)
             assertTrue(summary.keyActions.contains("AI summarization failed"), "Should contain fallback action message")
-            assertTrue(summary.errors.first().contains("Inference exception:"), "Should capture the inference failure error message")
+            assertTrue(summary.errors.first().contains("Inference exception: Simulated inference failure"), "Should capture the exception message")
+            
+            // Clean up
+            SummarizerProvider.revertToStub()
         }
+    }
+
+    private fun createDummySession(): Session {
+        return Session(
+            id = "test-id",
+            sourceId = "test-source",
+            filePath = "test-path",
+            timestamp = 0L,
+            updatedAt = 0L,
+            cwd = null,
+            threadName = null,
+            turns = emptyList(),
+            isArchived = false,
+            isPinned = false,
+            summary = null
+        )
     }
 }

@@ -60,11 +60,73 @@ graph TD
 - **Test**: `./gradlew :core:desktopTest`
 - **Launch Application**: `./gradlew :app-desktop:run`
 
-### Environment & Configuration Properties
+### ⚙️ Developer Runtime Modes & Configuration
 
-The application resolves dynamic parameters at startup from JVM system properties or environment variables:
-- `codeoba.firebase.api_key` (JVM property) or `CODEOBA_FIREBASE_API_KEY` (env variable): Firebase Web API Key required for token refresh operations in non-emulator (production) mode. If missing in production, token refreshes fail fast.
-- `codeoba.base_url` (JVM property): The active environment base URL. Defaults to `codeoba.com`. If configured to `localhost` or `127.0.0.1`, the app targets local Firebase emulators.
+By default, the application runs in **Free/Local-First Mode** (zero cloud dependencies, subscription features compiled out). For developers working on subscription, syncing, or remote-control features, the app supports three environments:
+
+#### 1. Free/Local-First Mode (Default)
+Runs 100% locally on your machine with no external credentials, internet, or databases required.
+* **Compile-Time Setup**: No properties file or key configuration is needed.
+* **Run**: 
+  ```bash
+  ./gradlew :app-desktop:run
+  ```
+
+#### 2. Local Emulator Development Mode
+Enables paid subscription and multi-device sync UI features locally by connecting to a local offline Firebase Emulator Suite.
+* **Compile-Time Setup**: 
+  Create `local.properties` in the root folder of this repository (it is git-ignored by default) and add:
+  ```properties
+  # Enable subscription and sync features in the UI
+  # (Note: This is a temporary developer toggle to A/B test the client with/without subscription
+  # features. Upon subscription release, this option will be removed and permanently enabled).
+  codeoba.enable_subscription=true
+  
+  # The native OS keyring is automatically bypassed by default in local/staging environments
+  # to prevent repeated keychain authorization prompts when unsigned developer builds are run.
+  ```
+  *(Note: When pointing to the local emulator, the client defaults to `EMULATOR_ONLY` for the Firebase API key. However, because subscription features are enabled, you must configure a public verification key (`codeoba.premium.public_key=...`) in `local.properties` to verify the premium module signature. Developers with access to the premium module can generate and pair these key properties automatically using the developer key setup tasks).*
+* **Run**: Start the app by passing the local emulator base URL as a JVM System Property:
+  ```bash
+  ./gradlew :app-desktop:run -Dcodeoba.base_url=localhost:5000
+  ```
+
+#### 3. Deployed Dev Server Mode (Staging sandbox pointing to dev.codeoba.com)
+Connects the local client app directly to the public staging cloud backend (Firebase project `codeoba-dev`).
+* **Compile-Time Setup**:
+  Add the following compile-time variables to `local.properties` (or set them as environment variables in your build shell):
+  ```properties
+  codeoba.enable_subscription=true
+  
+  # Paste your staging Firebase Web API Key:
+  codeoba.firebase.api_key=YOUR_STAGING_FIREBASE_WEB_API_KEY
+  
+  # Paste your staging Public Key (pairs with premium private key):
+  codeoba.premium.public_key=YOUR_STAGING_PREMIUM_PUBLIC_KEY
+  
+  # Paste your staging app signature attestation token:
+  codeoba.app_signature_hash=YOUR_STAGING_APP_SIGNATURE_TOKEN
+  ```
+  *(If using environment variables, export them in your terminal before building: `CODEOBA_FIREBASE_API_KEY`, `CODEOBA_PREMIUM_PUBLIC_KEY`, and `CODEOBA_APP_SIGNATURE_HASH`).*
+* **Run**: Run the client pointing to the staging base URL:
+  ```bash
+  ./gradlew :app-desktop:run -Dcodeoba.base_url=dev.codeoba.com
+  ```
+
+#### 4. Deployed Production Mode (Pointing to codeoba.com)
+Connects the client app to the live production database and backend services.
+* **Compile-Time Setup**:
+  Add the production variables to `local.properties` (or export as environment variables):
+  ```properties
+  codeoba.enable_subscription=true
+  codeoba.firebase.api_key=YOUR_PRODUCTION_FIREBASE_WEB_API_KEY
+  codeoba.premium.public_key=YOUR_PRODUCTION_PREMIUM_PUBLIC_KEY
+  codeoba.app_signature_hash=YOUR_PRODUCTION_APP_SIGNATURE_TOKEN
+  ```
+* **Run**: Run the client pointing to the production base URL:
+  ```bash
+  ./gradlew :app-desktop:run -Dcodeoba.base_url=codeoba.com
+  ```
 
 ---
 
@@ -72,3 +134,11 @@ The application resolves dynamic parameters at startup from JVM system propertie
 
 *   100% local-first: no remote accounts, telemetry, trackers, or cloud storage syncing.
 *   All parser steps, SQL queries, and semantic embeddings are executed directly on your local machine.
+
+---
+
+## 📸 Developer Guides
+
+*   [Adding a New Log Adapter Guide](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/docs/ADD_NEW_SOURCE.md)
+*   [Developer Setup & Build Guide](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/docs/DEVELOPMENT.md)
+*   [Marketing Screenshot Mock Generator Guide](file:///Users/pv/Dev/GitHub/LookAtWhatAiCanDo/Codeoba/docs/SCREENSHOT_GENERATOR.md)

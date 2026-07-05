@@ -25,7 +25,7 @@ class LocalAuthServerTest {
             var receivedEmail: String? = null
             var receivedUid: String? = null
 
-            val port = LocalAuthServer.start { idToken, refreshToken, email, uid ->
+            val port = LocalAuthServer.start { idToken, refreshToken, email, uid, _ ->
                 receivedIdToken = idToken
                 receivedRefreshToken = refreshToken
                 receivedEmail = email
@@ -66,7 +66,7 @@ class LocalAuthServerTest {
             var receivedEmail: String? = null
             var receivedUid: String? = null
 
-            val port = LocalAuthServer.start { idToken, refreshToken, email, uid ->
+            val port = LocalAuthServer.start { idToken, refreshToken, email, uid, _ ->
                 receivedIdToken = idToken
                 receivedRefreshToken = refreshToken
                 receivedEmail = email
@@ -113,7 +113,7 @@ class LocalAuthServerTest {
             var receivedEmail: String? = null
             var receivedUid: String? = null
 
-            val port = LocalAuthServer.start { idToken, refreshToken, email, uid ->
+            val port = LocalAuthServer.start { idToken, refreshToken, email, uid, _ ->
                 receivedIdToken = idToken
                 receivedRefreshToken = refreshToken
                 receivedEmail = email
@@ -146,7 +146,7 @@ class LocalAuthServerTest {
     @Test
     fun testCallbackOptionsCors() {
         runBlocking {
-            val port = LocalAuthServer.start { _, _, _, _ -> }
+            val port = LocalAuthServer.start { _, _, _, _, _ -> }
 
             val client = HttpClient(CIO)
             try {
@@ -169,7 +169,7 @@ class LocalAuthServerTest {
     @Test
     fun testCallbackUnauthorizedOrigin() {
         runBlocking {
-            val port = LocalAuthServer.start { _, _, _, _ -> }
+            val port = LocalAuthServer.start { _, _, _, _, _ -> }
 
             val client = HttpClient(CIO)
             try {
@@ -189,7 +189,7 @@ class LocalAuthServerTest {
     @Test
     fun testCallbackMissingOriginOnPost() {
         runBlocking {
-            val port = LocalAuthServer.start { _, _, _, _ -> }
+            val port = LocalAuthServer.start { _, _, _, _, _ -> }
 
             val client = HttpClient(CIO)
             try {
@@ -210,7 +210,7 @@ class LocalAuthServerTest {
     @Test
     fun testCallbackInvalidState() {
         runBlocking {
-            val port = LocalAuthServer.start { _, _, _, _ -> }
+            val port = LocalAuthServer.start { _, _, _, _, _ -> }
 
             val client = HttpClient(CIO)
             try {

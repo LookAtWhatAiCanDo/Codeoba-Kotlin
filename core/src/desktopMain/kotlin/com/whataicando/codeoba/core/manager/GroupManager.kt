@@ -3,6 +3,7 @@ package com.whataicando.codeoba.core.manager
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import com.whataicando.codeoba.core.domain.model.ConversationGroup
+import com.whataicando.codeoba.core.util.DebugStoreConfig
 import com.whataicando.codeoba.core.util.Logger.log
 import java.io.File
 
@@ -62,6 +63,9 @@ object GroupManager {
     }
 
     fun getGroups(): List<ConversationGroup> = synchronized(lock) {
+        if (DebugStoreConfig.isStoreMode) {
+            return DebugStoreConfig.cannedGroups
+        }
         if (inMemoryGroups.isEmpty()) {
             loadGroups()
         }

@@ -152,31 +152,6 @@ class SourceParsersTest {
         assertEquals("Hi human", session.turns[0].assistantMessage)
     }
 
-    @Test
-    fun testAiderSourceParsing() = runBlocking {
-        val tempFile = File.createTempFile("aider_test_", ".md")
-        tempFile.deleteOnExit()
-
-        tempFile.writeText(
-            """
-            # Aider chat started at 2026-05-20 12:00:00
-            
-            #### User:
-            Explain recursion.
-            
-            #### Assistant:
-            Recursion is when a function calls itself.
-            """.trimIndent()
-        )
-
-        val source = DesktopAiderSource()
-        val session = source.parseSession(tempFile.absolutePath)
-
-        assertNotNull(session)
-        assertEquals(1, session.turns.size)
-        assertEquals("Explain recursion.", session.turns[0].userMessage)
-        assertEquals("Recursion is when a function calls itself.", session.turns[0].assistantMessage)
-    }
 
     @Test
     fun testLexicalSearchEngine() = runBlocking {
@@ -653,33 +628,6 @@ class SourceParsersTest {
         assertEquals(TempMessagePart.Tool("VIEW_FILE", "View", "\nContent\n", 456L), parts2[1])
     }
 
-    @Test
-    fun testAiderGenericLevel4Headings() = runBlocking {
-        val tempFile = File.createTempFile("aider_headings_", ".md")
-        tempFile.deleteOnExit()
-        tempFile.writeText(
-            """
-            # Aider chat started at 2026-05-20 12:00:00
-
-            #### User:
-            Please fix the bug.
-            #### Steps to reproduce:
-            1. Open the file.
-            2. Run the code.
-
-            #### Assistant:
-            I will fix it.
-            #### Summary:
-            Done.
-            """.trimIndent()
-        )
-        val source = DesktopAiderSource()
-        val session = source.parseSession(tempFile.absolutePath)
-        assertNotNull(session)
-        assertEquals(1, session.turns.size)
-        assertEquals("Please fix the bug.\n#### Steps to reproduce:\n1. Open the file.\n2. Run the code.", session.turns[0].userMessage)
-        assertEquals("I will fix it.\n#### Summary:\nDone.", session.turns[0].assistantMessage)
-    }
 
     @Test
     fun testCursorWindowsPathStripping() {

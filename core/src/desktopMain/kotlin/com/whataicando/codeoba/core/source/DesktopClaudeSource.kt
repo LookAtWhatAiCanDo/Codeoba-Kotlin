@@ -13,6 +13,20 @@ class DesktopClaudeSource : DesktopSourceAdapter() {
     override val id: String = "claude"
     override val displayName: String = "Claude Code"
 
+    companion object {
+        /**
+         * The maximum depth to traverse when searching for Claude Code transcripts.
+         * Capping traversal depth is a critical performance, safety, and correctness guard:
+         * 1. Performance/Safety: Prevents the walker from descending into massive project folders
+         *    (e.g., node_modules, build directories) or traversing cyclic symlinks inside user projects.
+         * 2. Correctness: Prevents scanning subagent transcripts located at depth 4
+         *    (e.g., ~/.claude/projects/<proj>/<session>/subagents/<agent-id>.jsonl). Since subagents
+         *    share the parent session ID, parsing them would result in duplicate session IDs,
+         *    causing the search index to overwrite the parent session with incomplete subagent turn data.
+         */
+        private const val CLAUDE_LOGS_MAX_DEPTH = 3
+    }
+
     private val json = Json { ignoreUnknownKeys = true }
 
     override fun getBaseDir(): File {
@@ -230,7 +244,7 @@ class DesktopClaudeSource : DesktopSourceAdapter() {
         if (!baseDir.exists() || !baseDir.isDirectory) return emptyList()
 
         val sessions = mutableListOf<Session>()
-        baseDir.walkTopDown().forEach { file ->
+        baseDir.walkTopDown().maxDepth(CLAUDE_LOGS_MAX_DEPTH).forEach { file ->
             if (file.isFile && file.extension == "jsonl") {
                 val session = parseSession(file.absolutePath)
                 if (session != null) {

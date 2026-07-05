@@ -26,13 +26,15 @@ object DeviceKeyManager {
                 val privBytes = Base64.getDecoder().decode(securePriv)
                 val pubBytes = Base64.getDecoder().decode(securePub)
                 
-                val kf = KeyFactory.getInstance("RSA")
+                val kf = KeyFactory.getInstance("EC")
                 val privateKey = kf.generatePrivate(PKCS8EncodedKeySpec(privBytes))
                 val publicKey = kf.generatePublic(X509EncodedKeySpec(pubBytes))
                 
                 return KeyPair(publicKey, privateKey)
             } catch (e: Exception) {
-                log("DeviceKeyManager: Failed to load keys from SecureStorage: ${e.message}")
+                log("DeviceKeyManager: Failed to load EC keys from SecureStorage. Migrating/regenerating: ${e.message}")
+                SecureStorage.delete("device_private_key")
+                SecureStorage.delete("device_public_key")
             }
         }
 
@@ -41,8 +43,8 @@ object DeviceKeyManager {
     }
 
     private fun generateAndSaveKeyPair(): KeyPair {
-        val kpg = KeyPairGenerator.getInstance("RSA")
-        kpg.initialize(2048)
+        val kpg = KeyPairGenerator.getInstance("EC")
+        kpg.initialize(java.security.spec.ECGenParameterSpec("secp256r1"))
         val keyPair = kpg.genKeyPair()
 
         val privBase64 = Base64.getEncoder().encodeToString(keyPair.private.encoded)
@@ -63,7 +65,7 @@ object DeviceKeyManager {
 
     fun signPayload(payload: String): String {
         val kp = getOrGenerateKeyPair()
-        val sig = java.security.Signature.getInstance("SHA256withRSA")
+        val sig = java.security.Signature.getInstance("SHA256withECDSA")
         sig.initSign(kp.private)
         sig.update(payload.toByteArray(Charsets.UTF_8))
         return Base64.getEncoder().encodeToString(sig.sign())

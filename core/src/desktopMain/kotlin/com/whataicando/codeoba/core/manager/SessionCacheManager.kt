@@ -18,7 +18,8 @@ data class CacheEntry(
 
 @Serializable
 data class SourceCache(
-    val entries: List<CacheEntry>
+    val entries: List<CacheEntry>,
+    val version: String = "v1"
 )
 
 object SessionCacheManager {

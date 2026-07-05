@@ -27,22 +27,19 @@ class SourceRegistryTest {
         // Register adapters in arbitrary/unsorted order
         val cursor = MockSourceAdapter("cursor", "Cursor", installed = true, available = true)
         val claude = MockSourceAdapter("claude", "Claude Code", installed = true, available = true)
-        val aider = MockSourceAdapter("aider", "Aider", installed = false, available = false)
         val copilot = MockSourceAdapter("copilot", "GitHub Copilot", installed = false, available = false)
         
         registry.register(cursor)
         registry.register(claude)
-        registry.register(aider)
         registry.register(copilot)
 
-        // Sorted: Installed first (Claude Code, Cursor), then Uninstalled (Aider, GitHub Copilot)
+        // Sorted: Installed first (Claude Code, Cursor), then Uninstalled (GitHub Copilot)
         // Within each group, sorted alphabetically.
         val all = registry.getAllAdapters()
-        assertEquals(4, all.size)
+        assertEquals(3, all.size)
         assertEquals("Claude Code", all[0].displayName)
         assertEquals("Cursor", all[1].displayName)
-        assertEquals("Aider", all[2].displayName)
-        assertEquals("GitHub Copilot", all[3].displayName)
+        assertEquals("GitHub Copilot", all[2].displayName)
     }
 
     @Test
@@ -51,11 +48,9 @@ class SourceRegistryTest {
         
         val cursor = MockSourceAdapter("cursor", "Cursor", installed = true, available = true)
         val claude = MockSourceAdapter("claude", "Claude Code", installed = true, available = true)
-        val aider = MockSourceAdapter("aider", "Aider", installed = false, available = false)
         
         registry.register(cursor)
         registry.register(claude)
-        registry.register(aider)
 
         val active = registry.getActiveAdapters()
         assertEquals(2, active.size)

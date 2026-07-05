@@ -123,6 +123,7 @@ import com.whataicando.codeoba.core.domain.search.ArchivalFilter
 import com.whataicando.codeoba.core.domain.search.SearchResult
 import com.whataicando.codeoba.core.domain.source.SourceRegistry
 import com.whataicando.codeoba.core.util.PlatformUtils
+import com.whataicando.codeoba.desktop.provider.*
 
 @Composable
 fun Sidebar(
@@ -161,6 +162,7 @@ fun Sidebar(
     onGroupRemove: (Session, String) -> Unit = { _, _ -> },
     dragDropState: DragDropState = remember { DragDropState() },
     unassignedSessionCount: Int = 0,
+    statsProvider: WorkspaceStatsProvider = rememberWorkspaceStatsProvider(searchResults),
     isModelDownloaded: Boolean = true,
     isModelDownloading: Boolean = false,
     modelDownloadProgress: Float = 0f,
@@ -679,7 +681,7 @@ fun Sidebar(
                                     .padding(horizontal = 5.dp, vertical = 1.dp)
                             ) {
                                 Text(
-                                    text = unassignedSessionCount.toString(),
+                                    text = formatNumber(statsProvider.getGroupSessionCount("_none_", unassignedSessionCount).toLong()),
                                     color = AccentCyan,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
@@ -702,7 +704,8 @@ fun Sidebar(
                                     groupInputText = old
                                     showRenameGroupDialog = old
                                 },
-                                dragDropState = dragDropState
+                                dragDropState = dragDropState,
+                                statsProvider = statsProvider
                             )
                         }
                     }
@@ -815,7 +818,7 @@ fun Sidebar(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = searchResults.size.toString(),
+                        text = formatNumber(statsProvider.totalConversations.toLong()),
                         color = AccentCyan,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -2002,7 +2005,8 @@ fun GroupTreeItem(
     onDelete: (String) -> Unit,
     onTogglePin: (String, Boolean) -> Unit,
     onShowRenameDialog: (String) -> Unit,
-    dragDropState: DragDropState
+    dragDropState: DragDropState,
+    statsProvider: WorkspaceStatsProvider
 ) {
     var isExpanded by remember { mutableStateOf(true) }
     val isSelected = activeGroupFilter != null && activeGroupFilter.lowercase() == node.fullName.lowercase()
@@ -2126,7 +2130,7 @@ fun GroupTreeItem(
                             .padding(horizontal = 5.dp, vertical = 1.dp)
                     ) {
                         Text(
-                            text = node.recursiveSessionCount.toString(),
+                            text = formatNumber(statsProvider.getGroupSessionCount(node.segment, node.recursiveSessionCount).toLong()),
                             color = AccentCyan,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
@@ -2150,7 +2154,8 @@ fun GroupTreeItem(
                         onDelete = onDelete,
                         onTogglePin = onTogglePin,
                         onShowRenameDialog = onShowRenameDialog,
-                        dragDropState = dragDropState
+                        dragDropState = dragDropState,
+                        statsProvider = statsProvider
                     )
                 }
             }

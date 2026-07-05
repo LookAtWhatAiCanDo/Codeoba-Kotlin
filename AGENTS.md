@@ -14,6 +14,7 @@ To ensure the project context remains accurate:
 3. **No Automatic Git Staging/Commits:** By default, never stage (`git add`) or commit (`git commit`) changes unless explicitly requested or prompted by the user.
 4. **Relative Pathing Requirement:** Always write file paths relative to the folder they are in (e.g., `./README.md` or `../core/`). Never document absolute file paths or paths outside of the repository, with the important exception of data paths for the source agents this application monitors.
 5. **Plan Synchronization:** Any time a CLI command, parameter, file path, or configuration flag changes or is corrected during implementation, you must immediately propagate that change to the local `implementation_plan.md` in the system app data directory, as well as any architectural plan files under `docs/`.
+6. **Conventional Commits:** All commits MUST follow the Conventional Commits specification (https://www.conventionalcommits.org) using standard prefixes (e.g., `feat:`, `fix:`, `docs:`, `chore:`).
 
 ---
 
@@ -190,7 +191,7 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - Free local lexical and semantic searches are enabled by default for all users, while AI-powered summarization is a premium subscription feature.
     - Paid subscription entitlements are enforced strictly on the backend to gate access to the Device Sync Hub and remote command relay APIs.
     - Implements secure, browser-delegated OAuth flow utilizing a temporary JDK-native HTTP loopback server (listening on a random port for `/callback` parameters) and a unified Web Console SPA (running on Firebase Hosting) to prevent in-app credential handling.
-    - Stores all sensitive authentication credentials (ID and refresh tokens, licensing JWT, decryption key) in the OS-native keyring (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux) using a secure utility with automatic self-healing migration and a Java Preferences fallback. Keychain/Keyring prompts can be bypassed completely during development or troubleshooting by setting the JVM system property `codeoba.no.keyring=true`.
+    - Stores all sensitive authentication credentials (ID and refresh tokens, licensing JWT, decryption key) in the OS-native keyring (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux) using a secure utility with automatic self-healing migration and a Java Preferences fallback. Keychain/Keyring prompts are bypassed by default in non-production configurations to simplify testing, and can be explicitly controlled via the JVM system property `codeoba.no.keyring=<true|false>`.
     - Billing webhooks query subscriptions using the user's immutable Firebase `uid` mapped in checkout custom metadata rather than mutable emails to support profile email updates.
     - Implements challenge-response authentication utilizing 90-second single-use nonces and device public/private key pairs (stored securely in the OS-native keyring via `SecureStorage` with a fallback to Preferences).
     - Integrates a best-effort local regex secrets scanner to redact sensitive credentials on the client side before synchronizing data.
@@ -200,10 +201,19 @@ When modifying the Compose UI under `app-desktop`, adhere to these style guideli
     - The Firebase Web API key used for token refresh operations is resolved dynamically via the JVM system property `codeoba.firebase.api_key` or environment variable `CODEOBA_FIREBASE_API_KEY`.
     - If running in production (non-emulator) mode and the API key matches the default placeholder or is blank, a fail-fast validation check throws an `IllegalArgumentException` with clear configuration instructions.
 
+27. **App Signature Configuration**:
+    - The client app injects an app signature token resolved at build-time (from environment `CODEOBA_APP_SIGNATURE_HASH` or build properties) into `BuildConfig.APP_SIGNATURE`.
+    - This token is sent as the `X-App-Signature` header in all requests to backend functions. The backend compares it to `CODEOBA_APP_SIGNATURE_HASH` to verify that the request originates from the official signed distribution.
+
+28. **Store Screenshot Generator & Mock Mode**:
+    - Restricted to debug builds only (`BuildConfig.DEBUG == true`). Activated using the JVM system property `-Dcodeoba.store=apple|microsoft` (with optional custom JSON path via `-Dcodeoba.canned_data=PATH`).
+    - Sized and centered to specific default dimensions (Apple: 1280x800, Microsoft: 1920x1080) unless overridden via the program argument `--size=WIDTHxHEIGHT`.
+    - Intercepts directory/database scanning and loads faked, high-quality session lists from `store/canned_apple.json` or `store/canned_microsoft.json` relative to the current working directory, preventing local data updates to settings.
+
 ---
 
 ## 🛠️ Common Gradle Development Commands
 
 - Compile Desktop Client: `./gradlew :app-desktop:compileKotlinDesktop`
 - Run Unit Tests: `./gradlew :core:desktopTest`
-- Launch Application in Dev Mode: `./gradlew :app-desktop:run`
+- Launch Application in Dev Mode: `./gradlew :app-desktop:run -Dcodeoba.base_url=localhost:5000`

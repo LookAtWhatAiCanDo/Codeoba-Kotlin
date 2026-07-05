@@ -28,6 +28,7 @@ object FirebaseAuthClient {
             val env = System.getenv("CODEOBA_FIREBASE_API_KEY")?.trim()
             prop.takeUnless { it.isNullOrBlank() }
                 ?: env.takeUnless { it.isNullOrBlank() }
+                ?: com.whataicando.codeoba.core.util.BuildConfig.FIREBASE_API_KEY.takeUnless { it == "EMULATOR_ONLY" }
                 ?: DEFAULT_FIREBASE_API_KEY
         } catch (_: Throwable) {
             DEFAULT_FIREBASE_API_KEY
@@ -51,7 +52,25 @@ object FirebaseAuthClient {
     private val useEmulator: Boolean
         get() = AppConfig.useEmulator()
 
-
+    private fun extractErrorMessage(responseText: String, defaultMsg: String): String {
+        if (responseText.isBlank()) return defaultMsg
+        return try {
+            val root = json.parseToJsonElement(responseText).jsonObject
+            val errorObj = root["error"]?.jsonObject
+            val message = errorObj?.get("message")?.jsonPrimitive?.content
+            val status = errorObj?.get("status")?.jsonPrimitive?.content
+            if (message != null && status != null) {
+                "$message (Status: $status)"
+            } else if (message != null) {
+                message
+            } else {
+                val errorDetails = root["error"]?.jsonPrimitive?.content
+                errorDetails ?: responseText.take(500)
+            }
+        } catch (_: Exception) {
+            responseText.take(500)
+        }
+    }
 
     suspend fun refreshIdToken(refreshToken: String): AuthResponse {
         return withContext(Dispatchers.IO) {
@@ -112,13 +131,15 @@ object FirebaseAuthClient {
             
             val response: HttpResponse = client.post(url) {
                 header("Authorization", "Bearer $idToken")
+                header("X-App-Signature", com.whataicando.codeoba.core.util.BuildConfig.APP_SIGNATURE)
                 contentType(ContentType.Application.Json)
                 setBody(bodyStr)
             }
             
             val responseText = response.bodyAsText()
             if (response.status.value != 200) {
-                throw FirebaseAuthException(response.status.value, "Failed to get registration challenge. Status: ${response.status.value}")
+                val errorMsg = extractErrorMessage(responseText, "Failed to get registration challenge. Status: ${response.status.value}")
+                throw FirebaseAuthException(response.status.value, errorMsg)
             }
             
             val root = json.parseToJsonElement(responseText).jsonObject
@@ -146,13 +167,15 @@ object FirebaseAuthClient {
             
             val response: HttpResponse = client.post(url) {
                 header("Authorization", "Bearer $idToken")
+                header("X-App-Signature", com.whataicando.codeoba.core.util.BuildConfig.APP_SIGNATURE)
                 contentType(ContentType.Application.Json)
                 setBody(bodyStr)
             }
             
             val responseText = response.bodyAsText()
             if (response.status.value != 200) {
-                throw FirebaseAuthException(response.status.value, "Failed to register device in Sync Hub. Status: ${response.status.value}")
+                val errorMsg = extractErrorMessage(responseText, "Failed to register device in Sync Hub. Status: ${response.status.value}")
+                throw FirebaseAuthException(response.status.value, errorMsg)
             }
             
             val root = json.parseToJsonElement(responseText).jsonObject
@@ -174,22 +197,50 @@ object FirebaseAuthClient {
             
             val response: HttpResponse = client.post(url) {
                 header("Authorization", "Bearer $idToken")
+                header("X-App-Signature", com.whataicando.codeoba.core.util.BuildConfig.APP_SIGNATURE)
                 contentType(ContentType.Application.Json)
                 setBody(bodyStr)
             }
             
             val responseText = response.bodyAsText()
             if (response.status.value != 200) {
-                val errorMsg = try {
-                    val root = json.parseToJsonElement(responseText).jsonObject
-                    root["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
-                } catch (_: Exception) { null }
-                throw FirebaseAuthException(response.status.value, errorMsg ?: "Failed to get customer portal URL. Status: ${response.status.value}")
+                val errorMsg = extractErrorMessage(responseText, "Failed to get customer portal URL. Status: ${response.status.value}")
+                throw FirebaseAuthException(response.status.value, errorMsg)
             }
             
             val root = json.parseToJsonElement(responseText).jsonObject
             val result = root["result"]?.jsonObject ?: throw Exception("Invalid customer portal response format")
             result["url"]?.jsonPrimitive?.content ?: throw Exception("URL missing in response")
+        }
+    }
+
+    suspend fun checkSubscriptionStatus(idToken: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            val url = if (useEmulator) {
+                "http://127.0.0.1:5001/$firebaseProjectId/$CLOUD_FUNCTION_REGION/checkSubscriptionStatus"
+            } else {
+                "https://$CLOUD_FUNCTION_REGION-$firebaseProjectId.cloudfunctions.net/checkSubscriptionStatus"
+            }
+            val bodyStr = buildJsonObject {
+                put("data", buildJsonObject {})
+            }.toString()
+            
+            val response: HttpResponse = client.post(url) {
+                header("Authorization", "Bearer $idToken")
+                header("X-App-Signature", com.whataicando.codeoba.core.util.BuildConfig.APP_SIGNATURE)
+                contentType(ContentType.Application.Json)
+                setBody(bodyStr)
+            }
+            
+            val responseText = response.bodyAsText()
+            if (response.status.value != 200) {
+                val errorMsg = extractErrorMessage(responseText, "Failed to check subscription status. Status: ${response.status.value}")
+                throw FirebaseAuthException(response.status.value, errorMsg)
+            }
+            
+            val root = json.parseToJsonElement(responseText).jsonObject
+            val result = root["result"]?.jsonObject ?: throw Exception("Invalid subscription response format")
+            result["active"]?.jsonPrimitive?.content == "true"
         }
     }
 }

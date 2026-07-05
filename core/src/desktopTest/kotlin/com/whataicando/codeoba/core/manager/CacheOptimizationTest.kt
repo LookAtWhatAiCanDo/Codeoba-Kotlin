@@ -3,6 +3,7 @@ package com.whataicando.codeoba.core.manager
 import kotlinx.coroutines.runBlocking
 import com.whataicando.codeoba.core.domain.model.Session
 import com.whataicando.codeoba.core.domain.model.Turn
+import com.whataicando.codeoba.core.domain.parser.SessionSummary
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -195,6 +196,20 @@ class CacheOptimizationTest {
         com.whataicando.codeoba.core.domain.parser.LogParserFactory.setParserMode(
             com.whataicando.codeoba.core.domain.parser.ParserMode.SUMMARIZING
         )
+        val mockSummarizer = object : com.whataicando.codeoba.core.domain.parser.Summarizer {
+            override fun summarize(
+                session: Session,
+                parserConfigJson: String?
+            ): com.whataicando.codeoba.core.domain.parser.SummaryResult {
+                val summary = SessionSummary(
+                    keyActions = listOf("Parsed ${session.turns.size} dialogue exchanges from source '${session.sourceId}'"),
+                    errors = emptyList(),
+                    performanceCharts = emptyList()
+                )
+                return com.whataicando.codeoba.core.domain.parser.SummaryResult.Ok(summary)
+            }
+        }
+        com.whataicando.codeoba.core.domain.parser.SummarizerProvider.install(mockSummarizer)
 
         SessionCacheManager.isCacheEnabled = true
         SessionCacheManager.startScan(source.id)
@@ -233,6 +248,7 @@ class CacheOptimizationTest {
             com.whataicando.codeoba.core.domain.parser.LogParserFactory.setParserMode(
                 com.whataicando.codeoba.core.domain.parser.ParserMode.STANDARD
             )
+            com.whataicando.codeoba.core.domain.parser.SummarizerProvider.revertToStub()
             SessionCacheManager.endScan(source.id)
         }
     }

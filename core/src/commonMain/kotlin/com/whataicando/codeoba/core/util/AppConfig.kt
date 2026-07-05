@@ -1,10 +1,18 @@
 package com.whataicando.codeoba.core.util
 
+/**
+ * Centralized configuration utility for the Codeoba application environment.
+ *
+ * Resolves environmental variables, host domains, base URLs, and determines
+ * target Firebase project environments and local emulator states.
+ */
 object AppConfig {
     /**
-     * Determines the active environment host/base URL.
-     * Can be specified via JVM system property `-Dcodeoba.base_url=...`.
-     * If not specified, defaults to "codeoba.com".
+     * Determines the active base URL / host domain of the environment (e.g. `"codeoba.com"`, `"localhost:5000"`, `"dev.codeoba.com"`).
+     * Resolves from the JVM system property `-Dcodeoba.base_url=...`.
+     * Defaults to `"codeoba.com"` if the property is missing or empty.
+     *
+     * @return The parsed base URL.
      */
     fun getBaseUrl(): String {
         val raw = System.getProperty("codeoba.base_url")?.trim().orEmpty()
@@ -12,66 +20,70 @@ object AppConfig {
 
         val normalized = raw.trimEnd('/')
         return try {
-            val uri = if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
-                java.net.URI(normalized)
-            } else {
-                // Add a scheme purely for parsing; we only return host[:port]
-                java.net.URI("https://$normalized")
-            }
-            val host = uri.host ?: normalized.replace(Regex("^https?://"), "")
-            val portPart = if (uri.port != -1) ":${uri.port}" else ""
-            (host + portPart).trimEnd('/')
+            val uri = java.net.URI(if (normalized.startsWith("http://") || normalized.startsWith("https://")) normalized else "https://$normalized")
+            val port = if (uri.port != -1) ":${uri.port}" else ""
+            ((uri.host ?: normalized.replace(Regex("^https?://"), "")) + port).trimEnd('/')
         } catch (_: Exception) {
             normalized.replace(Regex("^https?://"), "").trimEnd('/')
         }
     }
 
     /**
-     * Determines if a given host points to a local environment (localhost or 127.0.0.1, with or without a port).
+     * Checks if the given [host] represents a local loopback domain (e.g. `"localhost"` or `"127.0.0.1"`),
+     * with or without an explicit port configuration.
+     *
+     * @param host The host string to evaluate.
+     * @return `true` if the host represents a local address.
      */
-    fun isLocalHost(host: String): Boolean {
-        return isRawLocalHost(host) || host.startsWith("localhost:") ||
-            host.startsWith("127.0.0.1:")
-    }
+    fun isLocalHost(host: String) =
+        host == "localhost" || host == "127.0.0.1" ||
+        host.startsWith("localhost:") || host.startsWith("127.0.0.1:")
 
     /**
-     * Determines if a given host is exactly "localhost" or "127.0.0.1" without an explicit port.
+     * Checks if the given [host] is exactly `"localhost"` or `"127.0.0.1"` without an explicit port suffix.
+     *
+     * @param host The host string to evaluate.
+     * @return `true` if the host matches exactly.
      */
-    fun isRawLocalHost(host: String): Boolean {
-        return host == "localhost" || host == "127.0.0.1"
-    }
+    fun isRawLocalHost(host: String) = host == "localhost" || host == "127.0.0.1"
 
     /**
-     * Determines if the application is running in the local emulator environment.
-     * This is true if the base URL points to localhost or 127.0.0.1.
+     * Determines if the application is configured to run against the local Firebase emulator suite.
+     *
+     * @return `true` if the active base URL points to a local address.
      */
-    fun useEmulator(): Boolean {
-        return isLocalHost(getBaseUrl())
-    }
+    fun useEmulator() = isLocalHost(getBaseUrl())
 
     /**
-     * Resolves the web console URL based on the specified base URL.
+     * Resolves the URL for the web console / dashboard based on the active environment configuration.
+     * Maps local hostnames to emulator port 5000 and secure HTTPS schemes for remote domains.
+     *
+     * @return The fully formatted web console URL string.
      */
     fun getWebConsoleUrl(): String {
-        val host = getBaseUrl()
-        return if (useEmulator()) {
-            val emulatorHost = if (isRawLocalHost(host)) "$host:5000" else host
-            "http://$emulatorHost"
-        } else {
-            "https://$host"
-        }
+        val baseUrl = getBaseUrl()
+        if (!isLocalHost(baseUrl)) return "https://$baseUrl"
+        val emulatorHost = if (isRawLocalHost(baseUrl)) "$baseUrl:5000" else baseUrl
+        return "http://$emulatorHost"
     }
 
     /**
-     * Resolves the Firebase Project ID based on the specified base URL.
+     * Determines whether the active environment is local development (emulator) or a staging environment.
+     * This environment targets the `"codeoba-dev"` Firebase project.
+     *
+     * @return `true` if the active environment is an emulator or development configuration.
      */
-    fun getFirebaseProjectId(): String {
-        val host = getBaseUrl()
-        val isDev = useEmulator() || Regex("(^|\\.)codeoba-dev(\\.|$)").containsMatchIn(host)
-        return if (isDev) {
-            "codeoba-dev"
-        } else {
-            "codeoba-prod"
+    fun isEmulatorOrDev() =
+        useEmulator() ||
+        getBaseUrl().substringBefore(':').let { domain ->
+            domain == "dev.codeoba.com" ||
+            Regex("(^|\\.)codeoba-dev(\\.|$)").containsMatchIn(domain)
         }
-    }
+
+    /**
+     * Resolves the active Firebase Project ID target string based on [isEmulatorOrDev].
+     *
+     * @return `"codeoba-dev"` for developer/staging environments, otherwise `"codeoba-prod"`.
+     */
+    fun getFirebaseProjectId() = if (isEmulatorOrDev()) "codeoba-dev" else "codeoba-prod"
 }

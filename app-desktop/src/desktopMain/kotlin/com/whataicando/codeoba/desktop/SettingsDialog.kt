@@ -82,6 +82,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.whataicando.codeoba.core.auth.LocalAuthServer
 import com.whataicando.codeoba.core.domain.auth.FirebaseAuthClient
+import com.whataicando.codeoba.core.domain.auth.FirebaseAuthException
 import com.whataicando.codeoba.core.domain.parser.LogParserFactory
 import com.whataicando.codeoba.core.domain.parser.ParserMode
 import com.whataicando.codeoba.core.domain.source.SourceAdapter
@@ -1495,6 +1496,8 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var isLoadingPortal by remember { mutableStateOf(false) }
+    var isVerifyingStatus by remember { mutableStateOf(false) }
+    var cooldownSeconds by remember { mutableStateOf(0) }
 
     val savedEmail = SettingsManager.getFirebaseUserEmail()
     val savedUid = SettingsManager.getFirebaseUserUid()
@@ -1784,18 +1787,22 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                         }
                     }
 
+                    errorMessage?.let {
+                        Text(
+                            text = it,
+                            color = Color(0xFFD32F2F),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Button(
                             onClick = {
-                                SettingsManager.setFirebaseUserEmail(null)
-                                SettingsManager.setFirebaseUserUid(null)
-                                SettingsManager.setFirebaseAuthIdToken(null)
-                                SettingsManager.setFirebaseAuthRefreshToken(null)
-                                SettingsManager.setEcosystemActive(false)
-                                LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
+                                SettingsManager.signOut()
                                 errorMessage = null
                                 isLoading = false
                                 LocalAuthServer.stop()
@@ -1806,6 +1813,105 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text("Sign Out", style = MaterialTheme.typography.labelLarge)
+                        }
+
+                        if (!isSubscribed) {
+                            Button(
+                                onClick = {
+                                    isVerifyingStatus = true
+                                    errorMessage = null
+                                    scope.launch {
+                                        try {
+                                            val idToken = SettingsManager.getFirebaseAuthIdToken()
+                                            if (idToken != null) {
+                                                var tokenToUse = idToken
+                                                val active = try {
+                                                    FirebaseAuthClient.checkSubscriptionStatus(tokenToUse)
+                                                } catch (e: Exception) {
+                                                    val isAuthError = e.message?.contains("auth", ignoreCase = true) == true ||
+                                                                    e.message?.contains("token", ignoreCase = true) == true ||
+                                                                    e.message?.contains("expired", ignoreCase = true) == true
+                                                    if (isAuthError) {
+                                                        val refreshToken = SettingsManager.getFirebaseAuthRefreshToken()
+                                                        if (refreshToken != null) {
+                                                            val refreshedAuth = FirebaseAuthClient.refreshIdToken(refreshToken)
+                                                            if (refreshedAuth.idToken.isNotBlank()) {
+                                                                SettingsManager.setFirebaseAuthIdToken(refreshedAuth.idToken)
+                                                                tokenToUse = refreshedAuth.idToken
+                                                            }
+                                                            if (refreshedAuth.refreshToken.isNotBlank()) {
+                                                                SettingsManager.setFirebaseAuthRefreshToken(refreshedAuth.refreshToken)
+                                                            }
+                                                            FirebaseAuthClient.checkSubscriptionStatus(tokenToUse)
+                                                        } else {
+                                                            throw e
+                                                        }
+                                                    } else {
+                                                        throw e
+                                                    }
+                                                }
+
+                                                if (active) {
+                                                    val deviceId = SettingsManager.getDeviceId()
+                                                    val host = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" } }
+                                                    val deviceName = "${when { PlatformUtils.isMac() -> "macOS"; PlatformUtils.isWindows() -> "Windows"; else -> "Linux" }} ($host)"
+                                                    val publicKeyPem = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { DeviceKeyManager.getPublicKeyPem() }
+                                                    val nonce = FirebaseAuthClient.getRegistrationChallenge(tokenToUse, deviceId)
+                                                    val signature = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { DeviceKeyManager.signPayload(nonce) }
+
+                                                    val registered = FirebaseAuthClient.registerEcosystemDevice(tokenToUse, deviceId, deviceName, publicKeyPem, nonce, signature)
+                                                    require(registered) { "Device registration failed." }
+                                                    SettingsManager.setEcosystemActive(true)
+                                                    SettingsManager.setPreferredParserMode(ParserMode.SUMMARIZING)
+                                                    LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
+                                                    errorMessage = null
+                                                    onSettingsChanged()
+                                                } else {
+                                                    errorMessage = "No active subscription found. Upgrade your subscription to enable sync."
+                                                }
+                                            } else {
+                                                errorMessage = "Authentication token not found. Please sign in again."
+                                            }
+                                        } catch (e: Exception) {
+                                            log("Failed to verify status", e)
+                                            errorMessage = e.message ?: "Failed to verify status."
+                                        } finally {
+                                            isVerifyingStatus = false
+                                            if (!SettingsManager.getEcosystemActive()) {
+                                                cooldownSeconds = 60
+                                                scope.launch {
+                                                    while (cooldownSeconds > 0) {
+                                                        kotlinx.coroutines.delay(1000L)
+                                                        cooldownSeconds--
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                enabled = !isVerifyingStatus && cooldownSeconds == 0,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = SlateSurface, contentColor = TextPrimary),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                if (isVerifyingStatus) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            color = TextPrimary,
+                                            strokeWidth = 2.dp
+                                        )
+                                        Text("Verifying...", style = MaterialTheme.typography.labelLarge)
+                                    }
+                                } else if (cooldownSeconds > 0) {
+                                    Text("Wait ${cooldownSeconds}s", style = MaterialTheme.typography.labelLarge)
+                                } else {
+                                    Text("Verify Status", style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
                         }
 
                         val polarButtonText = if (!isSubscribed) "Subscribe" else "Manage Subscription"
@@ -1849,7 +1955,7 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                                                 val portalUrl = FirebaseAuthClient.getCustomerPortalUrl(refreshedAuth.idToken)
                                                                 java.awt.Desktop.getDesktop().browse(java.net.URI(portalUrl))
                                                             } catch (refreshEx: Exception) {
-                                                                log("Failed to refresh token after auth error: ${refreshEx.message}")
+                                                                log("Failed to refresh token after auth error", refreshEx)
                                                                 throw e
                                                             }
                                                         } else {
@@ -1936,7 +2042,7 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                             errorMessage = null
                             scope.launch {
                                 try {
-                                    val port = LocalAuthServer.start { idToken, refreshToken, email, uid ->
+                                    val port = LocalAuthServer.start { idToken, refreshToken, email, uid, isSubscribed ->
                                         scope.launch {
                                             try {
                                                 SettingsManager.setFirebaseUserEmail(email)
@@ -1944,29 +2050,46 @@ fun AccountSettingsSection(onSettingsChanged: () -> Unit) {
                                                 SettingsManager.setFirebaseAuthIdToken(idToken)
                                                 SettingsManager.setFirebaseAuthRefreshToken(refreshToken)
 
-                                                val deviceId = SettingsManager.getDeviceId()
-                                                val host = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" } }
-                                                val deviceName = "${when { PlatformUtils.isMac() -> "macOS"; PlatformUtils.isWindows() -> "Windows"; else -> "Linux" }} ($host)"
-                                                val publicKeyPem = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { DeviceKeyManager.getPublicKeyPem() }
-                                                val nonce = FirebaseAuthClient.getRegistrationChallenge(idToken, deviceId)
-                                                val signature = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { DeviceKeyManager.signPayload(nonce) }
+                                                if (isSubscribed) {
+                                                    val deviceId = SettingsManager.getDeviceId()
+                                                    val host = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" } }
+                                                    val deviceName = "${when { PlatformUtils.isMac() -> "macOS"; PlatformUtils.isWindows() -> "Windows"; else -> "Linux" }} ($host)"
+                                                    val publicKeyPem = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { DeviceKeyManager.getPublicKeyPem() }
+                                                    val nonce = FirebaseAuthClient.getRegistrationChallenge(idToken, deviceId)
+                                                    val signature = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { DeviceKeyManager.signPayload(nonce) }
 
-                                                val registered = FirebaseAuthClient.registerEcosystemDevice(idToken, deviceId, deviceName, publicKeyPem, nonce, signature)
-                                                require(registered) { "Device registration failed." }
-                                                SettingsManager.setEcosystemActive(true)
-                                                SettingsManager.setPreferredParserMode(ParserMode.SUMMARIZING)
+                                                    val registered = FirebaseAuthClient.registerEcosystemDevice(idToken, deviceId, deviceName, publicKeyPem, nonce, signature)
+                                                    require(registered) { "Device registration failed." }
+                                                    SettingsManager.setEcosystemActive(true)
+                                                    SettingsManager.setPreferredParserMode(ParserMode.SUMMARIZING)
+                                                } else {
+                                                    log("Connection successful, but subscription is inactive. Client started in Local Mode.")
+                                                    SettingsManager.setEcosystemActive(false)
+                                                }
+
                                                 LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
                                                 errorMessage = null
                                                 isLoading = false
                                                 onSettingsChanged()
+                                            } catch (e: FirebaseAuthException) {
+                                                if (e.status == 402 || e.status == 403) {
+                                                    log("Connection successful, but subscription is inactive. Sync disabled.", e)
+                                                    SettingsManager.setEcosystemActive(false)
+                                                    LogParserFactory.setParserMode(SettingsManager.getEffectiveParserMode())
+                                                    errorMessage = null
+                                                    isLoading = false
+                                                    onSettingsChanged()
+                                                } else {
+                                                    log("Error configuring device keys (AuthException)", e)
+                                                    SettingsManager.signOut()
+                                                    onSettingsChanged()
+                                                    errorMessage = e.message ?: "Error configuring device credentials."
+                                                    isLoading = false
+                                                }
                                             } catch (e: Exception) {
-                                                log("Error configuring device keys: ${e.message}")
+                                                log("Error configuring device keys", e)
                                                 // Roll back partial sign-in state so the user can retry cleanly.
-                                                SettingsManager.setFirebaseUserEmail(null)
-                                                SettingsManager.setFirebaseUserUid(null)
-                                                SettingsManager.setFirebaseAuthIdToken(null)
-                                                SettingsManager.setFirebaseAuthRefreshToken(null)
-                                                SettingsManager.setEcosystemActive(false)
+                                                SettingsManager.signOut()
                                                 onSettingsChanged()
                                                 errorMessage = e.message ?: "Error configuring device credentials."
                                                 isLoading = false

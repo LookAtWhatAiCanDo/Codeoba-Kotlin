@@ -38,6 +38,9 @@ jobs:
             artifact-path: 'app-desktop/build/compose/binaries/main*/**/*.deb'
             platform: linux
 
+    env:
+      JAVA_VERSION: ${{ vars.JAVA_VERSION || '21' }}
+
     defaults:
       run:
         shell: bash
@@ -46,11 +49,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v6
 
-      - name: Setup JDK 17
+      - name: Setup JDK
         uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: ${{ env.JAVA_VERSION }}
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
@@ -213,6 +216,24 @@ jobs:
             echo "Production-level version detected ($APP_VERSION). No filename mapping required."
           fi
 
+      - name: Rename pre-release package files superficially
+        run: |
+          if [[ "$APP_VERSION" =~ ^0\. ]]; then
+            # Under the hood, Gradle maps 0.x.y to 1.x.y to satisfy macOS CFBundleVersion rules.
+            # Here we rename the generated file names back to 0.x.y so the user sees a pre-release version name.
+            MAPPED_VERSION="1.${APP_VERSION#0.}"
+            echo "Pre-release version detected ($APP_VERSION). Searching for generated files matching mapped version $MAPPED_VERSION..."
+            
+            # Find files containing the mapped version and rename them to use the actual version
+            find app-desktop/build/compose/binaries/main* -type f \( -name "*${MAPPED_VERSION}*" \) | while read -r file; do
+              new_file=$(echo "$file" | sed "s/${MAPPED_VERSION}/${APP_VERSION}/g")
+              echo "Renaming $file to $new_file"
+              mv "$file" "$new_file"
+            done
+          else
+            echo "Production-level version detected ($APP_VERSION). No filename mapping required."
+          fi
+
       - name: Upload Main Package Artifact
         uses: actions/upload-artifact@v7
         with:
@@ -221,7 +242,7 @@ jobs:
           retention-days: 7
 
       - name: Upload PKG Package Artifact (macOS only)
-        if: matrix.platform == 'macos'
+        if: matrix.platform == 'macos' && env.MACOS_INSTALLER_PRESENT == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: Codeoba-macos-pkg
